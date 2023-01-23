@@ -55,14 +55,14 @@ class RemoteDataSrcGenerator
       if (method.params != null) {
         buffer.writeln("@override");
         buffer.writeln("Future<$returnType> ${method.name}(${method.params!
-            .map((param) => paramToString(method, param)).join(', ')}) {");
+            .map((param) => paramToString(method, param)).join(', ')}) async {");
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
         buffer.writeln();
       } else {
         buffer.writeln("@override");
-        buffer.writeln("Future<$returnType> ${method.name}() {");
+        buffer.writeln("Future<$returnType> ${method.name}() async {");
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
