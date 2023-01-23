@@ -46,7 +46,7 @@ class ModelTestGenerator
     buffer.writeln("group('$className', () {");
     buffer.writeln(
         "test('should be a subclass of [${visitor.className}] entity', () async {");
-    buffer.writeln("expect($className, isA<${visitor.className}>());");
+    buffer.writeln("expect(t$className, isA<${visitor.className}>());");
     buffer.writeln("});");
     buffer.writeln();
     fromMapTest(buffer, visitor);
@@ -70,7 +70,7 @@ class ModelTestGenerator
     buffer.writeln(
         "final map = jsonDecode(fixture('${visitor.className.toLowerCase()}.json')) as DataMap;");
     buffer.writeln("final result = $className.fromMap(map);");
-    buffer.writeln("expect(result, $className);");
+    buffer.writeln("expect(result, t$className);");
     buffer.writeln("});");
     buffer.writeln("});");
   }
@@ -83,7 +83,7 @@ class ModelTestGenerator
     buffer.writeln(
         "final json = fixture('${visitor.className.toLowerCase()}.json');");
     buffer.writeln("final result = $className.fromJson(json);");
-    buffer.writeln("expect(result, $className);");
+    buffer.writeln("expect(result, t$className);");
     buffer.writeln("});");
     buffer.writeln("});");
   }
@@ -137,8 +137,7 @@ class ModelTestGenerator
       final fieldName = pickedField.key.camelCase;
       buffer.writeln(
           'final result = t$className.copyWith($fieldName: $fallback);');
-      buffer.writeln(
-          'expect(result.$fieldName, equals($fallback));');
+      buffer.writeln('expect(result.$fieldName, equals($fallback));');
     }
     buffer.writeln("});");
     buffer.writeln("});");
