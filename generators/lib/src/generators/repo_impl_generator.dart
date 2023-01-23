@@ -34,7 +34,8 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     buffer.writeln('class $className implements $repoName {');
     buffer.writeln('const $className(this._remoteDataSource);');
     buffer.writeln();
-    buffer.writeln('final ${repoName.replaceAll('Repo', '')}RemoteDataSrc _remoteDataSource;');
+    buffer.writeln(
+        'final ${repoName.replaceAll('Repo', '')}RemoteDataSrc _remoteDataSource;');
     buffer.writeln();
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
@@ -42,15 +43,12 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       final returnResult = returnType.trim() != 'void' ? 'result' : 'null';
       buffer.writeln("@override");
       if (method.params != null) {
-
         buffer.writeln(
-            "FunctionalFuture<$returnType> ${method.name}(${method.params!
-                .map((param) => paramToString(method, param)).join(', ')}) "
-                "async {");
+            "FunctionalFuture<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) "
+            "async {");
         buffer.writeln("try {");
         buffer.writeln(
-            "${result}await _remoteDataSource.${method.name}(${method.params!.map(
-                    (param) => _paramToPass(param)).join(', ')});");
+            "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
         buffer.writeln("return Right($returnResult);");
         buffer.writeln("} on ServerException catch (e) {");
         buffer.writeln(
@@ -61,9 +59,10 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
         buffer
             .writeln("FunctionalFuture<$returnType> ${method.name}() async {");
         buffer.writeln("try {");
-        buffer.writeln(
-            "${result}await _remoteDataSource.${method.name}();");
-        buffer.writeln("return Right($returnResult);");
+        buffer.writeln("${result}await _remoteDataSource.${method.name}();");
+        buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
+            "($returnResult)"
+            ";");
         buffer.writeln("} on ServerException catch (e) {");
         buffer.writeln(
             "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
@@ -73,7 +72,6 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     }
     buffer.writeln("}");
   }
-
 
   String _paramToPass(Param param) {
     if (param.isNamed) {
