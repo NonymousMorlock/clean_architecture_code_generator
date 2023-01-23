@@ -8,9 +8,9 @@ import 'dart:convert';
 
 part 'person.g.dart';
 
-@modelGen
-@entityGen
-@modelTestGen
+// @modelGen
+// @entityGen
+// @modelTestGen
 class TankTBG {
   @required
   String tank_capacity;
