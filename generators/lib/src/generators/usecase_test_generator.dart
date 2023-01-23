@@ -38,10 +38,7 @@ class UsecaseTestGenerator
           final testName = 't${param.name.upperCamelCase}';
           testNames.add(testName);
           buffer.writeln(
-              'const $testName = ${isCustom ? '${param.type}(' : param.type.fallbackValue is String ? '"${param.type.fallbackValue}";' : '${param.type.fallbackValue};'}');
-          if (isCustom) {
-            buffer.writeln(');');
-          }
+              'const $testName = ${isCustom ? '${param.type}.empty();' : param.type.fallbackValue is String ? "'${param.type.fallbackValue}';" : '${param.type.fallbackValue};'}');
         }
       }
       buffer.writeln();
@@ -75,7 +72,7 @@ class UsecaseTestGenerator
         ? "'should call the [$className.${method.name}]',"
         : "'should return [${method.returnType.rightType}] from the repo',");
     buffer.writeln('() async {');
-    buffer.writeln('when(repo.$methodName(');
+    buffer.writeln('when(() => repo.$methodName(');
     if (method.params != null) {
       for (final param in method.params!) {
         final fallback = param.isNamed
@@ -87,7 +84,7 @@ class UsecaseTestGenerator
     final fallback = method.returnType.fallbackValue == method.returnType
         ? '${method.returnType.rightType}()'
         : method.returnType.fallbackValue;
-    buffer.writeln(')');
+    buffer.writeln('),');
     buffer.writeln(')');
     buffer.writeln('.thenAnswer(');
     final isCustom = testNames.length > 1;
@@ -96,10 +93,10 @@ class UsecaseTestGenerator
     buffer.writeln();
     buffer.writeln('final result = await ${isCustom ? 'usecase(' : 'usecase'
         '(${testNames[0]});'}');
-    if(isCustom) {
+    if (isCustom) {
       final className = '${method.name.upperCamelCase}Params';
       buffer.writeln('const $className(');
-      for(final name in testNames) {
+      for (final name in testNames) {
         buffer.writeln('${name.replaceFirst('t', '').lowerCamelCase}: $name,');
       }
       buffer.writeln('),');
@@ -117,7 +114,7 @@ class UsecaseTestGenerator
         buffer.writeln(fallback);
       }
     }
-    buffer.writeln(')).called(1);');
+    buffer.writeln('),).called(1);');
     buffer.writeln('verifyNoMoreInteractions(repo);');
     buffer.writeln('},');
     buffer.writeln(');');
