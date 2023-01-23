@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:generators/generators.dart';
-import 'package:generators/src/string_extensions.dart';
+import 'package:generators/core/services/string_extensions.dart';
 
 void main() {
   test('adds one to input values', () {

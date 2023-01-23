@@ -1,4 +1,5 @@
-import 'package:imitre/core/typedef/typedefs.dart';
+
+import 'package:example/typedefs.dart';
 
 abstract class UsecaseWithParams<Type, Params> {
   const UsecaseWithParams();

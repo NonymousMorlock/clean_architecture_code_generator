@@ -2,8 +2,8 @@
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
-import 'package:generators/src/field.dart';
-import 'package:generators/src/string_extensions.dart';
+import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/src/models/field.dart';
 
 typedef DataMap = Map<String, dynamic>;
 

@@ -1,4 +1,4 @@
-import 'package:generators/src/model_visitor.dart';
+import 'package:generators/src/visitors/model_visitor.dart';
 
 class Field {
   const Field._({

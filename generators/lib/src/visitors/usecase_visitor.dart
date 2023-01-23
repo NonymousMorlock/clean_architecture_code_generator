@@ -2,17 +2,29 @@
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
-import 'package:generators/src/function.dart';
+import 'package:generators/src/models/function.dart';
 
-class UsecaseVisitor extends SimpleElementVisitor<void> {
+class RepoVisitor extends SimpleElementVisitor<void> {
   String className = '';
   List<IFunction> methods = [];
+
   @override
   void visitMethodElement(MethodElement element) {
     final params = element.parameters;
     final methodParams = <Param>[];
     for (var e in params) {
-      methodParams.add(Param(name: e.name, type: e.type.toString()));
+      methodParams.add(Param(
+        name: e.name,
+        type: e.type.toString(),
+        isNamed: e.isNamed,
+        isOptional: e.isOptional,
+        isOptionalNamed: e.isOptionalNamed,
+        isRequired: e.isRequired,
+        isRequiredNamed: e.isRequiredNamed,
+        isRequiredPositional: e.isRequiredPositional,
+        isPositional: e.isPositional,
+        isOptionalPositional: e.isOptionalPositional,
+      ));
     }
 
     final method = IFunction(

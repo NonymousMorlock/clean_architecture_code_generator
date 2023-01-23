@@ -1,9 +1,13 @@
 const modelGen = ModelGenAnnotation();
 const entityGen = EntityGenAnnotation();
 const repoGen = RepoGenAnnotation();
+
+/// Generate usecases for the methods of this class
 const usecaseGen = UsecaseGenAnnotation();
 const repoImplGen = RepoImplGenAnnotation();
 const remoteSrcGen = RemoteDataSrcGenAnnotation();
+
+/// Generate unit tests for the usecases from this class
 const usecaseTestGen = UsecaseTestGenAnnotation();
 const modelTestGen = ModelTestGenAnnotation();
 const repoImplTestGen = RepoImplTestGenAnnotation();

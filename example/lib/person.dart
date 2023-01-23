@@ -10,14 +10,18 @@ part 'person.g.dart';
 
 @modelGen
 @entityGen
-class PersonTBG {
-  String first_name;
-  String last_name;
+@modelTestGen
+class TankTBG {
   @required
-  bool is_adult = false;
-  List<int> numbers;
-  double rate;
-  List<String> user_names;
-  DateTime date;
-  int age;
+  String tank_capacity;
+  @required
+  String tank_name;
+  @required
+  String beginning_stock_balance;
+  @required
+  int stock_type;
+  @required
+  int branch_id;
+  @required
+  int number_of_meters;
 }

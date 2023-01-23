@@ -8,8 +8,9 @@ builders:
   generators:
     target: ":generators"
     import: "package:generators/generators.dart"
-    builder_factories: ["generateEntityClass", "generateModelClass", "generateUsecases"] #Builder name(BuilderOptions)
-    build_extensions: { ".dart": [".g.dart"] }
+    builder_factories: [ "generateEntityClass", "generateModelClass", "generateUsecases", "generateUsecasesTest", "generateRepoImpl",
+                         "generateRemoteDataSrc", "generateRepository", "generateModelTest" ]
+    build_extensions: { ".dart": [ ".g.dart" ] }
     auto_apply: dependents
     build_to: cache
-    applies_builders: ["source_gen|combining_builder"]
+    applies_builders: [ "source_gen|combining_builder" ]

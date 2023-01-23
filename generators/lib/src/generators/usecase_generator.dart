@@ -1,9 +1,11 @@
+// ignore_for_file: implementation_imports, depend_on_referenced_packages
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
-import 'package:generators/src/function.dart';
-import 'package:generators/src/string_extensions.dart';
-import 'package:generators/src/usecase_visitor.dart';
+import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/src/models/function.dart';
+import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
 class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
@@ -13,7 +15,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
-    final visitor = UsecaseVisitor();
+    final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
     final buffer = StringBuffer();
@@ -29,7 +31,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
 
   void usecase({
     required StringBuffer buffer,
-    required UsecaseVisitor visitor,
+    required RepoVisitor visitor,
     required IFunction method,
   }) {
     final repoName = visitor.className;
@@ -52,12 +54,27 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     buffer.writeln();
     buffer.writeln('@override');
     buffer.writeln(
-        'FunctionalFuture<$returnType> call(${param == null ? '' : '$param params'}) => _repo.${method.name}(${param == null ? '' : 'params'});');
+        'FunctionalFuture<$returnType> call(${param == null ? '' : '$param params'}) =>');
+    callBody(buffer, needsCustomParams, method, param);
     buffer.writeln('}');
     if (needsCustomParams) {
       buffer.writeln();
       customParam(paramName: param!, params: method.params!, buffer: buffer);
     }
+  }
+
+  void callBody(StringBuffer buffer, bool needsCustomParams, IFunction
+  method, dynamic param) {
+    if(!needsCustomParams) {
+      buffer.writeln('_repo.${method.name}(${param == null ? '' : 'params'});');
+    } else {
+      buffer.writeln('_repo.${method.name}(');
+      for(var param in method.params!) {
+        buffer.writeln('${param.name}: params.${param.name},');
+      }
+      buffer.writeln(');');
+    }
+
   }
 
   void customParam({
