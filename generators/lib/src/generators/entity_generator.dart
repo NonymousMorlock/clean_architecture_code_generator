@@ -11,10 +11,10 @@ import 'package:source_gen/source_gen.dart';
 class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
   @override
   String generateForAnnotatedElement(
-    Element element,
-    ConstantReader annotation,
-    BuildStep buildStep,
-  ) {
+      Element element,
+      ConstantReader annotation,
+      BuildStep buildStep,
+      ) {
     final visitor = ModelVisitor();
     element.visitChildren(visitor);
 
@@ -40,6 +40,8 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     buffer.writeln('@override');
     buffer.writeln('List<dynamic> get props => [');
     for (var i = 0; i < length; i++) {
+      final type = visitor.fields.values.elementAt(i);
+      if (type.toString().toLowerCase().startsWith('list')) continue;
       final name = visitor.fields.keys.elementAt(i).camelCase;
 
       buffer.writeln('$name,');
