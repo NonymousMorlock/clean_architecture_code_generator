@@ -95,7 +95,7 @@ class ModelTestGenerator
         "test('should return a Dart map containing the proper data', () async {");
     buffer.writeln(
         "final map = jsonDecode(fixture('${visitor.className.toLowerCase()}.json')) as DataMap;");
-    buffer.writeln("final result = $className.toMap();");
+    buffer.writeln("final result = t$className.toMap();");
     buffer.writeln("expect(result, map);");
     buffer.writeln("});");
     buffer.writeln("});");
@@ -108,7 +108,7 @@ class ModelTestGenerator
         "test('should return a JSON string containing the proper data', () async {");
     buffer.writeln(
         "final json = jsonEncode(jsonDecode(fixture('${visitor.className.toLowerCase()}.json')));");
-    buffer.writeln("final result = $className.toJson();");
+    buffer.writeln("final result = t$className.toJson();");
     buffer.writeln("expect(result, json);");
     buffer.writeln("});");
     buffer.writeln("});");
