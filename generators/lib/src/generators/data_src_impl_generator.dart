@@ -5,16 +5,17 @@ import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/services/functions.dart';
 import 'package:generators/core/services/string_extensions.dart';
-import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
 class RemoteDataSrcGenerator
     extends GeneratorForAnnotation<RemoteDataSrcGenAnnotation> {
   @override
-  String generateForAnnotatedElement(Element element,
+  String generateForAnnotatedElement(
+      Element element,
       ConstantReader annotation,
-      BuildStep buildStep,) {
+      BuildStep buildStep,
+      ) {
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
@@ -34,10 +35,12 @@ class RemoteDataSrcGenerator
     buffer.writeln();
 
     for (final method in visitor.methods) {
-      final returnType = method.returnType.rightType;
+      final className = repoName.replaceAll('Repo', '');
+      final returnType =
+      method.returnType.rightType.replaceAll(className, '${className}Model');
       if (method.params != null) {
-        buffer.writeln("Future<$returnType> ${method.name}(${method.params!
-            .map((param) => paramToString(method, param)).join(', ')});");
+        buffer.writeln(
+            "Future<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')});");
       } else {
         buffer.writeln("Future<$returnType> ${method.name}();");
       }
@@ -51,11 +54,13 @@ class RemoteDataSrcGenerator
     buffer.writeln("final http.Client _client;");
     buffer.writeln();
     for (final method in visitor.methods) {
-      final returnType = method.returnType.rightType;
+      final className = repoName.replaceAll('Repo', '');
+      final returnType =
+      method.returnType.rightType.replaceAll(className, '${className}Model');
       if (method.params != null) {
         buffer.writeln("@override");
-        buffer.writeln("Future<$returnType> ${method.name}(${method.params!
-            .map((param) => paramToString(method, param)).join(', ')}) async {");
+        buffer.writeln(
+            "Future<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) async {");
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
@@ -71,5 +76,4 @@ class RemoteDataSrcGenerator
     }
     buffer.writeln("}");
   }
-
 }
