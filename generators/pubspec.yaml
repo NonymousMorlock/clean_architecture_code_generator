@@ -13,9 +13,9 @@ dependencies:
     sdk: flutter
   build:
   equatable:
-  source_gen:
   annotations:
     path: ../annotations/
+  source_gen:
 
 dev_dependencies:
   flutter_test:

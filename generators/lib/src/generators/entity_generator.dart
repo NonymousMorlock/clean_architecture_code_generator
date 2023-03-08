@@ -11,10 +11,10 @@ import 'package:source_gen/source_gen.dart';
 class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
   @override
   String generateForAnnotatedElement(
-      Element element,
-      ConstantReader annotation,
-      BuildStep buildStep,
-      ) {
+    Element element,
+    ConstantReader annotation,
+    BuildStep buildStep,
+  ) {
     final visitor = ModelVisitor();
     element.visitChildren(visitor);
 
@@ -29,6 +29,18 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       buffer.writeln('${field.isRequired ? 'required ' : ''}this.$name,');
     }
     buffer.writeln('});');
+    buffer.writeln();
+    buffer.writeln('$className.empty()');
+    buffer.writeln(':');
+    for (var i = 0; i < length; i++) {
+      final type = visitor.fields.values.elementAt(i);
+      final name = visitor.fields.keys.elementAt(i).camelCase;
+      final field = visitor.fieldProperties[name]!;
+      final defaultValue = type.toString().fallbackValue;
+      final emptyConstructor = '$type.empty()';
+      buffer.writeln(
+          '$name = ${defaultValue is String && defaultValue.toLowerCase() == 'test string' ? '"' : ''}${defaultValue ?? emptyConstructor}${defaultValue is String && defaultValue.toLowerCase() == 'test string' ? '"' : ''}${i == length - 1 ? ';' : ','}');
+    }
     buffer.writeln();
     for (var i = 0; i < length; i++) {
       final type = visitor.fields.values.elementAt(i);

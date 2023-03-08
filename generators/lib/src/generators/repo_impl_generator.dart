@@ -49,7 +49,8 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
         buffer.writeln("try {");
         buffer.writeln(
             "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
-        buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right($returnResult);");
+        buffer.writeln(
+            "return ${returnResult == 'null' ? 'const ' : ''}Right($returnResult);");
         buffer.writeln("} on ServerException catch (e) {");
         buffer.writeln(
             "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");

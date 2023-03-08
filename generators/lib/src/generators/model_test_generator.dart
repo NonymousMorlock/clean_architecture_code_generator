@@ -29,19 +29,11 @@ class ModelTestGenerator
 
     buffer.writeln("import 'package:flutter_test/flutter_test.dart';");
     buffer.writeln("import 'dart:convert';");
-    buffer.writeln(
-        "import '${visitor.fieldProperties.values.first.filePath.replaceAll(';', '')}';");
+    // buffer.writeln(
+    //     "import '${visitor.fieldProperties.values.first.filePath.replaceAll(';', '')}';");
     buffer.writeln();
     buffer.writeln('void main() {');
-    buffer.writeln('final t$className = $className(');
-    for (var i = 0; i < length; i++) {
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      final fallback =
-          visitor.fields.values.elementAt(i).toString().fallbackValue;
-      buffer.writeln(
-          '$name: ${fallback is String ? '"$fallback"' : '$fallback'},');
-    }
-    buffer.writeln(');');
+    buffer.writeln('final t$className = $className.empty();');
     buffer.writeln();
     buffer.writeln("group('$className', () {");
     buffer.writeln(

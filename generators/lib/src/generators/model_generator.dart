@@ -38,6 +38,19 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
     }
     buffer.writeln('});');
     buffer.writeln();
+    buffer.writeln('$className.empty()');
+    buffer.writeln(':');
+    buffer.writeln('this(');
+    for (var i = 0; i < length; i++) {
+      final type = visitor.fields.values.elementAt(i);
+      final name = visitor.fields.keys.elementAt(i).camelCase;
+      final field = visitor.fieldProperties[name]!;
+      final defaultValue = type.toString().fallbackValue;
+      final emptyConstructor = '$type.empty()';
+      buffer.writeln(
+          '$name: ${defaultValue is String && defaultValue.toLowerCase() == 'test string' ? '"' : ''}${defaultValue ?? emptyConstructor}${defaultValue is String && defaultValue.toLowerCase() == 'test string' ? '"' : ''}${i == length - 1 ? ',);' : ','}');
+    }
+    buffer.writeln();
     fromJson(buffer, visitor);
     buffer.writeln();
     fromMap(buffer, visitor);
