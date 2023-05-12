@@ -34,11 +34,14 @@ class UsecaseTestGenerator
       if (hasParams) {
         for (final param in method.params!) {
           buffer.writeln();
-          final isCustom = param.type == param.type.fallbackValue;
           final testName = 't${param.name.upperCamelCase}';
           testNames.add(testName);
-          buffer.writeln(
-              'const $testName = ${isCustom ? '${param.type}.empty();' : param.type.fallbackValue is String ? "'${param.type.fallbackValue}';" : '${param.type.fallbackValue};'}');
+          if (param.type.fallbackValue is List) {
+            buffer.writeln('const $testName = <${param.type.stripType}>[];');
+          } else {
+            buffer.writeln(
+                'const $testName = ${/*isCustom ? '${param.type}.empty();' :*/ param.type.fallbackValue is String ? "'${param.type.fallbackValue}';" : '${param.type.fallbackValue};'}');
+          }
         }
       }
       buffer.writeln();

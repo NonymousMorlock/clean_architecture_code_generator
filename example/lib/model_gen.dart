@@ -8,16 +8,19 @@ import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-@entityGen
-@modelGen
-@modelTestGen
-class MeterReportTBG {
+// @entityGen
+// @modelGen
+// @modelTestGen
+class ExpenseReportTBG {
   @required
   int id;
+  String drivers_name;
+  String plate_number;
+  String expanse_name;
   @required
-  double meter_reading;
+  String expense_type;
   @required
-  double litre_rate;
+  double amount;
   @required
   DateTime date_created;
   @required
@@ -25,30 +28,45 @@ class MeterReportTBG {
   @required
   int branch_id;
   @required
-  int stock_type;
-  @required
-  int meter_id;
-  @required
   int staff_id;
 }
 
 final request = {
-  "meter_reading": "20.00",
-  "litre_rate": "11.23",
-  "branch_id": 4,
-  "stock_type": 1,
-  "meter_id": 1,
-  "staff_id": 3
+  "id": 3,
+  "drivers_name": null,
+  "plate_number": null,
+  "expanse_name": null,
+  "expense_type": "Miscellanous",
+  "amount": "10.00",
+  "date_created": "2023-03-25T13:04:47.649399Z",
+  "updated_date": "2023-03-25T13:04:47.649424Z",
+  "branch_id": 1,
+  "staff_id": 1
 };
 
-final response = {
-  "id": 12,
-  "meter_reading": "20.00",
-  "litre_rate": "11.23",
-  "date_created": "2023-03-08T08:02:08.599577Z",
-  "updated_date": "2023-03-08T08:02:08.599610Z",
-  "branch_id": 4,
-  "stock_type": 1,
-  "meter_id": 1,
-  "staff_id": 3
-};
+final response = [
+  {
+    "id": 2,
+    "drivers_name": null,
+    "plate_number": null,
+    "expanse_name": null,
+    "expense_type": "Miscellanous",
+    "amount": "10.00",
+    "date_created": "2023-03-25T13:04:26.771282Z",
+    "updated_date": "2023-03-25T13:04:26.771300Z",
+    "branch_id": 1,
+    "staff_id": 1
+  },
+  {
+    "id": 3,
+    "drivers_name": null,
+    "plate_number": null,
+    "expanse_name": null,
+    "expense_type": "Miscellanous",
+    "amount": "10.00",
+    "date_created": "2023-03-25T13:04:47.649399Z",
+    "updated_date": "2023-03-25T13:04:47.649424Z",
+    "branch_id": 1,
+    "staff_id": 1
+  }
+];

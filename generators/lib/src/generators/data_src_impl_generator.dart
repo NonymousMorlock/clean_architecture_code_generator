@@ -12,10 +12,10 @@ class RemoteDataSrcGenerator
     extends GeneratorForAnnotation<RemoteDataSrcGenAnnotation> {
   @override
   String generateForAnnotatedElement(
-      Element element,
-      ConstantReader annotation,
-      BuildStep buildStep,
-      ) {
+    Element element,
+    ConstantReader annotation,
+    BuildStep buildStep,
+  ) {
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
@@ -30,14 +30,15 @@ class RemoteDataSrcGenerator
     required RepoVisitor visitor,
   }) {
     final repoName = visitor.className;
-    final dataSrcName = '${repoName}RemoteDataSrc'.replaceAll('Repo', '');
+    final dataSrcName =
+        '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc';
     buffer.writeln('abstract class $dataSrcName {');
     buffer.writeln();
 
     for (final method in visitor.methods) {
       final className = repoName.replaceAll('Repo', '');
-      final returnType =
-      method.returnType.rightType.replaceAll(className, '${className}Model');
+      final returnType = method.returnType.rightType
+          .replaceAll(className, '${className}Model');
       if (method.params != null) {
         buffer.writeln(
             "Future<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')});");
@@ -55,8 +56,8 @@ class RemoteDataSrcGenerator
     buffer.writeln();
     for (final method in visitor.methods) {
       final className = repoName.replaceAll('Repo', '');
-      final returnType =
-      method.returnType.rightType.replaceAll(className, '${className}Model');
+      final returnType = method.returnType.rightType
+          .replaceAll(className, '${className}Model');
       if (method.params != null) {
         buffer.writeln("@override");
         buffer.writeln(

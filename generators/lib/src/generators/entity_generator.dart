@@ -35,7 +35,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     for (var i = 0; i < length; i++) {
       final type = visitor.fields.values.elementAt(i);
       final name = visitor.fields.keys.elementAt(i).camelCase;
-      final field = visitor.fieldProperties[name]!;
+      // final field = visitor.fieldProperties[name]!;
       final defaultValue = type.toString().fallbackValue;
       final emptyConstructor = '$type.empty()';
       buffer.writeln(

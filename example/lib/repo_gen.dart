@@ -13,22 +13,27 @@ typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
 @usecaseTestGen
 @repoImplGen
 @remoteSrcGen
-class MeterReportRepoTBG {
-  external Future<Either<Failure, List<MeterReport>>> getMeterReports({
-    required String date,
-    required int branchId,
+class BranchesRepoTBG {
+  external Future<Either<Failure, void>> deleteTank({
+    required int tankId,
     required String token,
   });
 
-  external Future<Either<Failure, void>> submitMeterReports({
-    required List<MeterReport> meterReports,
-    required String token,
+  external Future<Either<Failure, void>> deleteBranch({
+    int branchId,
+    String token,
+  });
+
+  external Future<Either<Failure, void>> closeBranch({
+    int branchId,
+    String token,
+  });
+
+  external Future<Either<Failure, void>> openBranch({
+    int branchId,
+    String token,
   });
 }
-
-class MeterReport {}
-
-class DailyProgress {}
 
 class Either<T, R> {}
 

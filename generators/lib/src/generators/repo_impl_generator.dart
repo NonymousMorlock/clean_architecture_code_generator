@@ -35,7 +35,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     buffer.writeln('const $className(this._remoteDataSource);');
     buffer.writeln();
     buffer.writeln(
-        'final ${repoName.replaceAll('Repo', '')}RemoteDataSrc _remoteDataSource;');
+        'final ${repoName.substring(0, repoName.length - 4)}RemoteDataSrc _remoteDataSource;');
     buffer.writeln();
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;

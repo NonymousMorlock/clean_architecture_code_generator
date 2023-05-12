@@ -25,7 +25,7 @@ class ModelTestGenerator
 
   void testMain(StringBuffer buffer, ModelVisitor visitor) {
     final className = '${visitor.className}Model';
-    final length = visitor.fields.length;
+    // final length = visitor.fields.length;
 
     buffer.writeln("import 'package:flutter_test/flutter_test.dart';");
     buffer.writeln("import 'dart:convert';");
@@ -60,7 +60,7 @@ class ModelTestGenerator
     buffer.writeln(
         "test('should return a valid [$className] when the JSON is not null', () async {");
     buffer.writeln(
-        "final map = jsonDecode(fixture('${visitor.className.toLowerCase()}.json')) as DataMap;");
+        "final map = jsonDecode(fixture('${visitor.className.snakeCase}.json')) as DataMap;");
     buffer.writeln("final result = $className.fromMap(map);");
     buffer.writeln("expect(result, t$className);");
     buffer.writeln("});");
@@ -73,7 +73,7 @@ class ModelTestGenerator
     buffer.writeln(
         "test('should return a valid [$className] when the JSON is not null', () async {");
     buffer.writeln(
-        "final json = fixture('${visitor.className.toLowerCase()}.json');");
+        "final json = fixture('${visitor.className.snakeCase}.json');");
     buffer.writeln("final result = $className.fromJson(json);");
     buffer.writeln("expect(result, t$className);");
     buffer.writeln("});");
@@ -86,7 +86,7 @@ class ModelTestGenerator
     buffer.writeln(
         "test('should return a Dart map containing the proper data', () async {");
     buffer.writeln(
-        "final map = jsonDecode(fixture('${visitor.className.toLowerCase()}.json')) as DataMap;");
+        "final map = jsonDecode(fixture('${visitor.className.snakeCase}.json')) as DataMap;");
     buffer.writeln("final result = t$className.toMap();");
     buffer.writeln("expect(result, map);");
     buffer.writeln("});");
@@ -99,7 +99,7 @@ class ModelTestGenerator
     buffer.writeln(
         "test('should return a JSON string containing the proper data', () async {");
     buffer.writeln(
-        "final json = jsonEncode(jsonDecode(fixture('${visitor.className.toLowerCase()}.json')));");
+        "final json = jsonEncode(jsonDecode(fixture('${visitor.className.snakeCase}.json')));");
     buffer.writeln("final result = t$className.toJson();");
     buffer.writeln("expect(result, json);");
     buffer.writeln("});");

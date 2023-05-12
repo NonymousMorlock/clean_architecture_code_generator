@@ -18,12 +18,31 @@ extension StringExt on String {
     return converted;
   }
 
+  String get snakeCase {
+    return replaceAllMapped(
+      RegExp('([A-Z])'),
+      (match) => '_${match.group(0)!.toLowerCase()}',
+    ).replaceAll(RegExp('^_'), '');
+  }
+
   String get upperCamelCase {
     return '${this[0].toUpperCase()}${substring(1)}';
   }
 
   String get lowerCamelCase {
     return '${this[0].toLowerCase()}${substring(1)}';
+  }
+
+  String get stripType {
+    if (contains('<')) {
+      // final type = substring(0, indexOf('<'));
+      final type2 = substring(indexOf('<') + 1, lastIndexOf('>'));
+      if (type2.contains('<')) {
+        return type2;
+      }
+      return type2;
+    }
+    return this;
   }
 
   String get rightType {
