@@ -8,6 +8,24 @@ import 'package:generators/src/visitors/model_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
 class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
+  // DIDN'T SOLVE MY ISSUE, HAD TO CHANGE BUILD.YAML CONFIG
+  // static const _checker = TypeChecker.fromRuntime(ModelGenAnnotation);
+  // unfortunately, after dart 3 update, the generateForAnnotatedElement
+  // override was no longer enough to generate the model class, so we had to
+  // override generate as well.
+  // @override
+  // Future<String> generate(LibraryReader library, BuildStep buildStep) async {
+  //   final buffer = StringBuffer();
+  //   for (var element in library.allElements) {
+  //     if (element is ClassElement && _checker.hasAnnotationOfExact(element)) {
+  //       final visitor = ModelVisitor();
+  //       element.visitChildren(visitor);
+  //       constructor(buffer, visitor);
+  //     }
+  //   }
+  //   return buffer.toString();
+  // }
+
   @override
   String generateForAnnotatedElement(
     Element element,

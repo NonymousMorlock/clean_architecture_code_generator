@@ -4,13 +4,24 @@ targets:
       generators|annotations:
         enabled: true
 
+      # Add the generated files to the builders configuration
+      generators|generators:
+        enabled: true
+        generate_for:
+          include:
+            - "example/**" # Adjust the path to match your example_directory
+        options:
+        # Add any relevant options here if needed
+
 builders:
-  generators:
+  # Add the configuration for the generators builder
+  generators|generators:
     target: ":generators"
     import: "package:generators/generators.dart"
     builder_factories: [ "generateEntityClass", "generateModelClass", "generateUsecases", "generateUsecasesTest", "generateRepoImpl",
                          "generateRemoteDataSrc", "generateRepository", "generateModelTest" ]
-    build_extensions: { ".dart": [ ".g.dart" ] }
+    build_extensions: { ".dart": [ ".g.dart", ".g.part"] } # add ".g.part" if you want to use partials
     auto_apply: dependents
-    build_to: cache
+    # Modify the output path to "example_directory/lib"
+    build_to: source # or use "example_directory/lib" if "source" doesn't work
     applies_builders: [ "source_gen|combining_builder" ]

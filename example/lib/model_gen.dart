@@ -8,9 +8,9 @@ import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-// @entityGen
-// @modelGen
-// @modelTestGen
+@entityGen
+@modelGen
+@modelTestGen
 class ExpenseReportTBG {
   @required
   int id;
