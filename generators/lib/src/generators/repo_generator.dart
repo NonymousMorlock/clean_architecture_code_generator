@@ -32,7 +32,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
       final returnType = method.returnType.rightType;
       final param = method.params == null ? '' : method.params!.map((e) =>
       paramToString(method, e)).join(', ');
-      buffer.writeln('FunctionalFuture<$returnType> ${method.name}($param);');
+      buffer.writeln('ResultFuture<$returnType> ${method.name}($param);');
     }
     buffer.writeln('}');
   }

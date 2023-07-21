@@ -44,7 +44,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       buffer.writeln("@override");
       if (method.params != null) {
         buffer.writeln(
-            "FunctionalFuture<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) "
+            "ResultFuture<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) "
             "async {");
         buffer.writeln("try {");
         buffer.writeln(
@@ -58,7 +58,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
         buffer.writeln("}");
       } else {
         buffer
-            .writeln("FunctionalFuture<$returnType> ${method.name}() async {");
+            .writeln("ResultFuture<$returnType> ${method.name}() async {");
         buffer.writeln("try {");
         buffer.writeln("${result}await _remoteDataSource.${method.name}();");
         buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
@@ -83,4 +83,4 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
   }
 }
 
-// FunctionalFuture<${method.returnType.rightType}>
+// ResultFuture<${method.returnType.rightType}>

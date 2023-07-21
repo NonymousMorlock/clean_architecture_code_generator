@@ -8,27 +8,70 @@ import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-@entityGen
+// @entityGen
 @modelGen
 @modelTestGen
-class ExpenseReportTBG {
+class ExamTBG {
   @required
-  int id;
-  String drivers_name;
-  String plate_number;
-  String expanse_name;
+  final String id;
   @required
-  String expense_type;
+  final String courseId;
+}
+
+@modelGen
+@modelTestGen
+class ExamQuestionTBG {
   @required
-  double amount;
+  final String id;
   @required
-  DateTime date_created;
+  final String examId;
   @required
-  DateTime updated_date;
+  final String courseId;
   @required
-  int branch_id;
+  final String questionText;
   @required
-  int staff_id;
+  final List<QuestionChoice> choices;
+}
+
+@modelGen
+@modelTestGen
+class QuestionChoiceTBG {
+  @required
+  final String questionId;
+  @required
+  final String identifier;
+  @required
+  final String choiceAnswer;
+}
+
+// @modelGen
+// @modelTestGen
+class UserChoiceTBG {
+  @required
+  final String questionId;
+  @required
+  final String correctChoice;
+  @required
+  final String userChoice;
+  @required
+  final String choiceId;
+}
+
+@modelGen
+@modelTestGen
+class UserExamTBG {
+  @required
+  final String examId;
+  @required
+  final String courseId;
+  @required
+  final List<UserChoice> answers;
+}
+
+class UserChoice {
+}
+
+class QuestionChoice {
 }
 
 final request = {

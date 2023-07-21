@@ -54,7 +54,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     buffer.writeln();
     buffer.writeln('@override');
     buffer.writeln(
-        'FunctionalFuture<$returnType> call(${param == null ? '' : '$param params'}) =>');
+        'ResultFuture<$returnType> call(${param == null ? '' : '$param params'}) =>');
     callBody(buffer, needsCustomParams, method, param);
     buffer.writeln('}');
     if (needsCustomParams) {

@@ -27,8 +27,11 @@ class ModelTestGenerator
     final className = '${visitor.className}Model';
     // final length = visitor.fields.length;
 
-    buffer.writeln("import 'package:flutter_test/flutter_test.dart';");
-    buffer.writeln("import 'dart:convert';");
+    // TODO: Correct this to allow the import, this fails because we generate
+    //  part files and they have the part directive which is not allowed in
+    //  imports.
+    // buffer.writeln("import 'package:flutter_test/flutter_test.dart';");
+    // buffer.writeln("import 'dart:convert';");
     // buffer.writeln(
     //     "import '${visitor.fieldProperties.values.first.filePath.replaceAll(';', '')}';");
     buffer.writeln();
