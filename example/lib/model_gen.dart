@@ -9,8 +9,8 @@ import 'dart:convert';
 part 'model_gen.g.dart';
 
 // @entityGen
-@modelGen
-@modelTestGen
+// @modelGen
+// @modelTestGen
 class ExamTBG {
   @required
   final String id;

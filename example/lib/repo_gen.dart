@@ -9,27 +9,27 @@ part 'repo_gen.g.dart';
 typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
 
 // @repoGen
-// @usecaseGen
-// @usecaseTestGen
-// @repoImplGen
-// @remoteSrcGen
+@usecaseGen
+@usecaseTestGen
+@repoImplGen
+@remoteSrcGen
 class ExamRepoTBG {
-  external Future<Either<Failure, List<Exam>>> getExams(String
-  courseId);
+  // external Future<Either<Failure, List<UserExam>>> getUserExams();
 
-  external Future<Either<Failure, void>> uploadExam(Exam exam);
+  external Future<Either<Failure, List<Material>>> getMaterials(
+    String courseId,
+  );
 
-  external Future<Either<Failure, void>> deleteExam(String examId);
-
-  external Future<Either<Failure, void>> updateExam(Exam exam);
-  external Future<Either<Failure, void>> submitExam(UserExam exam);
+  external Future<Either<Failure, void>> addMaterial(Material material);
 }
 
-class UserExam {
-}
+class Material {}
 
-class Exam {
-}
+class ExamQuestion {}
+
+class UserExam {}
+
+class Exam {}
 
 class Either<T, R> {}
 
