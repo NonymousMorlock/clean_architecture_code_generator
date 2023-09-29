@@ -8,12 +8,12 @@ part 'repo_gen.g.dart';
 
 typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
 
-// @repoGen
+@repoGen
 @usecaseGen
 @usecaseTestGen
 @repoImplGen
 @remoteSrcGen
-class ExamRepoTBG {
+class MaterialRepoTBG {
   // external Future<Either<Failure, List<UserExam>>> getUserExams();
 
   external Future<Either<Failure, List<Material>>> getMaterials(
