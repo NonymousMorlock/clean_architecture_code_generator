@@ -21,11 +21,17 @@ class UsecaseTestGenerator
     element.visitChildren(visitor);
 
     final className = visitor.className;
-
+    final tag =
+        '''// **************************************************************************
+// ${className.snakeCase}.mock.dart
+// **************************************************************************
+''';
+    buffer.writeln(tag);
+    buffer.writeln('class Mock$className extends Mock implements $className '
+        '{}');
     for (var method in visitor.methods) {
       final hasParams = method.params != null;
-      buffer.writeln('class Mock$className extends Mock implements $className '
-          '{}');
+      buffer.writeln("// import '${className.snakeCase}.mock.dart';");
 
       buffer.writeln('void main() {');
       buffer.writeln('late Mock$className repo;');
