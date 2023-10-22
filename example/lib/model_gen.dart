@@ -8,17 +8,31 @@ import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-
 @modelGen
 @modelTestGen
-class ResourceTBG {
+class ProjectTBG {
   @required
-  final String path;
+  final String id;
   @required
-  final String author;
-  final String description;
-  final String title;
+  final String projectName;
+  @required
+  final String clientName;
+  final List<URL> urls;
+  @required
+  final double budget;
+  @required
+  final double totalPaid;
+  @required
+  final int numberOfMilestonesSoFar;
+  final String clientId;
+  @required
+  final DateTime startDate;
+  final DateTime endDate;
 }
+
+class URL {}
+
+class Milestone {}
 
 final request = {
   "id": 3,

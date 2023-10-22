@@ -13,15 +13,32 @@ typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
 @usecaseTestGen
 @repoImplGen
 @remoteSrcGen
-class MaterialRepoTBG {
-  // external Future<Either<Failure, List<UserExam>>> getUserExams();
+class ProjectRepoTBG {
+  external FunctionalFuture<void> addProject(Project project);
 
-  external Future<Either<Failure, List<Material>>> getMaterials(
-    String courseId,
-  );
+  external FunctionalFuture<void> editProjectDetails(Project updatedProject);
 
-  external Future<Either<Failure, void>> addMaterial(Material material);
+  external FunctionalFuture<void> deleteProject(String projectId);
+
+  external FunctionalFuture<List<Project>> getProjects();
+
+  external FunctionalFuture<Project> getProjectById(String projectId);
+
+  external FunctionalFuture<List<Client>> getClients();
+
+  external FunctionalFuture<List<Milestone>> getMilestones(String projectId);
+
+  external FunctionalFuture<Milestone> getMilestoneById({
+    required String projectId,
+    required String milestoneId,
+  });
 }
+
+class Milestone {}
+
+class Client {}
+
+class Project {}
 
 class Material {}
 

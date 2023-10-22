@@ -94,8 +94,9 @@ class UsecaseTestGenerator
     buffer.writeln('(_) async => const Right($fallback),');
     buffer.writeln(');');
     buffer.writeln();
-    buffer.writeln('final result = await ${isCustom ? 'usecase(' : 'usecase'
-        '(${testNames[0]});'}');
+    buffer.writeln(
+        'final result = await ${isCustom ? 'usecase(' : testNames.isNotEmpty ? 'usecase'
+            '(${testNames[0]});' : 'usecase();'}');
     if (isCustom) {
       final className = '${method.name.upperCamelCase}Params';
       buffer.writeln('const $className(');
