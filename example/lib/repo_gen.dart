@@ -6,7 +6,8 @@ import 'package:example/usecase.dart';
 
 part 'repo_gen.g.dart';
 
-typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
+typedef ResultFuture<T> = Future<Either<Failure, T>>;
+typedef ResultStream<T> = Stream<Either<Failure, T>>;
 
 @repoGen
 @usecaseGen
@@ -14,21 +15,21 @@ typedef FunctionalFuture<T> = Future<Either<Failure, T>>;
 @repoImplGen
 @remoteSrcGen
 class ProjectRepoTBG {
-  external FunctionalFuture<void> addProject(Project project);
+  external ResultFuture<void> addProject(Project project);
 
-  external FunctionalFuture<void> editProjectDetails(Project updatedProject);
+  external ResultFuture<void> editProjectDetails(Project updatedProject);
 
-  external FunctionalFuture<void> deleteProject(String projectId);
+  external ResultFuture<void> deleteProject(String projectId);
 
-  external FunctionalFuture<List<Project>> getProjects();
+  external ResultStream<List<Project>> getProjects();
 
-  external FunctionalFuture<Project> getProjectById(String projectId);
+  external ResultFuture<Project> getProjectById(String projectId);
 
-  external FunctionalFuture<List<Client>> getClients();
+  external ResultFuture<List<Client>> getClients();
 
-  external FunctionalFuture<List<Milestone>> getMilestones(String projectId);
+  external ResultFuture<List<Milestone>> getMilestones(String projectId);
 
-  external FunctionalFuture<Milestone> getMilestoneById({
+  external ResultFuture<Milestone> getMilestoneById({
     required String projectId,
     required String milestoneId,
   });

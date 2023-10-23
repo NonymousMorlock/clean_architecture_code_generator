@@ -57,11 +57,11 @@ class UsecaseTestGenerator
           }
         }
       }
-      final methodReturnTypeFallback = method.returnType.rightType
-          .fallbackValue;
+      final methodReturnTypeFallback =
+          method.returnType.rightType.fallbackValue;
       final methodReturnsCustomType = methodReturnTypeFallback is String &&
           methodReturnTypeFallback.isCustomType;
-      if(methodReturnsCustomType) {
+      if (methodReturnsCustomType) {
         buffer.writeln();
         buffer.writeln('final tResult = $methodReturnTypeFallback;');
       }
@@ -91,10 +91,12 @@ class UsecaseTestGenerator
       List<String> testNames) {
     final returnType = method.returnType.trim();
     final methodName = method.name;
+    final isStream = returnType.startsWith('Stream');
+    final action = isStream ? 'emit' : 'return';
     buffer.writeln('test(');
     buffer.writeln(returnType.rightType == 'void'
         ? "'should call the [$className.${method.name}]',"
-        : "'should return [${method.returnType.rightType}] from the repo',");
+        : "'should $action [${method.returnType.rightType}] from the repo',");
     buffer.writeln('() async {');
     buffer.writeln('when(() => repo.$methodName(');
     if (method.params != null) {
@@ -109,7 +111,7 @@ class UsecaseTestGenerator
         ? '${method.returnType.rightType}()'
         : method.returnType.fallbackValue;
     var hasCustomReturnType = false;
-    if(fallback is String && fallback.isCustomType) {
+    if (fallback is String && fallback.isCustomType) {
       fallback = 'tResult';
       hasCustomReturnType = true;
     }
@@ -118,12 +120,23 @@ class UsecaseTestGenerator
     buffer.writeln('.thenAnswer(');
     final moreThanOneParam = testNames.length > 1;
     final modifier = hasCustomReturnType ? '' : 'const';
-    buffer.writeln('(_) async => $modifier Right($fallback),');
+    var streamPrefix = '';
+    var streamSuffix = '';
+    if (isStream) {
+      streamPrefix = 'Stream.value(';
+      streamSuffix = ')';
+    }
+    buffer.writeln(
+      '(_) async '
+      '=> $streamPrefix'
+      '$modifier Right($fallback)$streamSuffix,',
+    );
     buffer.writeln(');');
     buffer.writeln();
+    final resultText = isStream ? 'stream' : 'result';
     buffer.writeln(
-        'final result = await ${moreThanOneParam ? 'usecase(' : testNames.isNotEmpty ? 'usecase'
-            '(${testNames.first});' : 'usecase();'}');
+      'final $resultText = ${isStream ? '' : 'await'} ${moreThanOneParam ? 'usecase(' : testNames.isNotEmpty ? 'usecase(${testNames.first});' : 'usecase();'}',
+    );
     if (moreThanOneParam) {
       final className = '${method.name.upperCamelCase}Params';
       buffer.writeln('const $className(');
@@ -134,9 +147,9 @@ class UsecaseTestGenerator
       buffer.writeln(');');
     }
     buffer.writeln(
-        'expect(result, equals($modifier Right<dynamic, ${method.returnType
-            .rightType}>'
-        '($fallback)));');
+      'expect($resultText, ${isStream ? 'emits' : 'equals'}($modifier '
+      'Right<dynamic, ${method.returnType.rightType}>($fallback)));',
+    );
     buffer.writeln('verify(() => repo.$methodName(');
     if (method.params != null) {
       for (final param in method.params!) {

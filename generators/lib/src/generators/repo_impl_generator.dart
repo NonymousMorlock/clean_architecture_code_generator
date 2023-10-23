@@ -42,10 +42,15 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       final result = returnType.trim() != 'void' ? 'final result = ' : '';
       final returnResult = returnType.trim() != 'void' ? 'result' : 'null';
       buffer.writeln("@override");
+      final isStream = method.returnType.startsWith('Stream');
+      final asynchronyType = isStream ? 'Stream' : 'Future';
       if (method.params != null) {
+        final params = method.params!
+            .map((param) => paramToString(method, param))
+            .join(', ');
         buffer.writeln(
-            "ResultFuture<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) "
-            "async {");
+          "Result$asynchronyType<$returnType> ${method.name}($params) async {",
+        );
         buffer.writeln("try {");
         buffer.writeln(
             "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
@@ -57,8 +62,9 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
         buffer.writeln("}");
         buffer.writeln("}");
       } else {
-        buffer
-            .writeln("ResultFuture<$returnType> ${method.name}() async {");
+        buffer.writeln(
+          "Result$asynchronyType<$returnType> ${method.name}() async {",
+        );
         buffer.writeln("try {");
         buffer.writeln("${result}await _remoteDataSource.${method.name}();");
         buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"

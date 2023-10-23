@@ -1,5 +1,7 @@
 // ignore_for_file: implementation_imports, depend_on_referenced_packages
 
+import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
@@ -39,11 +41,15 @@ class RemoteDataSrcGenerator
       final className = repoName.replaceAll('Repo', '');
       final returnType = method.returnType.rightType
           .replaceAll(className, '${className}Model');
+      final isStream = method.returnType.startsWith('Stream');
+      final asynchronyType = isStream ? 'Stream' : 'Future';
       if (method.params != null) {
-        buffer.writeln(
-            "Future<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')});");
+        final params = method.params!
+            .map((param) => paramToString(method, param))
+            .join(', ');
+        buffer.writeln("Future<$returnType> ${method.name}($params);");
       } else {
-        buffer.writeln("Future<$returnType> ${method.name}();");
+        buffer.writeln("$asynchronyType<$returnType> ${method.name}();");
       }
       buffer.writeln();
     }
@@ -58,17 +64,24 @@ class RemoteDataSrcGenerator
       final className = repoName.replaceAll('Repo', '');
       final returnType = method.returnType.rightType
           .replaceAll(className, '${className}Model');
+      final isStream = method.returnType.startsWith('Stream');
+      final asynchronyType = isStream ? 'Stream' : 'Future';
       if (method.params != null) {
+        final params = method.params!
+            .map((param) => paramToString(method, param))
+            .join(', ');
         buffer.writeln("@override");
         buffer.writeln(
-            "Future<$returnType> ${method.name}(${method.params!.map((param) => paramToString(method, param)).join(', ')}) async {");
+          "$asynchronyType<$returnType> ${method.name}"
+          "($params) async {",
+        );
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
         buffer.writeln();
       } else {
         buffer.writeln("@override");
-        buffer.writeln("Future<$returnType> ${method.name}() async {");
+        buffer.writeln("$asynchronyType<$returnType> ${method.name}() async {");
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
@@ -76,5 +89,17 @@ class RemoteDataSrcGenerator
       }
     }
     buffer.writeln("}");
+  }
+
+  bool getTerminalInfo(String question) {
+    stdout.write('$question (yes): ');
+    final result = stdin.readLineSync() ?? 'yes';
+    var value = true;
+    if (result.isNotEmpty &&
+        result.toLowerCase() != 'yes' &&
+        result.toLowerCase() != 'y') {
+      value = false;
+    }
+    return value;
   }
 }

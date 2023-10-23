@@ -44,17 +44,22 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
             : method.params![0].type
         : null;
     final returnType = method.returnType.rightType;
+    final isStream = method.returnType.startsWith('Stream');
+    final usecaseTypePrefix = isStream ? 'Stream' : '';
     final usecaseType = method.params != null
-        ? 'UsecaseWithParams<$returnType, $param>'
-        : 'UsecaseWithoutParams<$returnType>';
+        ? '${usecaseTypePrefix}UsecaseWithParams<$returnType, $param>'
+        : '${usecaseTypePrefix}UsecaseWithoutParams<$returnType>';
     buffer.writeln('class $className extends $usecaseType {');
     buffer.writeln('const $className(this._repo);');
     buffer.writeln();
     buffer.writeln('final $repoName _repo;');
     buffer.writeln();
     buffer.writeln('@override');
+    final asynchronyType = isStream ? 'Stream' : 'Future';
     buffer.writeln(
-        'ResultFuture<$returnType> call(${param == null ? '' : '$param params'}) =>');
+      'Result$asynchronyType<$returnType> '
+      'call(${param == null ? '' : '$param params'}) =>',
+    );
     callBody(buffer, needsCustomParams, method, param);
     buffer.writeln('}');
     if (needsCustomParams) {
@@ -63,18 +68,17 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     }
   }
 
-  void callBody(StringBuffer buffer, bool needsCustomParams, IFunction
-  method, dynamic param) {
-    if(!needsCustomParams) {
+  void callBody(StringBuffer buffer, bool needsCustomParams, IFunction method,
+      dynamic param) {
+    if (!needsCustomParams) {
       buffer.writeln('_repo.${method.name}(${param == null ? '' : 'params'});');
     } else {
       buffer.writeln('_repo.${method.name}(');
-      for(var param in method.params!) {
+      for (var param in method.params!) {
         buffer.writeln('${param.name}: params.${param.name},');
       }
       buffer.writeln(');');
     }
-
   }
 
   void customParam({

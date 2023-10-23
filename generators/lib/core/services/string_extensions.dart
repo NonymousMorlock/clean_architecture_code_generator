@@ -47,6 +47,7 @@ extension StringExt on String {
 
   String get rightType {
     final result = replaceAll('Future', '')
+    .replaceAll('Stream', '')
         .replaceAll('<', '')
         .replaceAll('>', '')
         .replaceAll('Either', '')

@@ -3,10 +3,23 @@ import 'package:example/typedefs.dart';
 
 abstract class UsecaseWithParams<Type, Params> {
   const UsecaseWithParams();
-  FunctionalFuture<Type> call(Params params);
+  ResultFuture<Type> call(Params params);
 }
 
 abstract class UsecaseWithoutParams<Type> {
   const UsecaseWithoutParams();
-  FunctionalFuture<Type> call();
+  ResultFuture<Type> call();
 }
+
+abstract class StreamUsecaseWithParams<Type, Params> {
+  const StreamUsecaseWithParams();
+
+  ResultStream<Type> call(Params params);
+}
+
+abstract class StreamUsecaseWithoutParams<Type> {
+  const StreamUsecaseWithoutParams();
+
+  ResultStream<Type> call();
+}
+

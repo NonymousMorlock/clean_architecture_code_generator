@@ -30,9 +30,11 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     }
     for(final method in visitor.methods) {
       final returnType = method.returnType.rightType;
+      final isStream = method.returnType.startsWith('Stream');
       final param = method.params == null ? '' : method.params!.map((e) =>
       paramToString(method, e)).join(', ');
-      buffer.writeln('ResultFuture<$returnType> ${method.name}($param);');
+      final asynchronyType = isStream ? 'Stream' : 'Future';
+      buffer.writeln('Result$asynchronyType<$returnType> ${method.name}($param);');
     }
     buffer.writeln('}');
   }
