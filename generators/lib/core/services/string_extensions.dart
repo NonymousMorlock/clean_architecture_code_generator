@@ -95,4 +95,8 @@ extension StringExt on String {
       return false;
     }
   }
+
+  bool get isCustomType {
+    return contains('.empty()');
+  }
 }

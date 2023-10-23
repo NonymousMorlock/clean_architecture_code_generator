@@ -45,10 +45,25 @@ class UsecaseTestGenerator
           if (param.type.fallbackValue is List) {
             buffer.writeln('const $testName = <${param.type.stripType}>[];');
           } else {
-            buffer.writeln(
-                'const $testName = ${/*isCustom ? '${param.type}.empty();' :*/ param.type.fallbackValue is String ? "'${param.type.fallbackValue}';" : '${param.type.fallbackValue};'}');
+            final isCustomType = param.type.fallbackValue is String &&
+                (param.type.fallbackValue as String).isCustomType;
+            final testVariable = isCustomType
+                ? '${param.type}.empty();'
+                : param.type.fallbackValue is String
+                    ? "'${param.type.fallbackValue}';"
+                    : '${param.type.fallbackValue};';
+            buffer.writeln('${isCustomType ? 'final' : 'const'} $testName = '
+                '$testVariable');
           }
         }
+      }
+      final methodReturnTypeFallback = method.returnType.rightType
+          .fallbackValue;
+      final methodReturnsCustomType = methodReturnTypeFallback is String &&
+          methodReturnTypeFallback.isCustomType;
+      if(methodReturnsCustomType) {
+        buffer.writeln();
+        buffer.writeln('final tResult = $methodReturnTypeFallback;');
       }
       buffer.writeln();
       setUp(buffer, className, method);
@@ -90,20 +105,26 @@ class UsecaseTestGenerator
         buffer.writeln(fallback);
       }
     }
-    final fallback = method.returnType.fallbackValue == method.returnType
+    var fallback = method.returnType.fallbackValue == method.returnType
         ? '${method.returnType.rightType}()'
         : method.returnType.fallbackValue;
+    var hasCustomReturnType = false;
+    if(fallback is String && fallback.isCustomType) {
+      fallback = 'tResult';
+      hasCustomReturnType = true;
+    }
     buffer.writeln('),');
     buffer.writeln(')');
     buffer.writeln('.thenAnswer(');
-    final isCustom = testNames.length > 1;
-    buffer.writeln('(_) async => const Right($fallback),');
+    final moreThanOneParam = testNames.length > 1;
+    final modifier = hasCustomReturnType ? '' : 'const';
+    buffer.writeln('(_) async => $modifier Right($fallback),');
     buffer.writeln(');');
     buffer.writeln();
     buffer.writeln(
-        'final result = await ${isCustom ? 'usecase(' : testNames.isNotEmpty ? 'usecase'
-            '(${testNames[0]});' : 'usecase();'}');
-    if (isCustom) {
+        'final result = await ${moreThanOneParam ? 'usecase(' : testNames.isNotEmpty ? 'usecase'
+            '(${testNames.first});' : 'usecase();'}');
+    if (moreThanOneParam) {
       final className = '${method.name.upperCamelCase}Params';
       buffer.writeln('const $className(');
       for (final name in testNames) {
@@ -113,7 +134,8 @@ class UsecaseTestGenerator
       buffer.writeln(');');
     }
     buffer.writeln(
-        'expect(result, equals(const Right<dynamic, ${method.returnType.rightType}>'
+        'expect(result, equals($modifier Right<dynamic, ${method.returnType
+            .rightType}>'
         '($fallback)));');
     buffer.writeln('verify(() => repo.$methodName(');
     if (method.params != null) {

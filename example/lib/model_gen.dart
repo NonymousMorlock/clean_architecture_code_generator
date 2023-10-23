@@ -10,6 +10,41 @@ part 'model_gen.g.dart';
 
 @modelGen
 @modelTestGen
+class ClientTBG {
+  @required
+  final String id;
+  @required
+  final String name;
+  @required
+  final String totalSpent;
+}
+
+@modelGen
+@modelTestGen
+class URLTBG {
+  @required
+  final String url;
+  @required
+  final String title;
+}
+
+@modelGen
+@modelTestGen
+class MilestoneTBG {
+  @required
+  final String id;
+  @required
+  final String projectId;
+  final String shortDescription;
+  final List<String> notes;
+  @required
+  final double amountPaid;
+  @required
+  final DateTime date;
+}
+
+@modelGen
+@modelTestGen
 class ProjectTBG {
   @required
   final String id;
