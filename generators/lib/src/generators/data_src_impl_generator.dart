@@ -6,6 +6,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/services/functions.dart';
+import 'package:generators/core/services/map_extensions.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
@@ -56,9 +57,49 @@ class RemoteDataSrcGenerator
     buffer.writeln("}");
     buffer.writeln();
     buffer.writeln("class ${dataSrcName}Impl implements $dataSrcName {");
-    buffer.writeln("const ${dataSrcName}Impl(this._client);");
-    buffer.writeln();
-    buffer.writeln("final http.Client _client;");
+    final possibleDependencies = {
+      'FirebaseDatabase': 'database',
+      'FirebaseFirestore': 'firestore',
+      'FirebaseAuth': 'auth',
+      'http.Client': 'client',
+    };
+    final dependencies = {};
+    for (final dependency in possibleDependencies.entries) {
+      stdout..writeln()..writeln('REMOTE DATA SOURCE DEPENDENCIES');
+      final result = getTerminalInfo("does it use ${dependency.key}");
+      if (result) dependencies.addEntry(dependency);
+    }
+
+    if (dependencies.length == 1) {
+      final dependency = dependencies.entries.last;
+      final type = dependency.key;
+      final name = '_${dependency.value}';
+      buffer.writeln("const ${dataSrcName}Impl(this.$name);");
+      buffer.writeln();
+      buffer.writeln("final $type $name;");
+    } else if(dependencies.length > 1) {
+      buffer.writeln('const ${dataSrcName}Impl({');
+      for(final dependency in dependencies.entries) {
+        final type = dependency.key;
+        final name = dependency.value;
+        buffer.writeln('$type $name,');
+      }
+      buffer.write('}) : ');
+      for(var i = 0; i < dependencies.entries.length; i++) {
+        final dependency = dependencies.entries.elementAt(i);
+        final name = dependency.value;
+        final privateName = '_$name';
+        final punctuation = i < dependencies.entries.length - 1 ? ',' : ';';
+        buffer.writeln('$privateName = $name$punctuation');
+      }
+      buffer.writeln();
+      for(final dependency in dependencies.entries) {
+        final type = dependency.key;
+        final name = '_${dependency.value}';
+        buffer.writeln('final $type $name;');
+      }
+    }
+
     buffer.writeln();
     for (final method in visitor.methods) {
       final className = repoName.replaceAll('Repo', '');
