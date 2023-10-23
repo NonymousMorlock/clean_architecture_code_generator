@@ -65,7 +65,9 @@ class RemoteDataSrcGenerator
     };
     final dependencies = {};
     for (final dependency in possibleDependencies.entries) {
-      stdout..writeln()..writeln('REMOTE DATA SOURCE DEPENDENCIES');
+      stdout
+        ..writeln()
+        ..writeln('REMOTE DATA SOURCE DEPENDENCIES');
       final result = getTerminalInfo("does it use ${dependency.key}");
       if (result) dependencies.addEntry(dependency);
     }
@@ -77,15 +79,15 @@ class RemoteDataSrcGenerator
       buffer.writeln("const ${dataSrcName}Impl(this.$name);");
       buffer.writeln();
       buffer.writeln("final $type $name;");
-    } else if(dependencies.length > 1) {
+    } else if (dependencies.length > 1) {
       buffer.writeln('const ${dataSrcName}Impl({');
-      for(final dependency in dependencies.entries) {
+      for (final dependency in dependencies.entries) {
         final type = dependency.key;
         final name = dependency.value;
         buffer.writeln('$type $name,');
       }
       buffer.write('}) : ');
-      for(var i = 0; i < dependencies.entries.length; i++) {
+      for (var i = 0; i < dependencies.entries.length; i++) {
         final dependency = dependencies.entries.elementAt(i);
         final name = dependency.value;
         final privateName = '_$name';
@@ -93,7 +95,7 @@ class RemoteDataSrcGenerator
         buffer.writeln('$privateName = $name$punctuation');
       }
       buffer.writeln();
-      for(final dependency in dependencies.entries) {
+      for (final dependency in dependencies.entries) {
         final type = dependency.key;
         final name = '_${dependency.value}';
         buffer.writeln('final $type $name;');
@@ -107,6 +109,7 @@ class RemoteDataSrcGenerator
           .replaceAll(className, '${className}Model');
       final isStream = method.returnType.startsWith('Stream');
       final asynchronyType = isStream ? 'Stream' : 'Future';
+      final modifier = isStream ? '' : 'async';
       if (method.params != null) {
         final params = method.params!
             .map((param) => paramToString(method, param))
@@ -114,7 +117,7 @@ class RemoteDataSrcGenerator
         buffer.writeln("@override");
         buffer.writeln(
           "$asynchronyType<$returnType> ${method.name}"
-          "($params) async {",
+          "($params) $modifier {",
         );
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
@@ -122,7 +125,10 @@ class RemoteDataSrcGenerator
         buffer.writeln();
       } else {
         buffer.writeln("@override");
-        buffer.writeln("$asynchronyType<$returnType> ${method.name}() async {");
+        buffer.writeln(
+          "$asynchronyType<$returnType> ${method.name}() "
+          "$modifier {",
+        );
         buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
         buffer.writeln("throw UnimplementedError();");
         buffer.writeln("}");
