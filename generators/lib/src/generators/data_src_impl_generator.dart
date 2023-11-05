@@ -60,6 +60,7 @@ class RemoteDataSrcGenerator
     final possibleDependencies = {
       'FirebaseDatabase': 'database',
       'FirebaseFirestore': 'firestore',
+      'FirebaseStorage': 'storage',
       'FirebaseAuth': 'auth',
       'http.Client': 'client',
     };

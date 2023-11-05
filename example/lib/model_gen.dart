@@ -17,6 +17,7 @@ class ClientTBG {
   final String name;
   @required
   final String totalSpent;
+  final String image;
 }
 
 @modelGen
