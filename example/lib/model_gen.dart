@@ -35,6 +35,8 @@ class MilestoneTBG {
   final String id;
   @required
   final String projectId;
+  @required
+  final String title;
   final String shortDescription;
   final List<String> notes;
   @required
@@ -52,16 +54,28 @@ class ProjectTBG {
   final String projectName;
   @required
   final String clientName;
+  @required
+  final String shortDescription;
+  final String longDescription;
+  final List<String> notes;
   final List<URL> urls;
   @required
   final double budget;
+  final bool isFixed;
+  final bool isOneTime;
+  @required
+  final String projectType;
+  final List<String> tools;
   @required
   final double totalPaid;
   @required
   final int numberOfMilestonesSoFar;
+  final String image;
+  final List<String> images;
   final String clientId;
   @required
   final DateTime startDate;
+  final DateTime deadline;
   final DateTime endDate;
 }
 

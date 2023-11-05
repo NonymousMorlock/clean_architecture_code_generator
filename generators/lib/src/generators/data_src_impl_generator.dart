@@ -67,7 +67,7 @@ class RemoteDataSrcGenerator
     for (final dependency in possibleDependencies.entries) {
       stdout
         ..writeln()
-        ..writeln('REMOTE DATA SOURCE DEPENDENCIES');
+        ..writeln('REMOTE DATA SOURCE DEPENDENCIES FOR {$dataSrcName}');
       final result = getTerminalInfo("does it use ${dependency.key}");
       if (result) dependencies.addEntry(dependency);
     }
