@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:annotations/annotations.dart';
 import 'package:equatable/equatable.dart';
 import 'package:example/repo_gen.dart';
@@ -22,7 +24,7 @@ class ProjectRepoTBG {
 
   external ResultFuture<void> deleteProject(String projectId);
 
-  external ResultStream<List<Project>> getProjects();
+  external ResultStream<List<Project>> getProjects({bool detailed = false});
 
   external ResultFuture<Project> getProjectById(String projectId);
 }
@@ -66,7 +68,10 @@ class ClientRepoTBG {
 
   external ResultFuture<List<Client>> getClients();
 
-  external ResultFuture<List<Project>> getClientProjects();
+  external ResultFuture<List<Project>> getClientProjects({
+    required String clientId,
+    bool detailed = false,
+  });
 }
 
 class Milestone {}

@@ -39,16 +39,14 @@ class RemoteDataSrcGenerator
     buffer.writeln();
 
     for (final method in visitor.methods) {
-      final className = repoName.replaceAll('Repo', '');
-      final returnType = method.returnType.rightType
-          .replaceAll(className, '${className}Model');
+      var returnType = method.returnType.modelizeType;
       final isStream = method.returnType.startsWith('Stream');
       final asynchronyType = isStream ? 'Stream' : 'Future';
       if (method.params != null) {
         final params = method.params!
             .map((param) => paramToString(method, param))
             .join(', ');
-        buffer.writeln("Future<$returnType> ${method.name}($params);");
+        buffer.writeln("$asynchronyType<$returnType> ${method.name}($params);");
       } else {
         buffer.writeln("$asynchronyType<$returnType> ${method.name}();");
       }
@@ -105,9 +103,7 @@ class RemoteDataSrcGenerator
 
     buffer.writeln();
     for (final method in visitor.methods) {
-      final className = repoName.replaceAll('Repo', '');
-      final returnType = method.returnType.rightType
-          .replaceAll(className, '${className}Model');
+      final returnType = method.returnType.modelizeType;
       final isStream = method.returnType.startsWith('Stream');
       final asynchronyType = isStream ? 'Stream' : 'Future';
       final modifier = isStream ? '' : 'async';

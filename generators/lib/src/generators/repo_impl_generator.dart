@@ -53,30 +53,46 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
           "Result$asynchronyType<$returnType> ${method.name}($params) "
           "$asyncText {",
         );
-        buffer.writeln("try {");
-        buffer.writeln(
-            "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
-        buffer.writeln(
-            "return ${returnResult == 'null' ? 'const ' : ''}Right($returnResult);");
-        buffer.writeln("} on ServerException catch (e) {");
-        buffer.writeln(
-            "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
-        buffer.writeln("}");
+        if (!isStream) {
+          buffer.writeln("try {");
+          buffer.writeln(
+              "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
+          buffer.writeln(
+              "return ${returnResult == 'null' ? 'const ' : ''}Right($returnResult);");
+          buffer.writeln("} on ServerException catch (e) {");
+          buffer.writeln(
+              "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
+          buffer.writeln("}");
+        } else {
+          buffer.writeln(
+            "return _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')}).transform"
+            "(",
+          );
+         _writeTransformer(buffer, method: method);
+          buffer.writeln(');');
+        }
         buffer.writeln("}");
       } else {
         buffer.writeln(
           "Result$asynchronyType<$returnType> ${method.name}"
           "() $asyncText {",
         );
-        buffer.writeln("try {");
-        buffer.writeln("${result}await _remoteDataSource.${method.name}();");
-        buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
-            "($returnResult)"
-            ";");
-        buffer.writeln("} on ServerException catch (e) {");
-        buffer.writeln(
-            "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
-        buffer.writeln("}");
+        if(!isStream) {
+          buffer.writeln("try {");
+          buffer.writeln("${result}await _remoteDataSource.${method.name}();");
+          buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
+              "($returnResult)"
+              ";");
+          buffer.writeln("} on ServerException catch (e) {");
+          buffer.writeln(
+              "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
+          buffer.writeln("}");
+        } else {
+          buffer.writeln("return _remoteDataSource.${method.name}().transform"
+              "(");
+          _writeTransformer(buffer, method: method);
+          buffer.writeln(');');
+        }
         buffer.writeln("}");
       }
     }
@@ -90,6 +106,31 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       return param.name;
     }
   }
+
+  void _writeTransformer(StringBuffer buffer, {required IFunction method}) {
+    // left of transformer is the Stream's return type
+    // right side is the return type of the calling function, in this
+    // case, our repoImpl method
+    final modelReturnType = method.returnType.modelizeType;
+    buffer.writeln('StreamTransformer<'
+        '$modelReturnType, ${method.returnType}'
+        '>.fromHandlers(');
+    buffer.writeln('handleData: (data, sink) {');
+    buffer.writeln('sink.add(Right(data));');
+    buffer.writeln('},');
+    buffer.writeln('handleError: (error, stackTrace, sink) {');
+    buffer.writeln('if (error is ServerException) {');
+    buffer.writeln('sink.add(Left(ServerFailure(message: error.message,'
+        ' statusCode: error.statusCode,),),);');
+    buffer.writeln('} else {');
+    buffer.writeln('sink.add(Left(ServerFailure(message: error.toString'
+        '(), statusCode: 500,),),);');
+    buffer.writeln('}');
+    buffer.writeln('},');
+    buffer.writeln('),');
+  }
 }
+
+
 
 // ResultFuture<${method.returnType.rightType}>

@@ -60,6 +60,25 @@ extension StringExt on String {
     return result;
   }
 
+  String get modelizeType {
+    var returnType = rightType;
+    final tempReturnType =
+    returnType.split('<').last.replaceAll('<', '').replaceAll('>', '');
+    if(tempReturnType != 'void') {
+      returnType =
+          returnType.replaceAll(tempReturnType, '${tempReturnType}Model');
+    }
+    return returnType;
+  }
+
+  /// Stream<Either<Failure, List<Object>>> will return
+  /// Either<Failure, List<Object>>
+  String get innerType {
+    final splitData = split('<').sublist(1).join('<');
+    final length = splitData.length;
+    return splitData.split('').sublist(0, length -1).join();
+  }
+
   dynamic get fallbackValue {
     if (toLowerCase().startsWith('list')) {
       return [];
