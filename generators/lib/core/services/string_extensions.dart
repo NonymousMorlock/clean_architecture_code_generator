@@ -64,7 +64,8 @@ extension StringExt on String {
     var returnType = rightType;
     final tempReturnType =
     returnType.split('<').last.replaceAll('<', '').replaceAll('>', '');
-    if(tempReturnType != 'void') {
+    final returnTypeFallback = tempReturnType.fallbackValue;
+    if(returnTypeFallback is String && returnTypeFallback.isCustomType) {
       returnType =
           returnType.replaceAll(tempReturnType, '${tempReturnType}Model');
     }

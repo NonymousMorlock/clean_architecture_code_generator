@@ -17,62 +17,38 @@ typedef ResultStream<T> = Stream<Either<Failure, T>>;
 @usecaseTestGen
 @repoImplGen
 @remoteSrcGen
-class ProjectRepoTBG {
-  external ResultFuture<void> addProject(Project project);
-
-  external ResultFuture<void> editProjectDetails(DataMap updatedProject);
-
-  external ResultFuture<void> deleteProject(String projectId);
-
-  external ResultStream<List<Project>> getProjects({bool detailed = false});
-
-  external ResultFuture<Project> getProjectById(String projectId);
-}
-
-@repoGen
-@usecaseGen
-@usecaseTestGen
-@repoImplGen
-@remoteSrcGen
-class MilestoneRepoTBG {
-  external ResultFuture<void> addMilestone(Milestone milestone);
-
-  external ResultFuture<void> editMilestone(DataMap updatedMilestone);
-
-  external ResultFuture<List<Milestone>> getMilestones(String projectId);
-
-  external ResultFuture<void> deleteMilestone({
-    required String projectId,
-    required String milestoneId,
+class AuthRepoTBG {
+  external ResultFuture<void> register({
+    required String name,
+    required String password,
+    required String email,
+    required String phone,
   });
 
-  external ResultFuture<Milestone> getMilestoneById({
-    required String projectId,
-    required String milestoneId,
+  external ResultFuture<User> login({
+    required String email,
+    required String password,
   });
+
+  external ResultFuture<void> forgotPassword(String email);
+
+  external ResultFuture<void> verifyOTP({
+    required String email,
+    required String otp,
+  });
+
+  external ResultFuture<void> resetPassword({
+    required String email,
+    required String newPassword,
+  });
+
+  external ResultFuture<bool> verifyToken();
+
+  external ResultFuture<List<Milestone>> getAddresses();
+  external ResultFuture<List<String>> getData();
 }
 
-@repoGen
-@usecaseGen
-@usecaseTestGen
-@repoImplGen
-@remoteSrcGen
-class ClientRepoTBG {
-  external ResultFuture<void> addClient(Client client);
-
-  external ResultFuture<void> editClient(DataMap updatedClient);
-
-  external ResultFuture<void> deleteClient(String clientId);
-
-  external ResultFuture<Client> getClientById(String clientId);
-
-  external ResultFuture<List<Client>> getClients();
-
-  external ResultFuture<List<Project>> getClientProjects({
-    required String clientId,
-    bool detailed = false,
-  });
-}
+class User {}
 
 class Milestone {}
 

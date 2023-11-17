@@ -61,6 +61,7 @@ class RemoteDataSrcGenerator
       'FirebaseStorage': 'storage',
       'FirebaseAuth': 'auth',
       'http.Client': 'client',
+      'Dio': 'dio'
     };
     final dependencies = {};
     for (final dependency in possibleDependencies.entries) {

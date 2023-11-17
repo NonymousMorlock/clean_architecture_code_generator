@@ -10,75 +10,37 @@ part 'model_gen.g.dart';
 
 @modelGen
 @modelTestGen
-class ClientTBG {
+@entityGen
+class UserTBG {
   @required
   final String id;
   @required
   final String name;
   @required
-  final String totalSpent;
-  final String image;
+  final String email;
+  @required
+  final bool isAdmin;
+  @required
+  final List<String> wishlist;
+  final Address address;
+  final String phone;
 }
 
 @modelGen
 @modelTestGen
-class URLTBG {
-  @required
-  final String url;
-  @required
-  final String title;
+@entityGen
+class AddressTBG {
+  final String street;
+  final String apartment;
+  final String city;
+  final String zip;
+  final String country;
 }
 
-@modelGen
-@modelTestGen
-class MilestoneTBG {
-  @required
-  final String id;
-  @required
-  final String projectId;
-  @required
-  final String title;
-  final String shortDescription;
-  final List<String> notes;
-  @required
-  final double amountPaid;
-  @required
-  final DateTime date;
-}
 
-@modelGen
-@modelTestGen
-class ProjectTBG {
-  @required
-  final String id;
-  @required
-  final String projectName;
-  @required
-  final String clientName;
-  @required
-  final String shortDescription;
-  final String longDescription;
-  final List<String> notes;
-  final List<URL> urls;
-  @required
-  final double budget;
-  final bool isFixed;
-  final bool isOneTime;
-  @required
-  final String projectType;
-  final List<String> tools;
-  @required
-  final double totalPaid;
-  @required
-  final int numberOfMilestonesSoFar;
-  final String image;
-  final List<String> images;
-  final String clientId;
-  @required
-  final DateTime startDate;
-  final DateTime deadline;
-  final DateTime endDate;
-}
+class Address {}
+
+class WishlistProduct {}
 
 class URL {}
 

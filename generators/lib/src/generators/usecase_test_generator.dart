@@ -64,6 +64,24 @@ class UsecaseTestGenerator
       if (methodReturnsCustomType) {
         buffer.writeln();
         buffer.writeln('final tResult = $methodReturnTypeFallback;');
+      } else if (methodReturnTypeFallback is String &&
+          methodReturnTypeFallback == 'null') {
+        // pass
+      } else if (methodReturnTypeFallback is List) {
+        final listMembersType = method.returnType.rightType.stripType;
+        final listMembersDefault = listMembersType.fallbackValue;
+        var defaultMember =  listMembersDefault;
+        if(listMembersDefault is String && listMembersDefault.isCustomType) {
+          defaultMember = listMembersDefault;
+        } else if(listMembersDefault is String) {
+          defaultMember = "'$listMembersDefault'";
+        }
+        buffer.writeln(
+          'final tResult = <$listMembersType>[$defaultMember];',
+        );
+      } else {
+        buffer.writeln();
+        buffer.writeln('final tResult = $methodReturnTypeFallback;');
       }
       buffer.writeln();
       setUp(buffer, className, method);
@@ -107,14 +125,18 @@ class UsecaseTestGenerator
         buffer.writeln(fallback);
       }
     }
-    var fallback = method.returnType.fallbackValue == method.returnType
-        ? '${method.returnType.rightType}()'
-        : method.returnType.fallbackValue;
-    var hasCustomReturnType = false;
-    if (fallback is String && fallback.isCustomType) {
-      fallback = 'tResult';
-      hasCustomReturnType = true;
-    }
+    // var fallback = method.returnType.fallbackValue == method.returnType
+    //     ? '${method.returnType.rightType}()'
+    //     : method.returnType.fallbackValue;
+    final returnTypeFallback = method.returnType.fallbackValue;
+    final fallback = returnTypeFallback is String &&
+        returnTypeFallback == 'null' ? null : 'tResult';
+    var hasCustomReturnType = returnTypeFallback is String &&
+        returnTypeFallback.isCustomType;
+    // if (fallback is String && fallback.isCustomType) {
+    //   fallback = 'tResult';
+    //   hasCustomReturnType = true;
+    // }
     buffer.writeln('),');
     buffer.writeln(')');
     buffer.writeln('.thenAnswer(');
