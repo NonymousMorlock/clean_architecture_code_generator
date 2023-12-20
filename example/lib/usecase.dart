@@ -1,4 +1,3 @@
-
 import 'package:example/typedefs.dart';
 
 abstract class UsecaseWithParams<Type, Params> {
@@ -22,4 +21,3 @@ abstract class StreamUsecaseWithoutParams<Type> {
 
   ResultStream<Type> call();
 }
-

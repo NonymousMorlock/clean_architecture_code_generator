@@ -8,35 +8,68 @@ import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-@modelGen
-@modelTestGen
-@entityGen
-class UserTBG {
+// @modelGen
+// @modelTestGen
+// @entityGen
+class ProductTBG {
   @required
   final String id;
   @required
   final String name;
   @required
-  final String email;
+  final String description;
   @required
-  final bool isAdmin;
+  final double price;
   @required
-  final List<String> wishlist;
-  final Address address;
-  final String phone;
+  final double rating;
+  @required
+  final List<Color> colours;
+  @required
+  final String image;
+  @required
+  final List<String> images;
+  @required
+  final List<String> reviewIds;
+  @required
+  final int numberOfReviews;
+  @required
+  final List<String> sizes;
+  @required
+  final ProductCategory category;
+  final String genderAgeCategory;
+  @required
+  final int countInStock;
 }
 
-@modelGen
-@modelTestGen
-@entityGen
-class AddressTBG {
-  final String street;
-  final String apartment;
-  final String city;
-  final String zip;
-  final String country;
+// @modelTestGen
+// @modelGen
+// @entityGen
+class ProductCategoryTBG {
+  @required
+  final String id;
+  final String name;
+  final String colour;
 }
 
+// @modelTestGen
+// @modelGen
+// @entityGen
+class ReviewTBG {
+  @required
+  final String id;
+  @required
+  final String userId;
+  @required
+  final String userName;
+  @required
+  final String comment;
+  @required
+  final double rating;
+  @required
+  final DateTime date;
+}
+
+class ProductCategory {}
 
 class Address {}
 

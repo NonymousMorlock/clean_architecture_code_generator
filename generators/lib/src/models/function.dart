@@ -20,7 +20,7 @@ class IFunction {
       );''';
 }
 
-class Param extends Equatable{
+class Param extends Equatable {
   const Param({
     required this.isNamed,
     required this.isOptional,
@@ -34,18 +34,19 @@ class Param extends Equatable{
     required this.type,
   });
 
-  const Param.empty() : this(
-    isNamed: false,
-    isOptional: false,
-    isOptionalNamed: false,
-    isRequired: false,
-    isRequiredNamed: false,
-    isRequiredPositional: false,
-    isPositional: false,
-    isOptionalPositional: false,
-    name: '',
-    type: '',
-  );
+  const Param.empty()
+      : this(
+          isNamed: false,
+          isOptional: false,
+          isOptionalNamed: false,
+          isRequired: false,
+          isRequiredNamed: false,
+          isRequiredPositional: false,
+          isPositional: false,
+          isOptionalPositional: false,
+          name: '',
+          type: '',
+        );
 
   final String name;
   final String type;

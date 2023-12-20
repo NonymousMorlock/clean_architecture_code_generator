@@ -25,16 +25,18 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
   void repo(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
     buffer.writeln('abstract class $className {');
-    if(visitor.methods.length == 1) {
+    if (visitor.methods.length == 1) {
       buffer.writeln('const $className();');
     }
-    for(final method in visitor.methods) {
+    for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
       final isStream = method.returnType.startsWith('Stream');
-      final param = method.params == null ? '' : method.params!.map((e) =>
-      paramToString(method, e)).join(', ');
+      final param = method.params == null
+          ? ''
+          : method.params!.map((e) => paramToString(method, e)).join(', ');
       final asynchronyType = isStream ? 'Stream' : 'Future';
-      buffer.writeln('Result$asynchronyType<$returnType> ${method.name}($param);');
+      buffer.writeln(
+          'Result$asynchronyType<$returnType> ${method.name}($param);');
     }
     buffer.writeln('}');
   }

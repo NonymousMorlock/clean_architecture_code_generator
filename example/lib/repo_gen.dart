@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:annotations/annotations.dart';
 import 'package:equatable/equatable.dart';
-import 'package:example/repo_gen.dart';
-import 'package:example/typedefs.dart';
-import 'package:flutter/widgets.dart';
 import 'package:example/usecase.dart';
+
 
 part 'repo_gen.g.dart';
 
@@ -17,36 +15,24 @@ typedef ResultStream<T> = Stream<Either<Failure, T>>;
 @usecaseTestGen
 @repoImplGen
 @remoteSrcGen
-class AuthRepoTBG {
-  external ResultFuture<void> register({
-    required String name,
-    required String password,
-    required String email,
-    required String phone,
+class SubscriptionRepoTBG {
+  external ResultFuture<String> createPaymentIntent({
+    required BillingDetails billingDetails,
+    required Subscription subscription,
   });
 
-  external ResultFuture<User> login({
-    required String email,
-    required String password,
-  });
-
-  external ResultFuture<void> forgotPassword(String email);
-
-  external ResultFuture<void> verifyOTP({
-    required String email,
-    required String otp,
-  });
-
-  external ResultFuture<void> resetPassword({
-    required String email,
-    required String newPassword,
-  });
-
-  external ResultFuture<bool> verifyToken();
-
-  external ResultFuture<List<Milestone>> getAddresses();
-  external ResultFuture<List<String>> getData();
+  external ResultFuture<void> confirmPaymentIntent(String clientSecret);
 }
+
+class Subscription {}
+
+class BillingDetails {}
+
+class Category {}
+
+class Review {}
+
+class Product {}
 
 class User {}
 

@@ -47,7 +47,7 @@ extension StringExt on String {
 
   String get rightType {
     final result = replaceAll('Future', '')
-    .replaceAll('Stream', '')
+        .replaceAll('Stream', '')
         .replaceAll('<', '')
         .replaceAll('>', '')
         .replaceAll('Either', '')
@@ -63,9 +63,9 @@ extension StringExt on String {
   String get modelizeType {
     var returnType = rightType;
     final tempReturnType =
-    returnType.split('<').last.replaceAll('<', '').replaceAll('>', '');
+        returnType.split('<').last.replaceAll('<', '').replaceAll('>', '');
     final returnTypeFallback = tempReturnType.fallbackValue;
-    if(returnTypeFallback is String && returnTypeFallback.isCustomType) {
+    if (returnTypeFallback is String && returnTypeFallback.isCustomType) {
       returnType =
           returnType.replaceAll(tempReturnType, '${tempReturnType}Model');
     }
@@ -77,7 +77,7 @@ extension StringExt on String {
   String get innerType {
     final splitData = split('<').sublist(1).join('<');
     final length = splitData.length;
-    return splitData.split('').sublist(0, length -1).join();
+    return splitData.split('').sublist(0, length - 1).join();
   }
 
   dynamic get fallbackValue {

@@ -30,9 +30,6 @@ class ModelVisitor extends SimpleElementVisitor<void> {
   }
 }
 
-
-
-
 // declaration = bool? is_adult
 
 // children = []
@@ -49,7 +46,7 @@ class ModelVisitor extends SimpleElementVisitor<void> {
 
 // kind = FIELD
 
-// library = 
+// library =
 
 // libSource = /example/lib/person.dart
 

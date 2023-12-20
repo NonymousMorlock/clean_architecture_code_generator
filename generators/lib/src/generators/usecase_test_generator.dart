@@ -67,13 +67,17 @@ class UsecaseTestGenerator
       } else if (methodReturnTypeFallback is String &&
           methodReturnTypeFallback == 'null') {
         // pass
+        // means it's got void return type
+      } else if (methodReturnTypeFallback is String) {
+        buffer.writeln();
+        buffer.writeln("final tResult = '$methodReturnTypeFallback';");
       } else if (methodReturnTypeFallback is List) {
         final listMembersType = method.returnType.rightType.stripType;
         final listMembersDefault = listMembersType.fallbackValue;
-        var defaultMember =  listMembersDefault;
-        if(listMembersDefault is String && listMembersDefault.isCustomType) {
+        var defaultMember = listMembersDefault;
+        if (listMembersDefault is String && listMembersDefault.isCustomType) {
           defaultMember = listMembersDefault;
-        } else if(listMembersDefault is String) {
+        } else if (listMembersDefault is String) {
           defaultMember = "'$listMembersDefault'";
         }
         buffer.writeln(
@@ -129,10 +133,12 @@ class UsecaseTestGenerator
     //     ? '${method.returnType.rightType}()'
     //     : method.returnType.fallbackValue;
     final returnTypeFallback = method.returnType.fallbackValue;
-    final fallback = returnTypeFallback is String &&
-        returnTypeFallback == 'null' ? null : 'tResult';
-    var hasCustomReturnType = returnTypeFallback is String &&
-        returnTypeFallback.isCustomType;
+    final fallback =
+        returnTypeFallback is String && returnTypeFallback == 'null'
+            ? null
+            : 'tResult';
+    var hasCustomReturnType =
+        returnTypeFallback is String && returnTypeFallback.isCustomType;
     // if (fallback is String && fallback.isCustomType) {
     //   fallback = 'tResult';
     //   hasCustomReturnType = true;

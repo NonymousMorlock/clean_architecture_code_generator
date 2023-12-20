@@ -68,7 +68,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
             "return _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')}).transform"
             "(",
           );
-         _writeTransformer(buffer, method: method);
+          _writeTransformer(buffer, method: method);
           buffer.writeln(');');
         }
         buffer.writeln("}");
@@ -77,7 +77,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
           "Result$asynchronyType<$returnType> ${method.name}"
           "() $asyncText {",
         );
-        if(!isStream) {
+        if (!isStream) {
           buffer.writeln("try {");
           buffer.writeln("${result}await _remoteDataSource.${method.name}();");
           buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
@@ -130,7 +130,5 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     buffer.writeln('),');
   }
 }
-
-
 
 // ResultFuture<${method.returnType.rightType}>
