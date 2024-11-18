@@ -1,28 +1,43 @@
 import 'dart:async';
 
 import 'package:annotations/annotations.dart';
-import 'package:equatable/equatable.dart';
-import 'package:example/usecase.dart';
-
+import 'package:example/model_gen.dart';
 
 part 'repo_gen.g.dart';
 
 typedef ResultFuture<T> = Future<Either<Failure, T>>;
 typedef ResultStream<T> = Stream<Either<Failure, T>>;
 
-@repoGen
-@usecaseGen
-@usecaseTestGen
-@repoImplGen
-@remoteSrcGen
-class SubscriptionRepoTBG {
-  external ResultFuture<String> createPaymentIntent({
-    required BillingDetails billingDetails,
-    required Subscription subscription,
-  });
+enum Order { asc, desc }
 
-  external ResultFuture<void> confirmPaymentIntent(String clientSecret);
+// @repoGen
+// @usecaseGen
+// @usecaseTestGen
+@repoImplTestGen
+// @repoImplGen
+// @remoteSrcGen
+class CourseRepresentativeRepoTBG {
+  external ResultFuture<List<Faculty>> getFaculties();
+
+  external ResultFuture<List<Course>> getCourses(String facultyId);
+
+  external ResultFuture<List<Level>> getLevels({
+    required String facultyId,
+    required String courseId,
+  });
 }
+
+class Level {}
+
+class Wallet {}
+
+class Transaction {}
+
+class OrderStatus {}
+
+class CartProduct {}
+
+class WishlistProduct {}
 
 class Subscription {}
 
