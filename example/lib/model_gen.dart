@@ -1,83 +1,52 @@
 // ignore_for_file: unused_import
 
+import 'dart:convert';
+
 import 'package:annotations/annotations.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter/widgets.dart';
+import 'package:meta/meta.dart';
+
 import 'typedefs.dart';
-import 'dart:convert';
 
 part 'model_gen.g.dart';
 
-// @modelGen
 // @modelTestGen
+// @modelGen
 // @entityGen
-class ProductTBG {
+class FacultyTBG {
   @required
   final String id;
   @required
   final String name;
-  @required
-  final String description;
-  @required
-  final double price;
-  @required
-  final double rating;
-  @required
-  final List<Color> colours;
-  @required
-  final String image;
-  @required
-  final List<String> images;
-  @required
-  final List<String> reviewIds;
-  @required
-  final int numberOfReviews;
-  @required
-  final List<String> sizes;
-  @required
-  final ProductCategory category;
-  final String genderAgeCategory;
-  @required
-  final int countInStock;
 }
-
+//
 // @modelTestGen
 // @modelGen
 // @entityGen
-class ProductCategoryTBG {
-  @required
-  final String id;
-  final String name;
-  final String colour;
-}
-
+// class CourseTBG {
+//   @required
+//   final String id;
+//   @required
+//   final String name;
+//   @required
+//   final Faculty faculty;
+// }
+//
 // @modelTestGen
 // @modelGen
 // @entityGen
-class ReviewTBG {
-  @required
-  final String id;
-  @required
-  final String userId;
-  @required
-  final String userName;
-  @required
-  final String comment;
-  @required
-  final double rating;
-  @required
-  final DateTime date;
-}
+// class LevelTBG {
+//   @required
+//   final String id;
+//   @required
+//   final String name;
+//   @required
+//   final Course course;
+// }
 
-class ProductCategory {}
+class Course {}
 
-class Address {}
-
-class WishlistProduct {}
-
-class URL {}
-
-class Milestone {}
+class Faculty {}
 
 final request = {
   "id": 3,
