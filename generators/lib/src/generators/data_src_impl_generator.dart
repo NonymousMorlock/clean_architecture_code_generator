@@ -139,12 +139,8 @@ class RemoteDataSrcGenerator
   bool getTerminalInfo(String question) {
     stdout.write('$question (yes): ');
     final result = stdin.readLineSync() ?? 'yes';
-    var value = true;
-    if (result.isNotEmpty &&
+    return !(result.isNotEmpty &&
         result.toLowerCase() != 'yes' &&
-        result.toLowerCase() != 'y') {
-      value = false;
-    }
-    return value;
+        result.toLowerCase() != 'y');
   }
 }
