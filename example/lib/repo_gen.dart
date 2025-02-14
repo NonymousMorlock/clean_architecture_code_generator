@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:annotations/annotations.dart';
-import 'package:example/model_gen.dart';
 
 part 'repo_gen.g.dart';
 
@@ -10,22 +9,27 @@ typedef ResultStream<T> = Stream<Either<Failure, T>>;
 
 enum Order { asc, desc }
 
-// @repoGen
-// @usecaseGen
+@repoGen
+@usecaseGen
 // @usecaseTestGen
-@repoImplTestGen
-// @repoImplGen
-// @remoteSrcGen
-class CourseRepresentativeRepoTBG {
-  external ResultFuture<List<Faculty>> getFaculties();
-
-  external ResultFuture<List<Course>> getCourses(String facultyId);
-
-  external ResultFuture<List<Level>> getLevels({
-    required String facultyId,
-    required String courseId,
-  });
+// @repoImplTestGen
+@repoImplGen
+@remoteSrcGen
+class BlockRepoTBG {
+  external ResultFuture<Feedback> leaveFeedback(Feedback feedback);
 }
+
+class Feedback {}
+
+class Booking {}
+
+class Room {}
+
+class Block {}
+
+class ProductCategory {}
+
+class CourseRepresentative {}
 
 class Level {}
 
