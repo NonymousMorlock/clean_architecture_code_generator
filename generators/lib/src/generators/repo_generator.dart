@@ -24,7 +24,17 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
 
   void repo(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
-    buffer.writeln('abstract class $className {');
+    if (visitor.methods.length < 2) {
+      buffer.writeAll(
+        [
+          '// I need this class to be an interface.',
+          '// ignore_for_file: one_member_abstracts',
+          ''
+        ],
+        '\n',
+      );
+    }
+    buffer.writeln('abstract interface class $className {');
     if (visitor.methods.length == 1) {
       buffer.writeln('const $className();');
     }
