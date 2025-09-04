@@ -35,7 +35,7 @@ class RemoteDataSrcGenerator
     final repoName = visitor.className;
     final dataSrcName =
         '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc';
-    buffer.writeln('abstract class $dataSrcName {');
+    buffer.writeln('abstract interface class $dataSrcName {');
     buffer.writeln();
 
     for (final method in visitor.methods) {
