@@ -30,9 +30,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
       methodLength: visitor.methods.length,
     );
     buffer.writeln('abstract interface class $className {');
-    if (visitor.methods.length == 1) {
-      buffer.writeln('const $className();');
-    }
+    buffer.writeln('const $className();');
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
       final isStream = method.returnType.startsWith('Stream');
