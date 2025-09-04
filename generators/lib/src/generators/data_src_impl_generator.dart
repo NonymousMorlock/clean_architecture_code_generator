@@ -41,6 +41,8 @@ class RemoteDataSrcGenerator
       methodLength: visitor.methods.length,
     );
     buffer.writeln('abstract interface class $dataSrcName {');
+    buffer.writeln('const $dataSrcName();');
+
     buffer.writeln();
 
     for (final method in visitor.methods) {
