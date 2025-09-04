@@ -5,6 +5,7 @@ import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/services/functions.dart';
 import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -24,16 +25,10 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
 
   void repo(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
-    if (visitor.methods.length < 2) {
-      buffer.writeAll(
-        [
-          '// I need this class to be an interface.',
-          '// ignore_for_file: one_member_abstracts',
-          ''
-        ],
-        '\n',
-      );
-    }
+    Utils.oneMemberAbstractHandler(
+      buffer: buffer,
+      methodLength: visitor.methods.length,
+    );
     buffer.writeln('abstract interface class $className {');
     if (visitor.methods.length == 1) {
       buffer.writeln('const $className();');

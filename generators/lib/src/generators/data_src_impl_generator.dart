@@ -8,6 +8,7 @@ import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/services/functions.dart';
 import 'package:generators/core/services/map_extensions.dart';
 import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -35,6 +36,10 @@ class RemoteDataSrcGenerator
     final repoName = visitor.className;
     final dataSrcName =
         '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc';
+    Utils.oneMemberAbstractHandler(
+      buffer: buffer,
+      methodLength: visitor.methods.length,
+    );
     buffer.writeln('abstract interface class $dataSrcName {');
     buffer.writeln();
 
