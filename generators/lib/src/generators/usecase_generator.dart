@@ -49,7 +49,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     final usecaseType = method.params != null
         ? '${usecaseTypePrefix}UsecaseWithParams<$returnType, $param>'
         : '${usecaseTypePrefix}UsecaseWithoutParams<$returnType>';
-    buffer.writeln('class $className extends $usecaseType {');
+    buffer.writeln('class $className implements $usecaseType {');
     buffer.writeln('const $className(this._repo);');
     buffer.writeln();
     buffer.writeln('final $repoName _repo;');
