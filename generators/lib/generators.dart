@@ -3,6 +3,7 @@ library generators;
 import 'package:build/build.dart';
 import 'package:generators/src/generators/data_src_impl_generator.dart';
 import 'package:generators/src/generators/entity_generator.dart';
+import 'package:generators/src/generators/injection_generator.dart';
 import 'package:generators/src/generators/local_data_src_generator.dart';
 import 'package:generators/src/generators/model_generator.dart';
 import 'package:generators/src/generators/model_test_generator.dart';
@@ -38,3 +39,6 @@ Builder generateModelTest(BuilderOptions options) =>
 
 Builder generateLocalDataSrc(BuilderOptions options) =>
     SharedPartBuilder([LocalDataSrcGenerator()], 'localDataSrc');
+
+Builder generateInjectionContainer(BuilderOptions options) =>
+    SharedPartBuilder([InjectionGenerator()], 'injection');
