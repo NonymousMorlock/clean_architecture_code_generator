@@ -123,8 +123,9 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     buffer.writeln('sink.add(Left(ServerFailure(message: error.message,'
         ' statusCode: error.statusCode,),),);');
     buffer.writeln('} else {');
-    buffer.writeln('sink.add(Left(ServerFailure(message: error.toString'
-        '(), statusCode: 500,),),);');
+    buffer
+        .writeln('sink.add(Left(ServerFailure(message: \'Something went wrong\''
+            '(), statusCode: 500,),),);');
     buffer.writeln('}');
     buffer.writeln('},');
     buffer.writeln('),');
