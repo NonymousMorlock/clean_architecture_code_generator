@@ -1,0 +1,47 @@
+# Clean Architecture Code Generator Configuration
+
+# Output directory for generated files (relative to project root)
+output_path: lib
+
+# Naming convention for generated classes and files
+# Options: camel_case, snake_case, pascal_case
+naming_convention: camel_case
+
+# Whether to generate test files
+generate_tests: true
+
+# Whether to generate documentation
+generate_docs: false
+
+# Custom imports to add to generated files
+custom_imports:
+  - "import 'dart:convert';"
+  - "import 'package:dartz/dartz.dart';"
+  - "import 'package:equatable/equatable.dart';"
+  - "import 'package:shared_preferences/shared_preferences.dart';"
+  - "import 'package:dio/dio.dart';"
+
+# Template overrides for custom code generation
+template_overrides:
+  # Add custom templates here if needed
+  # entity_template: "path/to/custom/entity_template.dart"
+
+# Feature structure configuration
+feature_structure:
+  data_path: data
+  domain_path: domain
+  presentation_path: presentation
+  use_subfolders: true
+
+# Dependency injection configuration
+dependency_injection:
+  service_locator: get_it
+  generate_injection_container: true
+  container_name: injection_container
+  
+# State management configuration
+state_management:
+  type: cubit # Options: cubit, bloc
+  generate_states: true
+  base_state_name: State
+  error_handling: true

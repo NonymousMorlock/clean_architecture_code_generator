@@ -16,6 +16,7 @@ dependencies:
   annotations:
     path: ../annotations/
   source_gen:
+  yaml: ^3.1.2
 
 dev_dependencies:
   flutter_test:
