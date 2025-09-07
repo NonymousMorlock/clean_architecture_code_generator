@@ -19,7 +19,7 @@ builders:
     target: ":generators"
     import: "package:generators/generators.dart"
     builder_factories: [ "generateEntityClass", "generateModelClass", "generateUsecases", "generateUsecasesTest", "generateRepoImpl",
-                         "generateRemoteDataSrc", "generateLocalDataSrc", "generateRepository", "generateModelTest", "generateInjectionContainer" ]
+                         "generateRemoteDataSrc", "generateLocalDataSrc", "generateRepository", "generateModelTest", "generateInjectionContainer", "generateCubit" ]
     build_extensions: { ".dart": [ ".g.dart", ".g.part"] } # add ".g.part" if you want to use partials
     auto_apply: dependents
     # Modify the output path to "example_directory/lib"

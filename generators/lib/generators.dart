@@ -1,6 +1,7 @@
 library generators;
 
 import 'package:build/build.dart';
+import 'package:generators/src/generators/cubit_generator.dart';
 import 'package:generators/src/generators/data_src_impl_generator.dart';
 import 'package:generators/src/generators/entity_generator.dart';
 import 'package:generators/src/generators/injection_generator.dart';
@@ -42,3 +43,6 @@ Builder generateLocalDataSrc(BuilderOptions options) =>
 
 Builder generateInjectionContainer(BuilderOptions options) =>
     SharedPartBuilder([InjectionGenerator()], 'injection');
+
+Builder generateCubit(BuilderOptions options) =>
+    SharedPartBuilder([CubitGenerator()], 'cubit');

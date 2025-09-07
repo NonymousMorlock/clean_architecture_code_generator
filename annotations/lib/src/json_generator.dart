@@ -8,6 +8,7 @@ const repoImplGen = RepoImplGenAnnotation();
 const remoteSrcGen = RemoteDataSrcGenAnnotation();
 const localSrcGen = LocalDataSrcGenAnnotation();
 const injectionGen = InjectionGenAnnotation();
+const cubitGen = CubitGenAnnotation();
 
 /// Generate unit tests for the usecases from this class
 const usecaseTestGen = UsecaseTestGenAnnotation();
@@ -66,4 +67,8 @@ class LocalDataSrcTestGenAnnotation {
 
 class InjectionGenAnnotation {
   const InjectionGenAnnotation();
+}
+
+class CubitGenAnnotation {
+  const CubitGenAnnotation();
 }
