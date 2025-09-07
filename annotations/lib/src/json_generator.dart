@@ -6,12 +6,14 @@ const repoGen = RepoGenAnnotation();
 const usecaseGen = UsecaseGenAnnotation();
 const repoImplGen = RepoImplGenAnnotation();
 const remoteSrcGen = RemoteDataSrcGenAnnotation();
+const localSrcGen = LocalDataSrcGenAnnotation();
 
 /// Generate unit tests for the usecases from this class
 const usecaseTestGen = UsecaseTestGenAnnotation();
 const modelTestGen = ModelTestGenAnnotation();
 const repoImplTestGen = RepoImplTestGenAnnotation();
 const remoteSrcTestGen = RemoteDataSrcTestGenAnnotation();
+const localSrcTestGen = LocalDataSrcTestGenAnnotation();
 
 class ModelGenAnnotation {
   const ModelGenAnnotation();
@@ -51,4 +53,12 @@ class RepoImplTestGenAnnotation {
 
 class RemoteDataSrcTestGenAnnotation {
   const RemoteDataSrcTestGenAnnotation();
+}
+
+class LocalDataSrcGenAnnotation {
+  const LocalDataSrcGenAnnotation();
+}
+
+class LocalDataSrcTestGenAnnotation {
+  const LocalDataSrcTestGenAnnotation();
 }
