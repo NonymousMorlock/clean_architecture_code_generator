@@ -1,10 +1,9 @@
 #!/usr/bin/env dart
 
-import 'package:args/args.dart';
+import 'package:clean_arch_cli/clean_arch_cli.dart';
+import 'package:clean_arch_cli/commands/create_command.dart';
 import 'package:clean_arch_cli/commands/generate_command.dart';
 import 'package:clean_arch_cli/commands/init_command.dart';
-import 'package:clean_arch_cli/commands/create_command.dart';
-import 'package:mason_logger/mason_logger.dart';
 
 void main(List<String> arguments) async {
   final logger = Logger();
@@ -79,16 +78,4 @@ void _showUsage(ArgParser parser, Map<String, Command> subCommands) {
   print(parser.usage);
   print('');
   print('Run "clean_arch_cli <command> --help" for more information about a command.');
-}
-
-abstract class Command {
-  Command(this.logger);
-  
-  final Logger logger;
-  
-  String get name;
-  String get description;
-  ArgParser get argParser;
-  
-  Future<void> run(ArgResults results);
 }
