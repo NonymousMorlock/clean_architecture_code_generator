@@ -4,6 +4,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/src/generators/model_test_generator_improved.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -15,12 +16,10 @@ class ModelTestGenerator
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
-    final visitor = ModelVisitor();
-    element.visitChildren(visitor);
-
-    final buffer = StringBuffer();
-    testMain(buffer, visitor);
-    return buffer.toString();
+    // Use the improved model test generator
+    final improvedGenerator = ModelTestGeneratorImproved();
+    return improvedGenerator.generateForAnnotatedElement(
+        element, annotation, buildStep);
   }
 
   void testMain(StringBuffer buffer, ModelVisitor visitor) {

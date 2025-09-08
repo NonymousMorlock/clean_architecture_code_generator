@@ -10,6 +10,7 @@ class GeneratorConfig {
     this.customImports = const [],
     this.templateOverrides = const {},
     this.featureStructure = const DefaultFeatureStructure(),
+    this.modelTestConfig = const ModelTestConfig(),
   });
 
   factory GeneratorConfig.fromFile(String configPath) {
@@ -44,6 +45,9 @@ class GeneratorConfig {
       featureStructure: FeatureStructure.fromMap(
         map['feature_structure'] as Map<dynamic, dynamic>? ?? {},
       ),
+      modelTestConfig: ModelTestConfig.fromMap(
+        map['model_test_config'] as Map<dynamic, dynamic>? ?? {},
+      ),
     );
   }
 
@@ -54,6 +58,7 @@ class GeneratorConfig {
   final List<String> customImports;
   final Map<String, String> templateOverrides;
   final FeatureStructure featureStructure;
+  final ModelTestConfig modelTestConfig;
 
   static NamingConvention _parseNamingConvention(String? convention) {
     switch (convention?.toLowerCase()) {
@@ -166,4 +171,96 @@ class DefaultFeatureStructure extends FeatureStructure {
           presentationPath: 'presentation',
           useSubfolders: true,
         );
+}
+
+class ModelTestConfig {
+  const ModelTestConfig({
+    this.useFixtureBasedTests = true,
+    this.generateNullSafetyTests = true,
+    this.modelConfigs = const {},
+    this.defaults = const ModelTestDefaults(),
+  });
+
+  factory ModelTestConfig.fromMap(Map<dynamic, dynamic> map) {
+    final global = map['global'] as Map<dynamic, dynamic>? ?? {};
+    final modelConfigs = <String, ModelFieldTypeConfig>{};
+
+    // Parse model-specific configurations
+    for (final entry in map.entries) {
+      if (entry.key != 'global' && entry.key != 'defaults') {
+        final modelName = entry.key as String;
+        final modelMap = entry.value as Map<dynamic, dynamic>? ?? {};
+        modelConfigs[modelName] = ModelFieldTypeConfig.fromMap(modelMap);
+      }
+    }
+
+    return ModelTestConfig(
+      useFixtureBasedTests: global['use_fixture_based_tests'] as bool? ?? true,
+      generateNullSafetyTests:
+          global['generate_null_safety_tests'] as bool? ?? true,
+      modelConfigs: modelConfigs,
+      defaults: ModelTestDefaults.fromMap(
+        map['defaults'] as Map<dynamic, dynamic>? ?? {},
+      ),
+    );
+  }
+
+  final bool useFixtureBasedTests;
+  final bool generateNullSafetyTests;
+  final Map<String, ModelFieldTypeConfig> modelConfigs;
+  final ModelTestDefaults defaults;
+
+  String getFieldType(String modelName, String fieldName, String dartType) {
+    // Check model-specific configuration first
+    final modelConfig = modelConfigs[modelName.toLowerCase()];
+    if (modelConfig != null) {
+      final fieldType = modelConfig.fieldTypes[fieldName];
+      if (fieldType != null) {
+        return fieldType;
+      }
+    }
+
+    // Fall back to defaults based on dart type
+    if (dartType.toLowerCase().contains('datetime')) {
+      return defaults.datetimeFormat;
+    } else if (dartType.toLowerCase().contains('double')) {
+      return defaults.numberFormat;
+    } else if (dartType.toLowerCase().contains('int')) {
+      return 'int';
+    }
+
+    return ''; // Use default handling
+  }
+}
+
+class ModelFieldTypeConfig {
+  const ModelFieldTypeConfig({
+    this.fieldTypes = const {},
+  });
+
+  factory ModelFieldTypeConfig.fromMap(Map<dynamic, dynamic> map) {
+    final fieldTypesMap = map['field_types'] as Map<dynamic, dynamic>? ?? {};
+    return ModelFieldTypeConfig(
+      fieldTypes: Map<String, String>.from(fieldTypesMap),
+    );
+  }
+
+  final Map<String, String> fieldTypes;
+}
+
+class ModelTestDefaults {
+  const ModelTestDefaults({
+    this.datetimeFormat = 'iso_string',
+    this.numberFormat = 'double',
+  });
+
+  factory ModelTestDefaults.fromMap(Map<dynamic, dynamic> map) {
+    return ModelTestDefaults(
+      datetimeFormat: map['datetime_format'] as String? ?? 'iso_string',
+      numberFormat: map['number_format'] as String? ?? 'double',
+    );
+  }
+
+  final String datetimeFormat;
+  final String numberFormat;
 }

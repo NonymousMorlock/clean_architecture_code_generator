@@ -45,3 +45,27 @@ state_management:
   generate_states: true
   base_state_name: State
   error_handling: true
+
+# Model test configuration
+model_test_config:
+  # Global settings for all models
+  global:
+    use_fixture_based_tests: true
+    generate_null_safety_tests: true
+    
+  # Per-model field type configurations
+  user:
+    field_types:
+      created_at: "iso_string"     # Options: iso_string, timestamp_ms, timestamp_s
+      updated_at: "iso_string"
+      birth_date: "timestamp_ms"
+      
+  product:
+    field_types:
+      price: "double"              # Options: double, int, string
+      created_at: "timestamp_ms"
+      
+  # Default field type mappings for new models
+  defaults:
+    datetime_format: "iso_string"  # Default for DateTime fields
+    number_format: "double"        # Default for numeric fields
