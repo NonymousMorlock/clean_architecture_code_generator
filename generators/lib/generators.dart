@@ -10,6 +10,7 @@ import 'package:generators/src/generators/model_generator.dart';
 import 'package:generators/src/generators/model_test_generator.dart';
 import 'package:generators/src/generators/repo_generator.dart';
 import 'package:generators/src/generators/repo_impl_generator.dart';
+import 'package:generators/src/generators/repo_impl_test_generator.dart';
 import 'package:generators/src/generators/usecase_generator.dart';
 import 'package:generators/src/generators/usecase_test_generator.dart';
 import 'package:source_gen/source_gen.dart';
@@ -46,3 +47,6 @@ Builder generateInjectionContainer(BuilderOptions options) =>
 
 Builder generateCubit(BuilderOptions options) =>
     SharedPartBuilder([CubitGenerator()], 'cubit');
+
+Builder generateRepoImplTest(BuilderOptions options) =>
+    SharedPartBuilder([RepoImplTestGenerator()], 'repoImplTest');
