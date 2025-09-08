@@ -78,6 +78,11 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
     toMap(buffer, visitor);
     buffer.writeln();
     toJson(buffer);
+    buffer.writeln();
+
+    // Add DateTime parsing helper method
+    _generateDateTimeParsingHelper(buffer);
+    
     buffer.writeln('}');
   }
 
@@ -109,12 +114,13 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
         }
         buffer.writeln("${name.camelCase}: $value,");
       } else if (type.toLowerCase().startsWith('datetime')) {
-        var value = "DateTime.parse(map['$name'] as String)";
+        // Enhanced DateTime parsing to handle multiple API formats
         if (!field.isRequired) {
-          value =
-              "map['$name'] == null ? null : DateTime.parse(map['$name'] as String)";
+          buffer.writeln(
+              "${name.camelCase}: map['$name'] == null ? null : _parseDateTime(map['$name']),");
+        } else {
+          buffer.writeln("${name.camelCase}: _parseDateTime(map['$name']),");
         }
-        buffer.writeln("${name.camelCase}: $value,");
       } else {
         buffer.writeln(
             "${name.camelCase}: map['$name'] as $type${field.isRequired ? '' : '?'},");
@@ -168,5 +174,27 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
     }
     buffer.writeln(');');
     buffer.writeln('}');
+  }
+
+  void _generateDateTimeParsingHelper(StringBuffer buffer) {
+    buffer.writeln(
+        '  // Helper method to parse DateTime from various API formats');
+    buffer.writeln('  static DateTime _parseDateTime(dynamic value) {');
+    buffer.writeln('    if (value is String) {');
+    buffer.writeln('      return DateTime.parse(value);');
+    buffer.writeln('    } else if (value is int) {');
+    buffer.writeln('      // Handle timestamp (milliseconds or seconds)');
+    buffer.writeln('      return value > 1000000000000');
+    buffer.writeln('          ? DateTime.fromMillisecondsSinceEpoch(value)');
+    buffer.writeln(
+        '          : DateTime.fromMillisecondsSinceEpoch(value * 1000);');
+    buffer.writeln('    } else if (value is double) {');
+    buffer.writeln(
+        '      return DateTime.fromMillisecondsSinceEpoch(value.toInt());');
+    buffer.writeln('    } else {');
+    buffer.writeln(
+        '      throw FormatException(\'Invalid DateTime format: \$value\');');
+    buffer.writeln('    }');
+    buffer.writeln('  }');
   }
 }
