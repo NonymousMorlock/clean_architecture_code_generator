@@ -17,6 +17,12 @@
       <excludeFolder url="file://$MODULE_DIR$/annotations/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/annotations/build" />
       <excludeFolder url="file://$MODULE_DIR$/annotations/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/build" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/my_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/my_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/my_app/build" />
     </content>
     <orderEntry type="jdk" jdkName="Android API 33, extension level 3 Platform" jdkType="Android SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
