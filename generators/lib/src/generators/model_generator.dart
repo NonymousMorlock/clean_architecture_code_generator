@@ -82,7 +82,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
 
     // Add DateTime parsing helper method
     _generateDateTimeParsingHelper(buffer);
-    
+
     buffer.writeln('}');
   }
 
