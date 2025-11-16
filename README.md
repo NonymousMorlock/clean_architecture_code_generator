@@ -307,6 +307,9 @@ Create a `clean_arch_config.yaml` file in your project root to customize generat
 ```yaml
 # Clean Architecture Code Generator Configuration
 
+# Application configuration
+app_name: "your_app"  # Change this to your actual app name (used for import paths)
+
 # Output directory for generated files
 output_path: lib
 
@@ -341,6 +344,53 @@ state_management:
   type: cubit  # Options: cubit, bloc
   generate_states: true
   error_handling: true
+
+# Remote data source configuration
+remote_data_source:
+  # HTTP Client configuration
+  http_client: "dio"              # Options: dio, http, chopper, retrofit, custom
+  base_url: "https://api.example.com"
+  timeout: 30000                  # Timeout in milliseconds
+  enable_logging: true
+  enable_retry: true
+  max_retries: 3
+
+  # Service integrations
+  firebase_auth: false            # Use Firebase Authentication
+  firebase_firestore: false      # Use Cloud Firestore
+  firebase_storage: false        # Use Firebase Storage
+  graphql: false                  # Use GraphQL client
+  websockets: false               # Use WebSocket connections
+  supabase: false                 # Use Supabase client
+
+  # Custom dependencies (for packages not covered above)
+  custom_dependencies:
+    - "package:custom_http_client/custom_http_client.dart"
+    - "package:analytics/analytics.dart"
+```
+
+### 🎯 Remote Data Source Configuration Benefits
+
+The remote data source generator now uses **YAML configuration** instead of terminal prompts, providing:
+
+- **🚀 Non-Interactive Builds**: No more terminal prompts during code generation
+- **🔄 Consistent Builds**: Same configuration produces identical results across environments
+- **⚙️ CI/CD Friendly**: Perfect for automated build pipelines
+- **📝 Version Controlled**: Configuration is part of your codebase
+- **🎛️ Declarative**: Clear, readable dependency specification
+
+**Before (Terminal Prompts):**
+```
+REMOTE DATA SOURCE DEPENDENCIES FOR UserRemoteDataSrc
+does it use FirebaseAuth? (yes/no): yes
+does it use Dio? (yes/no): yes
+```
+
+**After (YAML Configuration):**
+```yaml
+remote_data_source:
+  http_client: "dio"
+  firebase_auth: true
 ```
 
 ## 📚 Examples
