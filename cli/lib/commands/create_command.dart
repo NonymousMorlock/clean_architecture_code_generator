@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'package:args/args.dart';
-import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as path;
 import '../clean_arch_cli.dart';
 
@@ -144,6 +142,8 @@ class ${_toPascalCase(entityName)}TBG {
 import 'package:annotations/annotations.dart';
 import '../../../../core/typedefs.dart';
 import '../entities/${repoName.toLowerCase()}.dart';
+
+part '${repoName.toLowerCase()}_repository.g.dart';
 
 @repoGen
 @usecaseGen
