@@ -3,7 +3,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
-import 'package:generators/core/services/functions.dart';
+import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
@@ -76,24 +76,28 @@ class RepoImplTestGenerator
       String repoName,
       String repoImplName,
       String remoteDataSourceName) {
+    // Load configuration to get app name
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final appName = config.appName;
+
     buffer.writeln('import \'package:dartz/dartz.dart\';');
     buffer.writeln('import \'package:flutter_test/flutter_test.dart\';');
     buffer.writeln('import \'package:mocktail/mocktail.dart\';');
     buffer.writeln();
     buffer.writeln('// Core imports');
-    buffer.writeln('import \'package:your_app/core/errors/exceptions.dart\';');
-    buffer.writeln('import \'package:your_app/core/errors/failures.dart\';');
-    buffer.writeln('import \'package:your_app/core/typedefs.dart\';');
+    buffer.writeln('import \'package:$appName/core/errors/exceptions.dart\';');
+    buffer.writeln('import \'package:$appName/core/errors/failures.dart\';');
+    buffer.writeln('import \'package:$appName/core/typedefs.dart\';');
     buffer.writeln();
     buffer.writeln('// Feature imports');
     buffer.writeln(
-        'import \'package:your_app/features/$featureSnakeCase/data/datasources/${featureSnakeCase}_remote_data_source.dart\';');
+        'import \'package:$appName/features/$featureSnakeCase/data/datasources/${featureSnakeCase}_remote_data_source.dart\';');
     buffer.writeln(
-        'import \'package:your_app/features/$featureSnakeCase/data/models/${featureSnakeCase}_model.dart\';');
+        'import \'package:$appName/features/$featureSnakeCase/data/models/${featureSnakeCase}_model.dart\';');
     buffer.writeln(
-        'import \'package:your_app/features/$featureSnakeCase/data/repositories/${featureSnakeCase}_repository_impl.dart\';');
+        'import \'package:$appName/features/$featureSnakeCase/data/repositories/${featureSnakeCase}_repository_impl.dart\';');
     buffer.writeln(
-        'import \'package:your_app/features/$featureSnakeCase/domain/entities/${featureSnakeCase}.dart\';');
+        'import \'package:$appName/features/$featureSnakeCase/domain/entities/$featureSnakeCase.dart\';');
     buffer.writeln();
   }
 
@@ -120,14 +124,14 @@ class RepoImplTestGenerator
 
     // Generate test entities
     for (final entityType in entityTypes) {
-      buffer.writeln('  final t${entityType} = ${entityType}.empty();');
+      buffer.writeln('  final t$entityType = $entityType.empty();');
     }
 
     if (entityTypes.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('  setUpAll(() {');
       for (final entityType in entityTypes) {
-        buffer.writeln('    registerFallbackValue(t${entityType});');
+        buffer.writeln('    registerFallbackValue(t$entityType);');
       }
       buffer.writeln('  });');
       buffer.writeln();
@@ -196,7 +200,6 @@ class RepoImplTestGenerator
   void _generateSuccessTest(StringBuffer buffer, IFunction method,
       String returnType, bool isStream, bool isVoid, String featureName) {
     final methodName = method.name;
-    final params = method.params?.map((p) => p.name).join(', ') ?? '';
     final namedParams = method.params
             ?.where((p) => p.isNamed)
             .map((p) => '${p.name}: ${p.name}')
@@ -365,7 +368,6 @@ class RepoImplTestGenerator
   void _generateFailureTest(StringBuffer buffer, IFunction method,
       String returnType, bool isStream, bool isVoid) {
     final methodName = method.name;
-    final params = method.params?.map((p) => p.name).join(', ') ?? '';
     final namedParams = method.params
             ?.where((p) => p.isNamed)
             .map((p) => '${p.name}: ${p.name}')

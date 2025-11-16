@@ -1,5 +1,8 @@
 # Clean Architecture Code Generator Configuration
 
+# Application configuration
+app_name: "your_app"  # Change this to your actual app name (used for import paths)
+
 # Output directory for generated files (relative to project root)
 output_path: lib
 

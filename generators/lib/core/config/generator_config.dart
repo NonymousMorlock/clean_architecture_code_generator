@@ -3,6 +3,7 @@ import 'package:yaml/yaml.dart';
 
 class GeneratorConfig {
   GeneratorConfig({
+    this.appName = 'your_app',
     this.outputPath = 'lib',
     this.namingConvention = NamingConvention.camelCase,
     this.generateTests = true,
@@ -11,6 +12,7 @@ class GeneratorConfig {
     this.templateOverrides = const {},
     this.featureStructure = const DefaultFeatureStructure(),
     this.modelTestConfig = const ModelTestConfig(),
+    this.remoteDataSourceConfig = const RemoteDataSourceConfig(),
   });
 
   factory GeneratorConfig.fromFile(String configPath) {
@@ -22,7 +24,7 @@ class GeneratorConfig {
 
       final yamlString = file.readAsStringSync();
       final yamlMap = loadYaml(yamlString) as Map<dynamic, dynamic>;
-      
+
       return GeneratorConfig.fromMap(yamlMap);
     } catch (e) {
       print('Warning: Could not load config file. Using defaults. Error: $e');
@@ -32,13 +34,16 @@ class GeneratorConfig {
 
   factory GeneratorConfig.fromMap(Map<dynamic, dynamic> map) {
     return GeneratorConfig(
+      appName: map['app_name'] as String? ?? 'your_app',
       outputPath: map['output_path'] as String? ?? 'lib',
-      namingConvention: _parseNamingConvention(map['naming_convention'] as String?),
+      namingConvention:
+          _parseNamingConvention(map['naming_convention'] as String?),
       generateTests: map['generate_tests'] as bool? ?? true,
       generateDocs: map['generate_docs'] as bool? ?? false,
       customImports: (map['custom_imports'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ?? const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       templateOverrides: Map<String, String>.from(
         map['template_overrides'] as Map<dynamic, dynamic>? ?? {},
       ),
@@ -48,9 +53,13 @@ class GeneratorConfig {
       modelTestConfig: ModelTestConfig.fromMap(
         map['model_test_config'] as Map<dynamic, dynamic>? ?? {},
       ),
+      remoteDataSourceConfig: RemoteDataSourceConfig.fromMap(
+        map['remote_data_source'] as Map<dynamic, dynamic>? ?? {},
+      ),
     );
   }
 
+  final String appName;
   final String outputPath;
   final NamingConvention namingConvention;
   final bool generateTests;
@@ -59,6 +68,7 @@ class GeneratorConfig {
   final Map<String, String> templateOverrides;
   final FeatureStructure featureStructure;
   final ModelTestConfig modelTestConfig;
+  final RemoteDataSourceConfig remoteDataSourceConfig;
 
   static NamingConvention _parseNamingConvention(String? convention) {
     switch (convention?.toLowerCase()) {
@@ -74,6 +84,7 @@ class GeneratorConfig {
 
   Map<String, dynamic> toMap() {
     return {
+      'app_name': appName,
       'output_path': outputPath,
       'naming_convention': namingConvention.name,
       'generate_tests': generateTests,
@@ -263,4 +274,180 @@ class ModelTestDefaults {
 
   final String datetimeFormat;
   final String numberFormat;
+}
+
+class RemoteDataSourceConfig {
+  const RemoteDataSourceConfig({
+    this.httpClient = HttpClientType.dio,
+    this.useFirebaseAuth = false,
+    this.useFirebaseFirestore = false,
+    this.useFirebaseStorage = false,
+    this.useGraphQL = false,
+    this.useWebSockets = false,
+    this.useSupabase = false,
+    this.customDependencies = const [],
+    this.baseUrl = '',
+    this.timeout = 30000,
+    this.enableLogging = true,
+    this.enableRetry = true,
+    this.maxRetries = 3,
+  });
+
+  factory RemoteDataSourceConfig.fromMap(Map<dynamic, dynamic> map) {
+    return RemoteDataSourceConfig(
+      httpClient: _parseHttpClientType(map['http_client'] as String?),
+      useFirebaseAuth: map['firebase_auth'] as bool? ?? false,
+      useFirebaseFirestore: map['firebase_firestore'] as bool? ?? false,
+      useFirebaseStorage: map['firebase_storage'] as bool? ?? false,
+      useGraphQL: map['graphql'] as bool? ?? false,
+      useWebSockets: map['websockets'] as bool? ?? false,
+      useSupabase: map['supabase'] as bool? ?? false,
+      customDependencies: (map['custom_dependencies'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      baseUrl: map['base_url'] as String? ?? '',
+      timeout: map['timeout'] as int? ?? 30000,
+      enableLogging: map['enable_logging'] as bool? ?? true,
+      enableRetry: map['enable_retry'] as bool? ?? true,
+      maxRetries: map['max_retries'] as int? ?? 3,
+    );
+  }
+
+  final HttpClientType httpClient;
+  final bool useFirebaseAuth;
+  final bool useFirebaseFirestore;
+  final bool useFirebaseStorage;
+  final bool useGraphQL;
+  final bool useWebSockets;
+  final bool useSupabase;
+  final List<String> customDependencies;
+  final String baseUrl;
+  final int timeout;
+  final bool enableLogging;
+  final bool enableRetry;
+  final int maxRetries;
+
+  static HttpClientType _parseHttpClientType(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'dio':
+        return HttpClientType.dio;
+      case 'http':
+        return HttpClientType.http;
+      case 'chopper':
+        return HttpClientType.chopper;
+      case 'retrofit':
+        return HttpClientType.retrofit;
+      case 'custom':
+        return HttpClientType.custom;
+      default:
+        return HttpClientType.dio;
+    }
+  }
+
+  List<String> get requiredImports {
+    final imports = <String>[];
+
+    switch (httpClient) {
+      case HttpClientType.dio:
+        imports.add('package:dio/dio.dart');
+        break;
+      case HttpClientType.http:
+        imports.add('package:http/http.dart');
+        break;
+      case HttpClientType.chopper:
+        imports.add('package:chopper/chopper.dart');
+        break;
+      case HttpClientType.retrofit:
+        imports.add('package:retrofit/retrofit.dart');
+        break;
+      case HttpClientType.custom:
+        // Custom imports handled via customDependencies
+        break;
+    }
+
+    if (useFirebaseAuth) {
+      imports.add('package:firebase_auth/firebase_auth.dart');
+    }
+
+    if (useFirebaseFirestore) {
+      imports.add('package:cloud_firestore/cloud_firestore.dart');
+    }
+
+    if (useFirebaseStorage) {
+      imports.add('package:firebase_storage/firebase_storage.dart');
+    }
+
+    if (useGraphQL) {
+      imports.add('package:graphql_flutter/graphql_flutter.dart');
+    }
+
+    if (useWebSockets) {
+      imports.add('package:web_socket_channel/web_socket_channel.dart');
+    }
+
+    if (useSupabase) {
+      imports.add('package:supabase_flutter/supabase_flutter.dart');
+    }
+
+    imports.addAll(customDependencies);
+
+    return imports;
+  }
+
+  List<String> get constructorDependencies {
+    final dependencies = <String>[];
+
+    switch (httpClient) {
+      case HttpClientType.dio:
+        dependencies.add('Dio dio');
+        break;
+      case HttpClientType.http:
+        dependencies.add('http.Client client');
+        break;
+      case HttpClientType.chopper:
+        dependencies.add('ChopperClient client');
+        break;
+      case HttpClientType.retrofit:
+        dependencies.add('RestClient client');
+        break;
+      case HttpClientType.custom:
+        dependencies.add('HttpClient client');
+        break;
+    }
+
+    if (useFirebaseAuth) {
+      dependencies.add('FirebaseAuth firebaseAuth');
+    }
+
+    if (useFirebaseFirestore) {
+      dependencies.add('FirebaseFirestore firestore');
+    }
+
+    if (useFirebaseStorage) {
+      dependencies.add('FirebaseStorage storage');
+    }
+
+    if (useGraphQL) {
+      dependencies.add('GraphQLClient graphQLClient');
+    }
+
+    if (useWebSockets) {
+      dependencies.add('WebSocketChannel webSocketChannel');
+    }
+
+    if (useSupabase) {
+      dependencies.add('SupabaseClient supabaseClient');
+    }
+
+    return dependencies;
+  }
+}
+
+enum HttpClientType {
+  dio,
+  http,
+  chopper,
+  retrofit,
+  custom,
 }

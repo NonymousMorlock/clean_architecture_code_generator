@@ -29,8 +29,7 @@ class ModelTestGeneratorImproved
     final modelClassName = '${className}Model';
     final entityClassName = className;
 
-    // Load configuration
-    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    // Configuration is loaded in individual methods as needed
 
     // Generate imports
     _generateImports(buffer, className);
@@ -59,16 +58,20 @@ class ModelTestGeneratorImproved
   void _generateImports(StringBuffer buffer, String className) {
     final classSnakeCase = className.snakeCase;
 
+    // Load configuration to get app name
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final appName = config.appName;
+
     buffer.writeln('import \'dart:convert\';');
     buffer.writeln();
     buffer.writeln('import \'package:flutter_test/flutter_test.dart\';');
     buffer.writeln();
     buffer.writeln('// Feature imports');
-    buffer.writeln('import \'package:your_app/core/typedefs.dart\';');
+    buffer.writeln('import \'package:$appName/core/typedefs.dart\';');
     buffer.writeln(
-        'import \'package:your_app/features/$classSnakeCase/data/models/${classSnakeCase}_model.dart\';');
+        'import \'package:$appName/features/$classSnakeCase/data/models/${classSnakeCase}_model.dart\';');
     buffer.writeln(
-        'import \'package:your_app/features/$classSnakeCase/domain/entities/$classSnakeCase.dart\';');
+        'import \'package:$appName/features/$classSnakeCase/domain/entities/$classSnakeCase.dart\';');
     buffer.writeln();
     buffer.writeln('// Test utilities');
     buffer.writeln('import \'../../../fixtures/fixture_reader.dart\';');
@@ -79,7 +82,7 @@ class ModelTestGeneratorImproved
       String modelClassName, String entityClassName, ModelVisitor visitor) {
     buffer
         .writeln('  // Test model created from fixture to ensure consistency');
-    buffer.writeln('  late $modelClassName t${modelClassName};');
+    buffer.writeln('  late $modelClassName t$modelClassName;');
     buffer.writeln('  late DataMap tMap;');
     buffer.writeln();
     buffer.writeln('  setUpAll(() {');
@@ -93,7 +96,7 @@ class ModelTestGeneratorImproved
     _generateFixtureTransformations(buffer, visitor);
 
     buffer.writeln('    // Create test model from fixture data');
-    buffer.writeln('    t${modelClassName} = $modelClassName.fromMap(tMap);');
+    buffer.writeln('    t$modelClassName = $modelClassName.fromMap(tMap);');
     buffer.writeln('  });');
     buffer.writeln();
   }
@@ -369,7 +372,7 @@ class ModelTestGeneratorImproved
     buffer.writeln();
     buffer.writeln(
         '// **************************************************************************');
-    buffer.writeln('// Fixture Generator - ${className} Fixture');
+    buffer.writeln('// Fixture Generator - $className Fixture');
     buffer.writeln(
         '// **************************************************************************');
     buffer.writeln();
