@@ -18,6 +18,7 @@ dependencies:
   source_gen:
   yaml: ^3.1.2
 
+  analyzer: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
