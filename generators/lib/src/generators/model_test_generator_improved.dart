@@ -278,13 +278,13 @@ class ModelTestGeneratorImproved
     buffer.writeln('      () {');
 
     String testValue;
-    if (testFieldType!.toLowerCase().contains('string')) {
-      testValue = '\'Updated ${testField!}\'';
-    } else if (testFieldType.toLowerCase().contains('int')) {
+    if (testFieldType?.toLowerCase().contains('string') ?? false) {
+      testValue = '\'Updated $testField\'';
+    } else if (testFieldType?.toLowerCase().contains('int') ?? false) {
       testValue = '999';
-    } else if (testFieldType.toLowerCase().contains('double')) {
+    } else if (testFieldType?.toLowerCase().contains('double') ?? false) {
       testValue = '99.9';
-    } else if (testFieldType.toLowerCase().contains('bool')) {
+    } else if (testFieldType?.toLowerCase().contains('bool') ?? false) {
       testValue = '!t$modelClassName.$testField';
     } else {
       testValue = 'null'; // For complex types
