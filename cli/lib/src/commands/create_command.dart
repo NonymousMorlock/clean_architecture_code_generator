@@ -1,78 +1,89 @@
 import 'dart:io';
-import 'package:path/path.dart' as path;
-import '../clean_arch_cli.dart';
 
-class CreateCommand extends Command {
-  CreateCommand(super.logger);
+import 'package:args/command_runner.dart';
+import 'package:mason_logger/mason_logger.dart';
+import 'package:path/path.dart' as path;
+
+/// {@template create_command}
+/// `clean_arch_cli create` command to create clean architecture components.
+/// {@endtemplate}
+class CreateCommand extends Command<int> {
+  /// {@macro create_command}
+  CreateCommand({required Logger logger}) : _logger = logger {
+    argParser
+      ..addOption(
+        'type',
+        abbr: 't',
+        help: 'Type of component to create',
+        allowed: ['feature', 'entity', 'repository', 'usecase', 'cubit'],
+        mandatory: true,
+      )
+      ..addOption(
+        'name',
+        abbr: 'n',
+        help: 'Name of the component',
+        mandatory: true,
+      )
+      ..addOption(
+        'feature',
+        abbr: 'f',
+        help: 'Feature name (required for non-feature components)',
+      )
+      ..addOption(
+        'path',
+        abbr: 'p',
+        help: 'Project path (default: current directory)',
+        defaultsTo: '.',
+      );
+  }
+
+  final Logger _logger;
 
   @override
   String get name => 'create';
 
   @override
-  String get description => 'Create clean architecture components (feature, entity, repository, etc.)';
+  String get description =>
+      'Create clean architecture components '
+      '(feature, entity, repository, etc.).\n\n'
+      'Supports feature scaffolding from YAML config '
+      '(auto-generates files from defined methods).\n'
+      'Configure in clean_arch_config.yaml under feature_scaffolding.';
 
   @override
-  ArgParser get argParser => ArgParser()
-    ..addOption(
-      'type',
-      abbr: 't',
-      help: 'Type of component to create',
-      allowed: ['feature', 'entity', 'repository', 'usecase', 'cubit'],
-      mandatory: true,
-    )
-    ..addOption(
-      'name',
-      abbr: 'n',
-      help: 'Name of the component',
-      mandatory: true,
-    )
-    ..addOption(
-      'feature',
-      abbr: 'f',
-      help: 'Feature name (required for non-feature components)',
-    )
-    ..addOption(
-      'path',
-      abbr: 'p',
-      help: 'Project path (default: current directory)',
-      defaultsTo: '.',
-    );
-
-  @override
-  Future<void> run(ArgResults results) async {
-    final type = results['type'] as String;
-    final name = results['name'] as String;
-    final feature = results['feature'] as String?;
-    final projectPath = results['path'] as String;
+  Future<int> run() async {
+    final type = argResults!['type'] as String;
+    final name = argResults!['name'] as String;
+    final feature = argResults!['feature'] as String?;
+    final projectPath = argResults!['path'] as String;
 
     if (type != 'feature' && feature == null) {
-      logger.err('❌ Feature name is required for $type creation');
-      logger.info('Use --feature to specify the feature name');
-      return;
+      _logger
+        ..err('❌ Feature name is required for $type creation')
+        ..info('Use --feature to specify the feature name');
+      return ExitCode.usage.code;
     }
 
-    logger.info('🏗️  Creating $type: $name');
+    _logger.info('🏗️  Creating $type: $name');
 
     switch (type) {
       case 'feature':
         await _createFeature(projectPath, name);
-        break;
       case 'entity':
         await _createEntity(projectPath, feature!, name);
-        break;
       case 'repository':
         await _createRepository(projectPath, feature!, name);
-        break;
       case 'usecase':
         await _createUsecase(projectPath, feature!, name);
-        break;
       case 'cubit':
         await _createCubit(projectPath, feature!, name);
-        break;
     }
 
-    logger.success('✅ $type created successfully!');
-    logger.info('🔧 Run "clean_arch_cli generate" to generate code');
+    _logger
+      ..success('✅ $type created successfully!')
+      ..info('🔧 Run "clean_arch_cli generate" to generate code');
+
+    return ExitCode.success.code;
   }
 
   Future<void> _createFeature(String projectPath, String featureName) async {
@@ -94,11 +105,15 @@ class CreateCommand extends Command {
     for (final dir in directories) {
       final dirPath = path.join(featurePath, dir);
       await Directory(dirPath).create(recursive: true);
-      logger.detail('📁 Created: features/$featureName/$dir');
+      _logger.detail('📁 Created: features/$featureName/$dir');
     }
   }
 
-  Future<void> _createEntity(String projectPath, String featureName, String entityName) async {
+  Future<void> _createEntity(
+    String projectPath,
+    String featureName,
+    String entityName,
+  ) async {
     final entityPath = path.join(
       projectPath,
       'lib',
@@ -109,7 +124,8 @@ class CreateCommand extends Command {
       '${entityName.toLowerCase()}.dart',
     );
 
-    final content = '''
+    final content =
+        '''
 import 'package:annotations/annotations.dart';
 
 @entityGen
@@ -124,10 +140,14 @@ class ${_toPascalCase(entityName)}TBG {
 ''';
 
     await File(entityPath).writeAsString(content);
-    logger.detail('📄 Created entity: ${entityName.toLowerCase()}.dart');
+    _logger.detail('📄 Created entity: ${entityName.toLowerCase()}.dart');
   }
 
-  Future<void> _createRepository(String projectPath, String featureName, String repoName) async {
+  Future<void> _createRepository(
+    String projectPath,
+    String featureName,
+    String repoName,
+  ) async {
     final repoPath = path.join(
       projectPath,
       'lib',
@@ -138,7 +158,8 @@ class ${_toPascalCase(entityName)}TBG {
       '${repoName.toLowerCase()}_repository.dart',
     );
 
-    final content = '''
+    final content =
+        '''
 import 'package:annotations/annotations.dart';
 import '../../../../core/typedefs.dart';
 import '../entities/${repoName.toLowerCase()}.dart';
@@ -160,10 +181,16 @@ class ${_toPascalCase(repoName)}RepoTBG {
 ''';
 
     await File(repoPath).writeAsString(content);
-    logger.detail('📄 Created repository: ${repoName.toLowerCase()}_repository.dart');
+    _logger.detail(
+      '📄 Created repository: ${repoName.toLowerCase()}_repository.dart',
+    );
   }
 
-  Future<void> _createUsecase(String projectPath, String featureName, String usecaseName) async {
+  Future<void> _createUsecase(
+    String projectPath,
+    String featureName,
+    String usecaseName,
+  ) async {
     final usecasePath = path.join(
       projectPath,
       'lib',
@@ -174,7 +201,8 @@ class ${_toPascalCase(repoName)}RepoTBG {
       '${usecaseName.toLowerCase()}.dart',
     );
 
-    final content = '''
+    final content =
+        '''
 import '../../../../core/usecases/usecase.dart';
 import '../../../../core/typedefs.dart';
 import '../repositories/${featureName.toLowerCase()}_repository.dart';
@@ -190,10 +218,14 @@ class ${_toPascalCase(usecaseName)} extends UsecaseWithoutParams<void> {
 ''';
 
     await File(usecasePath).writeAsString(content);
-    logger.detail('📄 Created usecase: ${usecaseName.toLowerCase()}.dart');
+    _logger.detail('📄 Created usecase: ${usecaseName.toLowerCase()}.dart');
   }
 
-  Future<void> _createCubit(String projectPath, String featureName, String cubitName) async {
+  Future<void> _createCubit(
+    String projectPath,
+    String featureName,
+    String cubitName,
+  ) async {
     final cubitPath = path.join(
       projectPath,
       'lib',
@@ -214,7 +246,8 @@ class ${_toPascalCase(usecaseName)} extends UsecaseWithoutParams<void> {
       '${cubitName.toLowerCase()}_state.dart',
     );
 
-    final cubitContent = '''
+    final cubitContent =
+        '''
 import 'package:annotations/annotations.dart';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -244,7 +277,8 @@ class ${_toPascalCase(cubitName)}CubitTBG extends Cubit<${_toPascalCase(cubitNam
 }
 ''';
 
-    final stateContent = '''
+    final stateContent =
+        '''
 part of '${cubitName.toLowerCase()}_cubit.dart';
 
 sealed class ${_toPascalCase(cubitName)}State extends Equatable {
@@ -287,9 +321,10 @@ final class ${_toPascalCase(cubitName)}Error extends ${_toPascalCase(cubitName)}
 
     await File(cubitPath).writeAsString(cubitContent);
     await File(statePath).writeAsString(stateContent);
-    
-    logger.detail('📄 Created cubit: ${cubitName.toLowerCase()}_cubit.dart');
-    logger.detail('📄 Created state: ${cubitName.toLowerCase()}_state.dart');
+
+    _logger
+      ..detail('📄 Created cubit: ${cubitName.toLowerCase()}_cubit.dart')
+      ..detail('📄 Created state: ${cubitName.toLowerCase()}_state.dart');
   }
 
   String _toPascalCase(String input) {

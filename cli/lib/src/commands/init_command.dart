@@ -1,48 +1,54 @@
 import 'dart:io';
-import 'package:args/args.dart';
+import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as path;
-import '../clean_arch_cli.dart';
 
-class InitCommand extends Command {
-  InitCommand(super.logger);
+/// {@template init_command}
+/// `clean_arch_cli init` command to initialize a new Flutter project
+/// with clean architecture setup.
+/// {@endtemplate}
+class InitCommand extends Command<int> {
+  /// {@macro init_command}
+  InitCommand({required Logger logger}) : _logger = logger {
+    argParser
+      ..addOption(
+        'project-name',
+        abbr: 'n',
+        help: 'Name of the Flutter project',
+        mandatory: true,
+      )
+      ..addOption(
+        'output',
+        abbr: 'o',
+        help: 'Output directory (default: current directory)',
+        defaultsTo: '.',
+      )
+      ..addFlag(
+        'with-examples',
+        help: 'Include example models and repositories',
+        defaultsTo: true,
+      );
+  }
+
+  final Logger _logger;
 
   @override
   String get name => 'init';
 
   @override
-  String get description => 'Initialize a new Flutter project with clean architecture setup';
+  String get description =>
+      'Initialize a new Flutter project with clean architecture setup';
 
   @override
-  ArgParser get argParser => ArgParser()
-    ..addOption(
-      'project-name',
-      abbr: 'n',
-      help: 'Name of the Flutter project',
-      mandatory: true,
-    )
-    ..addOption(
-      'output',
-      abbr: 'o',
-      help: 'Output directory (default: current directory)',
-      defaultsTo: '.',
-    )
-    ..addFlag(
-      'with-examples',
-      help: 'Include example models and repositories',
-      defaultsTo: true,
-    );
+  Future<int> run() async {
+    final projectName = argResults!['project-name'] as String;
+    final outputDir = argResults!['output'] as String;
+    final withExamples = argResults!['with-examples'] as bool;
 
-  @override
-  Future<void> run(ArgResults results) async {
-    final projectName = results['project-name'] as String;
-    final outputDir = results['output'] as String;
-    final withExamples = results['with-examples'] as bool;
-
-    logger.info('🚀 Initializing Flutter project with clean architecture...');
+    _logger.info('🚀 Initializing Flutter project with clean architecture...');
 
     final projectPath = path.join(outputDir, projectName);
-    
+
     // Create Flutter project
     final createResult = await Process.run(
       'flutter',
@@ -51,26 +57,32 @@ class InitCommand extends Command {
     );
 
     if (createResult.exitCode != 0) {
-      logger.err('Failed to create Flutter project: ${createResult.stderr}');
-      return;
+      _logger.err('Failed to create Flutter project: ${createResult.stderr}');
+      return ExitCode.software.code;
     }
 
-    logger.success('✅ Flutter project created');
+    _logger.success('✅ Flutter project created');
 
     // Create clean architecture structure
     await _createCleanArchStructure(projectPath, projectName, withExamples);
-    
+
     // Add dependencies
     await _addDependencies(projectPath);
 
-    logger.success('🎉 Clean architecture project initialized successfully!');
-    logger.info('📁 Project created at: $projectPath');
-    logger.info('🔧 Run "flutter pub get" to install dependencies');
+    _logger..success('🎉 Clean architecture project initialized successfully!')
+    ..info('📁 Project created at: $projectPath')
+    ..info('🔧 Run "flutter pub get" to install dependencies');
+
+    return ExitCode.success.code;
   }
 
-  Future<void> _createCleanArchStructure(String projectPath, String projectName, bool withExamples) async {
+  Future<void> _createCleanArchStructure(
+    String projectPath,
+    String projectName,
+    bool withExamples,
+  ) async {
     final libPath = path.join(projectPath, 'lib');
-    
+
     // Core directories
     final directories = [
       'core/constants',
@@ -98,12 +110,12 @@ class InitCommand extends Command {
     for (final dir in directories) {
       final dirPath = path.join(libPath, dir);
       await Directory(dirPath).create(recursive: true);
-      logger.detail('📁 Created: $dir');
+      _logger.detail('📁 Created: $dir');
     }
 
     // Create core files
     await _createCoreFiles(libPath);
-    
+
     if (withExamples) {
       await _createExampleFiles(libPath);
     }
@@ -111,15 +123,17 @@ class InitCommand extends Command {
 
   Future<void> _createCoreFiles(String libPath) async {
     // Create typedefs.dart
-    final typedefsContent = '''
+    const typedefsContent = '''
 typedef DataMap = Map<String, dynamic>;
 typedef ResultFuture<T> = Future<Either<Failure, T>>;
 typedef ResultStream<T> = Stream<Either<Failure, T>>;
 ''';
-    await File(path.join(libPath, 'core', 'typedefs.dart')).writeAsString(typedefsContent);
+    await File(
+      path.join(libPath, 'core', 'typedefs.dart'),
+    ).writeAsString(typedefsContent);
 
     // Create failures.dart
-    final failuresContent = '''
+    const failuresContent = '''
 import 'package:equatable/equatable.dart';
 
 abstract class Failure extends Equatable {
@@ -144,10 +158,12 @@ class NetworkFailure extends Failure {
   const NetworkFailure({required super.message, required super.statusCode});
 }
 ''';
-    await File(path.join(libPath, 'core', 'errors', 'failures.dart')).writeAsString(failuresContent);
+    await File(
+      path.join(libPath, 'core', 'errors', 'failures.dart'),
+    ).writeAsString(failuresContent);
 
     // Create exceptions.dart
-    final exceptionsContent = '''
+    const exceptionsContent = '''
 class ServerException implements Exception {
   const ServerException({required this.message, required this.statusCode});
 
@@ -163,10 +179,12 @@ class NetworkException implements Exception {
   const NetworkException({required this.message, required this.statusCode});
 }
 ''';
-    await File(path.join(libPath, 'core', 'errors', 'exceptions.dart')).writeAsString(exceptionsContent);
+    await File(
+      path.join(libPath, 'core', 'errors', 'exceptions.dart'),
+    ).writeAsString(exceptionsContent);
 
     // Create usecase.dart
-    final usecaseContent = '''
+    const usecaseContent = '''
 import '../typedefs.dart';
 
 abstract class UsecaseWithParams<Type, Params> {
@@ -193,14 +211,16 @@ abstract class StreamUsecaseWithoutParams<Type> {
   ResultStream<Type> call();
 }
 ''';
-    await File(path.join(libPath, 'core', 'usecases', 'usecase.dart')).writeAsString(usecaseContent);
+    await File(
+      path.join(libPath, 'core', 'usecases', 'usecase.dart'),
+    ).writeAsString(usecaseContent);
 
-    logger.detail('✅ Created core files');
+    _logger.detail('✅ Created core files');
   }
 
   Future<void> _createExampleFiles(String libPath) async {
     // Create example auth entity
-    final authEntityContent = '''
+    const authEntityContent = '''
 import 'package:annotations/annotations.dart';
 
 @entityGen
@@ -213,10 +233,19 @@ class UserTBG {
   final DateTime updatedAt;
 }
 ''';
-    await File(path.join(libPath, 'features', 'authentication', 'domain', 'entities', 'user.dart')).writeAsString(authEntityContent);
+    await File(
+      path.join(
+        libPath,
+        'features',
+        'authentication',
+        'domain',
+        'entities',
+        'user.dart',
+      ),
+    ).writeAsString(authEntityContent);
 
     // Create example repository interface
-    final authRepoContent = '''
+    const authRepoContent = '''
 import 'package:annotations/annotations.dart';
 import '../entities/user.dart';
 import '../../../../core/typedefs.dart';
@@ -233,16 +262,25 @@ class AuthRepoTBG {
   external ResultFuture<User> getCurrentUser();
 }
 ''';
-    await File(path.join(libPath, 'features', 'authentication', 'domain', 'repositories', 'auth_repository.dart')).writeAsString(authRepoContent);
+    await File(
+      path.join(
+        libPath,
+        'features',
+        'authentication',
+        'domain',
+        'repositories',
+        'auth_repository.dart',
+      ),
+    ).writeAsString(authRepoContent);
 
-    logger.detail('✅ Created example files');
+    _logger.detail('✅ Created example files');
   }
 
   Future<void> _addDependencies(String projectPath) async {
     final pubspecPath = path.join(projectPath, 'pubspec.yaml');
     final pubspecContent = await File(pubspecPath).readAsString();
 
-    final additionalDependencies = '''
+    const additionalDependencies = '''
   # Clean Architecture Dependencies
   equatable: ^2.0.5
   dartz: ^0.10.1
@@ -265,10 +303,10 @@ dev_dependencies:
 
     final updatedContent = pubspecContent.replaceFirst(
       'dev_dependencies:',
-      additionalDependencies + '\ndev_dependencies:',
+      '$additionalDependencies\ndev_dependencies:',
     );
 
     await File(pubspecPath).writeAsString(updatedContent);
-    logger.detail('✅ Added dependencies to pubspec.yaml');
+    _logger.detail('✅ Added dependencies to pubspec.yaml');
   }
 }
