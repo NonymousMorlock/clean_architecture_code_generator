@@ -1,8 +1,11 @@
 // ignore_for_file: implementation_imports, depend_on_referenced_packages
 
+import 'dart:io';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
+import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
@@ -18,13 +21,78 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
-    final buffer = StringBuffer();
+    // Load config to check if multi-file output is enabled
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final writer = FeatureFileWriter(config, buildStep);
 
+    if (writer.isMultiFileEnabled) {
+      return _generateMultiFile(visitor, writer, buildStep);
+    }
+
+    // Default behavior: generate all usecases to .g.dart
+    final buffer = StringBuffer();
     for (final method in visitor.methods) {
       usecase(buffer: buffer, visitor: visitor, method: method);
     }
-
     return buffer.toString();
+  }
+
+  String _generateMultiFile(
+    RepoVisitor visitor,
+    FeatureFileWriter writer,
+    BuildStep buildStep,
+  ) {
+    final featureName = writer.extractFeatureName();
+    if (featureName == null) {
+      // Fallback to default
+      final buffer = StringBuffer();
+      for (final method in visitor.methods) {
+        usecase(buffer: buffer, visitor: visitor, method: method);
+      }
+      return buffer.toString();
+    }
+
+    final baseName = writer.extractBaseName(visitor.className);
+    final results = <String>[];
+
+    // Generate each usecase in its own file
+    for (final method in visitor.methods) {
+      final usecasePath = writer.getUsecasePath(featureName, method.name);
+
+      // Generate usecase code
+      final buffer = StringBuffer();
+      usecase(buffer: buffer, visitor: visitor, method: method);
+
+      // Generate complete file with imports
+      final needsCustomParams =
+          method.params != null && method.params!.length > 1;
+      final isStream = method.returnType.startsWith('Stream');
+      final imports = writer.getUsecaseImports(
+        featureName,
+        baseName,
+        method.name,
+        hasParams: needsCustomParams,
+        isStream: isStream,
+      );
+
+      final completeFile = writer.generateCompleteFile(
+        imports: imports,
+        generatedCode: buffer.toString(),
+        header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
+      );
+
+      // Write to the usecase file
+      try {
+        File(usecasePath).writeAsStringSync(completeFile);
+        results.add('// Usecase ${method.name} written to: $usecasePath');
+      } catch (e) {
+        print('Warning: Could not write to $usecasePath: $e');
+        results.add('// Error writing usecase ${method.name}: $e');
+      }
+    }
+
+    // Return markers for the .g.dart file
+    return '${results.join('\n')}\n';
   }
 
   // if function params is greter than 1, then create params class else just use it

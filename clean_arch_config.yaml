@@ -95,3 +95,25 @@ remote_data_source:
 #  custom_dependencies:
 #    - "package:custom_http_client/custom_http_client.dart"
 #    - "package:analytics/analytics.dart"
+
+# Multi-file output configuration
+multi_file_output:
+  enabled: false                  # Write generated code to actual feature files instead of .g.dart
+  auto_create_targets: true       # Auto-create missing files during generation
+
+# Feature scaffolding configuration
+feature_scaffolding:
+  enabled: false                  # Pre-generate files when running 'create -t feature'
+  features:                       # Define features and their methods for scaffolding
+#    auth:
+#      methods:
+#        - register
+#        - login
+#        - logout
+#        - verify_token
+#      data_file_name: auth        # Optional: override default file naming
+#    user:
+#      methods:
+#        - get_profile
+#        - update_profile
+#        - delete_account

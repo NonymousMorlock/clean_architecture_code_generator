@@ -1,8 +1,11 @@
 // ignore_for_file: implementation_imports, depend_on_referenced_packages
 
+import 'dart:io';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
+import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/core/services/functions.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/core/utils/utils.dart';
@@ -18,9 +21,58 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
   ) {
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
+
+    // Load config to check if multi-file output is enabled
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final writer = FeatureFileWriter(config, buildStep);
+
+    if (writer.isMultiFileEnabled) {
+      return _generateMultiFile(visitor, writer, buildStep);
+    }
+
+    // Default behavior: generate to .g.dart
     final buffer = StringBuffer();
     repo(buffer, visitor);
     return buffer.toString();
+  }
+
+  String _generateMultiFile(
+    RepoVisitor visitor,
+    FeatureFileWriter writer,
+    BuildStep buildStep,
+  ) {
+    final featureName = writer.extractFeatureName();
+    if (featureName == null) {
+      // Fallback to default if feature name can't be extracted
+      final buffer = StringBuffer();
+      repo(buffer, visitor);
+      return buffer.toString();
+    }
+
+    final baseName = writer.extractBaseName(visitor.className);
+    final repoPath = writer.getDomainRepoPath(featureName, baseName);
+
+    // Generate repository interface code
+    final buffer = StringBuffer();
+    repo(buffer, visitor);
+
+    // Generate complete file with imports
+    final imports = writer.getRepositoryImports(featureName, baseName);
+    final completeFile = writer.generateCompleteFile(
+      imports: imports,
+      generatedCode: buffer.toString(),
+      header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
+    );
+
+    // Write to the actual repository file
+    try {
+      File(repoPath).writeAsStringSync(completeFile);
+    } catch (e) {
+      print('Warning: Could not write to $repoPath: $e');
+    }
+
+    // Return a minimal marker for the .g.dart file
+    return '// Repository interface written to: $repoPath\n';
   }
 
   void repo(StringBuffer buffer, RepoVisitor visitor) {

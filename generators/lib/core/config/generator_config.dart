@@ -13,6 +13,8 @@ class GeneratorConfig {
     this.featureStructure = const DefaultFeatureStructure(),
     this.modelTestConfig = const ModelTestConfig(),
     this.remoteDataSourceConfig = const RemoteDataSourceConfig(),
+    this.multiFileOutput = const MultiFileOutputConfig(),
+    this.featureScaffolding = const FeatureScaffoldingConfig(),
   });
 
   factory GeneratorConfig.fromFile(String configPath) {
@@ -56,6 +58,12 @@ class GeneratorConfig {
       remoteDataSourceConfig: RemoteDataSourceConfig.fromMap(
         map['remote_data_source'] as Map<dynamic, dynamic>? ?? {},
       ),
+      multiFileOutput: MultiFileOutputConfig.fromMap(
+        map['multi_file_output'] as Map<dynamic, dynamic>? ?? {},
+      ),
+      featureScaffolding: FeatureScaffoldingConfig.fromMap(
+        map['feature_scaffolding'] as Map<dynamic, dynamic>? ?? {},
+      ),
     );
   }
 
@@ -69,6 +77,8 @@ class GeneratorConfig {
   final FeatureStructure featureStructure;
   final ModelTestConfig modelTestConfig;
   final RemoteDataSourceConfig remoteDataSourceConfig;
+  final MultiFileOutputConfig multiFileOutput;
+  final FeatureScaffoldingConfig featureScaffolding;
 
   static NamingConvention _parseNamingConvention(String? convention) {
     switch (convention?.toLowerCase()) {
@@ -450,4 +460,90 @@ enum HttpClientType {
   chopper,
   retrofit,
   custom,
+}
+
+class MultiFileOutputConfig {
+  const MultiFileOutputConfig({
+    this.enabled = false,
+    this.autoCreateTargets = true,
+  });
+
+  factory MultiFileOutputConfig.fromMap(Map<dynamic, dynamic> map) {
+    return MultiFileOutputConfig(
+      enabled: map['enabled'] as bool? ?? false,
+      autoCreateTargets: map['auto_create_targets'] as bool? ?? true,
+    );
+  }
+
+  final bool enabled;
+  final bool autoCreateTargets;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'enabled': enabled,
+      'auto_create_targets': autoCreateTargets,
+    };
+  }
+}
+
+class FeatureScaffoldingConfig {
+  const FeatureScaffoldingConfig({
+    this.enabled = false,
+    this.features = const {},
+  });
+
+  factory FeatureScaffoldingConfig.fromMap(Map<dynamic, dynamic> map) {
+    final featuresMap = map['features'] as Map<dynamic, dynamic>? ?? {};
+    final features = <String, FeatureDefinition>{};
+
+    for (final entry in featuresMap.entries) {
+      final featureName = entry.key as String;
+      final featureData = entry.value as Map<dynamic, dynamic>? ?? {};
+      features[featureName] = FeatureDefinition.fromMap(featureData);
+    }
+
+    return FeatureScaffoldingConfig(
+      enabled: map['enabled'] as bool? ?? false,
+      features: features,
+    );
+  }
+
+  final bool enabled;
+  final Map<String, FeatureDefinition> features;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'enabled': enabled,
+      'features': features.map((key, value) => MapEntry(key, value.toMap())),
+    };
+  }
+
+  bool hasFeature(String featureName) => features.containsKey(featureName);
+
+  FeatureDefinition? getFeature(String featureName) => features[featureName];
+}
+
+class FeatureDefinition {
+  const FeatureDefinition({
+    this.methods = const [],
+    this.dataFileName,
+  });
+
+  factory FeatureDefinition.fromMap(Map<dynamic, dynamic> map) {
+    final methodsList = map['methods'] as List<dynamic>? ?? [];
+    return FeatureDefinition(
+      methods: methodsList.map((e) => e.toString()).toList(),
+      dataFileName: map['data_file_name'] as String?,
+    );
+  }
+
+  final List<String> methods;
+  final String? dataFileName;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'methods': methods,
+      if (dataFileName != null) 'data_file_name': dataFileName,
+    };
+  }
 }

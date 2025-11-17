@@ -14,6 +14,8 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 - **CLI Tool**: Command-line interface for easy project management
 - **Configuration**: YAML-based configuration for customization
 - **Test Generation**: Generate unit tests for all components
+- **Multi-File Output**: Write generated code directly to feature files instead of .g.dart files
+- **Feature Scaffolding**: Pre-generate feature structure from YAML configuration
 
 ## 📋 Table of Contents
 
@@ -529,6 +531,108 @@ Future<void> getProducts() async {
 }
 ```
 
+## 🎯 Multi-File Output Mode
+
+### Overview
+
+By default, the generator writes all code to `.g.dart` files. With multi-file output mode, generated code is written directly to your feature files, making the codebase cleaner and easier to navigate.
+
+### Configuration
+
+Enable multi-file output in `clean_arch_config.yaml`:
+
+```yaml
+multi_file_output:
+  enabled: true                  # Write to actual feature files
+  auto_create_targets: true      # Auto-create missing files
+```
+
+### How It Works
+
+When enabled, the generator:
+
+1. **Repository Interface** → `lib/features/{feature}/domain/repositories/{feature}_repository.dart`
+2. **Use Cases** → `lib/features/{feature}/domain/usecases/{method_name}.dart` (one file per method)
+3. **Remote Data Source** → `lib/features/{feature}/data/datasources/{feature}_remote_data_src.dart`
+4. **Repository Implementation** → `lib/features/{feature}/data/repositories/{feature}_repository_impl.dart`
+5. **Tests** → `test/features/{feature}/...` (mirrors the lib structure)
+
+### Benefits
+
+- **Cleaner Structure**: No more monolithic `.g.dart` files
+- **Better Navigation**: Each component in its own file
+- **Easier Review**: Smaller, focused files for code reviews
+- **Standard Layout**: Follows clean architecture conventions
+
+### Auto-Creation
+
+If `auto_create_targets: true`, missing files are created automatically during generation. If `false`, generation fails if target files don't exist.
+
+## 🏗️ Feature Scaffolding
+
+### Overview
+
+Pre-generate complete feature structures from YAML configuration when running `create -t feature`.
+
+### Configuration
+
+Enable and configure features in `clean_arch_config.yaml`:
+
+```yaml
+feature_scaffolding:
+  enabled: true
+  features:
+    auth:
+      methods:
+        - register
+        - login
+        - logout
+        - verify_token
+      data_file_name: auth  # Optional: override default naming
+    
+    user:
+      methods:
+        - get_profile
+        - update_profile
+        - delete_account
+```
+
+### Usage
+
+```bash
+# Create a feature with scaffolding
+dart run clean_arch_cli:clean_arch_cli create --type feature --name auth
+```
+
+If `auth` is defined in the config with `feature_scaffolding.enabled: true`, the CLI will:
+
+1. Create the standard directory structure
+2. Generate repository file with all methods
+3. Create empty usecase files (one per method)
+4. Create empty data source files
+5. Create empty repository implementation files
+
+Then run the generator to populate the files:
+
+```bash
+dart run clean_arch_cli:clean_arch_cli generate
+```
+
+### Combined Workflow
+
+When both features are enabled:
+
+1. **Create Feature**: `create -t feature --name auth` → scaffolds structure from config
+2. **Generate Code**: `generate` → populates files with generated code (multi-file mode writes to actual files)
+3. **Implement**: Fill in TODO sections in data sources and add business logic
+
+### Benefits
+
+- **Rapid Setup**: Feature structure created instantly
+- **Consistency**: All features follow the same pattern
+- **Configuration-Driven**: Define features once, create many times
+- **No Manual File Creation**: Everything automated
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
@@ -549,6 +653,11 @@ Future<void> getProducts() async {
 4. **"Import errors in generated files"**
    - Check your custom imports in the config file
    - Ensure all required packages are added to pubspec.yaml
+
+5. **"Could not write to file" (Multi-File Mode)**
+   - Ensure the feature directory structure exists
+   - Check file permissions
+   - Verify `auto_create_targets` is enabled if files don't exist
 
 ### Generated Files Not Updating
 

@@ -1,9 +1,11 @@
 // ignore_for_file: implementation_imports, depend_on_referenced_packages
 
+import 'dart:io';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
@@ -20,9 +22,52 @@ class RepoImplTestGenerator
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
+    // Load config to check if multi-file output is enabled
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final writer = FeatureFileWriter(config, buildStep);
+
+    if (writer.isMultiFileEnabled) {
+      return _generateMultiFile(visitor, writer, buildStep);
+    }
+
+    // Default behavior: generate to .g.dart
     final buffer = StringBuffer();
     _generateRepoImplTest(buffer, visitor);
     return buffer.toString();
+  }
+
+  String _generateMultiFile(
+    RepoVisitor visitor,
+    FeatureFileWriter writer,
+    BuildStep buildStep,
+  ) {
+    final featureName = writer.extractFeatureName();
+    if (featureName == null) {
+      // Fallback to default
+      final buffer = StringBuffer();
+      _generateRepoImplTest(buffer, visitor);
+      return buffer.toString();
+    }
+
+    final baseName = writer.extractBaseName(visitor.className);
+    final testPath = writer.getRepoImplTestPath(featureName, baseName);
+
+    // Generate test code
+    final buffer = StringBuffer();
+    _generateRepoImplTest(buffer, visitor);
+
+    // Generate complete file with imports (imports are already in the generated code)
+    final completeFile = '// GENERATED CODE - DO NOT MODIFY BY HAND\n\n$buffer';
+
+    // Write to the test file
+    try {
+      File(testPath).writeAsStringSync(completeFile);
+    } catch (e) {
+      print('Warning: Could not write to $testPath: $e');
+    }
+
+    // Return a minimal marker for the .g.dart file
+    return '// Repository implementation test written to: $testPath\n';
   }
 
   void _generateRepoImplTest(StringBuffer buffer, RepoVisitor visitor) {

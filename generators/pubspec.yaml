@@ -19,6 +19,7 @@ dependencies:
   yaml: ^3.1.2
 
   analyzer: any
+  path: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
