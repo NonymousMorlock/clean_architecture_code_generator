@@ -273,9 +273,7 @@ class AuthRepoTBG {
         libPath,
         'features',
         'authentication',
-        'domain',
-        'repositories',
-        'auth_repository.dart',
+        'auth_repository_tbg.dart',
       ),
     ).writeAsString(authRepoContent);
 
