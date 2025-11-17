@@ -4,6 +4,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
+import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
@@ -25,16 +26,29 @@ class InjectionGenerator
 
     final buffer = StringBuffer();
 
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+
     // Generate injection container base file content
-    _generateInjectionContainerBase(buffer);
+    _generateInjectionContainerBase(
+      buffer: buffer,
+      isMultiMode: config.multiFileOutput.enabled,
+    );
 
     // Generate injection container main file content
-    _generateInjectionContainerMain(buffer, visitor);
+    _generateInjectionContainerMain(
+      buffer: buffer,
+      visitor: visitor,
+      isMultiMode: config.multiFileOutput.enabled,
+    );
 
     return buffer.toString();
   }
 
-  void _generateInjectionContainerBase(StringBuffer buffer) {
+  void _generateInjectionContainerBase({
+    required StringBuffer buffer,
+    required bool isMultiMode,
+  }) {
+    final optionalPartComment = isMultiMode ? '' : '// ';
     buffer
       ..writeln('// Generated injection container base file')
       ..writeln(
@@ -57,18 +71,20 @@ class InjectionGenerator
         '// These imports will be automatically managed by the generator',
       )
       ..writeln()
-      ..writeln("part 'injection_container.main.dart';")
+      ..writeln("${optionalPartComment}part 'injection_container.main.dart';")
       ..writeln();
   }
 
-  void _generateInjectionContainerMain(
-    StringBuffer buffer,
-    RepoVisitor visitor,
-  ) {
+  void _generateInjectionContainerMain({
+    required StringBuffer buffer,
+    required RepoVisitor visitor,
+    required bool isMultiMode,
+  }) {
     final className = visitor.className;
     final featureName = className
         .replaceAll('RepoTBG', '')
         .replaceAll('Repo', '');
+    final optionalPartComment = isMultiMode ? '' : '// ';
 
     buffer
       ..writeln(
@@ -79,7 +95,7 @@ class InjectionGenerator
         '// **************************************************************************',
       )
       ..writeln()
-      ..writeln("part of 'injection_container.dart';")
+      ..writeln("${optionalPartComment}part of 'injection_container.dart';")
       ..writeln()
       ..writeln('final sl = GetIt.instance;')
       ..writeln()
