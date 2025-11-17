@@ -42,6 +42,7 @@ class CliCommandRunner extends CompletionCommandRunner<int> {
     addCommand(CreateCommand(logger: _logger));
     addCommand(GenerateCommand(logger: _logger));
     addCommand(UpdateCommand(logger: _logger, pubUpdater: _pubUpdater));
+    addCommand(RebuildSnapshotCommand(logger: _logger));
   }
 
   @override
