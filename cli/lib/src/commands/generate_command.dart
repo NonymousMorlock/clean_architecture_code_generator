@@ -10,20 +10,20 @@ class GenerateCommand extends Command<int> {
   /// {@macro generate_command}
   GenerateCommand({required Logger logger}) : _logger = logger {
     argParser
-    ..addOption(
-      'path',
-      abbr: 'p',
-      help: 'Path to the Flutter project (default: current directory)',
-      defaultsTo: '.',
-    )
-    ..addFlag(
-      'watch',
-      abbr: 'w',
-      help: 'Watch for changes and regenerate automatically',
-    )
-    ..addFlag(
-      'delete-conflicting-outputs',
-      help: 'Delete conflicting outputs before generation',
+      ..addOption(
+        'path',
+        abbr: 'p',
+        help: 'Path to the Flutter project (default: current directory)',
+        defaultsTo: '.',
+      )
+      ..addFlag(
+        'watch',
+        abbr: 'w',
+        help: 'Watch for changes and regenerate automatically',
+      )
+      ..addFlag(
+        'delete-conflicting-outputs',
+        help: 'Delete conflicting outputs before generation',
       );
   }
 
@@ -59,13 +59,13 @@ class GenerateCommand extends Command<int> {
     // Run flutter packages get first
     _logger.info('📦 Getting packages...');
     try {
-    final getResult = await Process.run(
-      'flutter',
-      ['packages', 'get'],
-      workingDirectory: projectPath,
-    );
+      final getResult = await Process.run(
+        'flutter',
+        ['packages', 'get'],
+        workingDirectory: projectPath,
+      );
 
-    if (getResult.exitCode != 0) {
+      if (getResult.exitCode != 0) {
         _logger.err('❌ Failed to get packages: ${getResult.stderr}');
         return ExitCode.software.code;
       }
@@ -90,31 +90,31 @@ class GenerateCommand extends Command<int> {
     _logger.info('🚀 Running build_runner...');
 
     try {
-    final buildProcess = await Process.start(
-      'flutter',
-      buildArgs,
-      workingDirectory: projectPath,
-    );
+      final buildProcess = await Process.start(
+        'flutter',
+        buildArgs,
+        workingDirectory: projectPath,
+      );
 
-    // Stream output in real-time
-    buildProcess.stdout.listen((data) {
-      final output = String.fromCharCodes(data).trim();
-      if (output.isNotEmpty) {
+      // Stream output in real-time
+      buildProcess.stdout.listen((data) {
+        final output = String.fromCharCodes(data).trim();
+        if (output.isNotEmpty) {
           _logger.info(output);
-      }
-    });
+        }
+      });
 
-    buildProcess.stderr.listen((data) {
-      final output = String.fromCharCodes(data).trim();
-      if (output.isNotEmpty) {
+      buildProcess.stderr.listen((data) {
+        final output = String.fromCharCodes(data).trim();
+        if (output.isNotEmpty) {
           _logger.err(output);
-      }
-    });
+        }
+      });
 
-    final exitCode = await buildProcess.exitCode;
+      final exitCode = await buildProcess.exitCode;
 
-    if (exitCode == 0) {
-      if (watch) {
+      if (exitCode == 0) {
+        if (watch) {
           _logger.success('👀 Watching for changes... Press Ctrl+C to stop.');
         } else {
           _logger.success('✅ Code generation completed successfully!');

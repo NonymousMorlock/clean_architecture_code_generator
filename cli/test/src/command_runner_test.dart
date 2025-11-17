@@ -168,7 +168,7 @@ void main() {
         // Use the create command with its required option
         expect(
           () => commandRunner.run([
-          '--verbose',
+            '--verbose',
             'create',
             '--type',
             'feature',
