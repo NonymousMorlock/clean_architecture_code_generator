@@ -58,14 +58,19 @@ class GenerateCommand extends Command<int> {
 
     // Run flutter packages get first
     _logger.info('📦 Getting packages...');
-    final getResult = await Process.run(
-      'flutter',
-      ['packages', 'get'],
-      workingDirectory: projectPath,
-    );
+    try {
+      final getResult = await Process.run(
+        'flutter',
+        ['packages', 'get'],
+        workingDirectory: projectPath,
+      );
 
-    if (getResult.exitCode != 0) {
-      _logger.err('❌ Failed to get packages: ${getResult.stderr}');
+      if (getResult.exitCode != 0) {
+        _logger.err('❌ Failed to get packages: ${getResult.stderr}');
+        return ExitCode.software.code;
+      }
+    } on ProcessException catch (e) {
+      _logger.err('❌ Failed to get packages: ${e.message}');
       return ExitCode.software.code;
     }
 
@@ -84,39 +89,44 @@ class GenerateCommand extends Command<int> {
 
     _logger.info('🚀 Running build_runner...');
 
-    final buildProcess = await Process.start(
-      'flutter',
-      buildArgs,
-      workingDirectory: projectPath,
-    );
+    try {
+      final buildProcess = await Process.start(
+        'flutter',
+        buildArgs,
+        workingDirectory: projectPath,
+      );
 
-    // Stream output in real-time
-    buildProcess.stdout.listen((data) {
-      final output = String.fromCharCodes(data).trim();
-      if (output.isNotEmpty) {
-        _logger.info(output);
-      }
-    });
+      // Stream output in real-time
+      buildProcess.stdout.listen((data) {
+        final output = String.fromCharCodes(data).trim();
+        if (output.isNotEmpty) {
+          _logger.info(output);
+        }
+      });
 
-    buildProcess.stderr.listen((data) {
-      final output = String.fromCharCodes(data).trim();
-      if (output.isNotEmpty) {
-        _logger.err(output);
-      }
-    });
+      buildProcess.stderr.listen((data) {
+        final output = String.fromCharCodes(data).trim();
+        if (output.isNotEmpty) {
+          _logger.err(output);
+        }
+      });
 
-    final exitCode = await buildProcess.exitCode;
+      final exitCode = await buildProcess.exitCode;
 
-    if (exitCode == 0) {
-      if (watch) {
-        _logger.success('👀 Watching for changes... Press Ctrl+C to stop.');
+      if (exitCode == 0) {
+        if (watch) {
+          _logger.success('👀 Watching for changes... Press Ctrl+C to stop.');
+        } else {
+          _logger.success('✅ Code generation completed successfully!');
+        }
+        return ExitCode.success.code;
       } else {
-        _logger.success('✅ Code generation completed successfully!');
+        _logger.err('❌ Code generation failed with exit code $exitCode');
+        return exitCode;
       }
-      return ExitCode.success.code;
-    } else {
-      _logger.err('❌ Code generation failed with exit code $exitCode');
-      return exitCode;
+    } on ProcessException catch (e) {
+      _logger.err('❌ Failed to run build_runner: ${e.message}');
+      return ExitCode.software.code;
     }
   }
 }

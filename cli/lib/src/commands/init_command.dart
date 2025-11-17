@@ -50,14 +50,19 @@ class InitCommand extends Command<int> {
     final projectPath = path.join(outputDir, projectName);
 
     // Create Flutter project
-    final createResult = await Process.run(
-      'flutter',
-      ['create', projectName],
-      workingDirectory: outputDir,
-    );
+    try {
+      final createResult = await Process.run(
+        'flutter',
+        ['create', projectName],
+        workingDirectory: outputDir,
+      );
 
-    if (createResult.exitCode != 0) {
-      _logger.err('Failed to create Flutter project: ${createResult.stderr}');
+      if (createResult.exitCode != 0) {
+        _logger.err('Failed to create Flutter project: ${createResult.stderr}');
+        return ExitCode.software.code;
+      }
+    } on ProcessException catch (e) {
+      _logger.err('Failed to create Flutter project: ${e.message}');
       return ExitCode.software.code;
     }
 
@@ -69,9 +74,10 @@ class InitCommand extends Command<int> {
     // Add dependencies
     await _addDependencies(projectPath);
 
-    _logger..success('🎉 Clean architecture project initialized successfully!')
-    ..info('📁 Project created at: $projectPath')
-    ..info('🔧 Run "flutter pub get" to install dependencies');
+    _logger
+      ..success('🎉 Clean architecture project initialized successfully!')
+      ..info('📁 Project created at: $projectPath')
+      ..info('🔧 Run "flutter pub get" to install dependencies');
 
     return ExitCode.success.code;
   }
