@@ -1,6 +1,8 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
@@ -12,6 +14,10 @@ import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Generator for creating repository implementation classes.
+///
+/// Processes classes annotated with `@RepoImplGenAnnotation` and generates
+/// repository implementation classes in the data layer.
 class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
   @override
   String generateForAnnotatedElement(
@@ -67,31 +73,39 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     // Write to the repository implementation file
     try {
       File(repoImplPath).writeAsStringSync(completeFile);
-    } catch (e) {
-      print('Warning: Could not write to $repoImplPath: $e');
+    } on Exception catch (e) {
+      stderr.writeln('Warning: Could not write to $repoImplPath: $e');
     }
 
     // Return a minimal marker for the .g.dart file
     return '// Repository implementation written to: $repoImplPath\n';
   }
 
+  /// Generates the repository implementation class.
+  ///
+  /// Creates a concrete implementation of the repository interface
+  /// that delegates to data sources and handles data transformations.
   void repository({
     required StringBuffer buffer,
     required RepoVisitor visitor,
   }) {
     final repoName = visitor.className;
     final className = '${repoName}Impl';
-    buffer.writeln('class $className implements $repoName {');
-    buffer.writeln('const $className(this._remoteDataSource);');
-    buffer.writeln();
-    buffer.writeln(
-        'final ${repoName.substring(0, repoName.length - 4)}RemoteDataSrc _remoteDataSource;');
-    buffer.writeln();
+    buffer
+      ..writeln('class $className implements $repoName {')
+      ..writeln('const $className(this._remoteDataSource);')
+      ..writeln()
+      ..writeln(
+        'final '
+        '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc '
+        '_remoteDataSource;',
+      )
+      ..writeln();
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
       final result = returnType.trim() != 'void' ? 'final result = ' : '';
       final returnResult = returnType.trim() != 'void' ? 'result' : 'null';
-      buffer.writeln("@override");
+      buffer.writeln('@override');
       final isStream = method.returnType.startsWith('Stream');
       final asyncText = isStream ? '' : 'async';
       final asynchronyType = isStream ? 'Stream' : 'Future';
@@ -100,56 +114,74 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
             .map((param) => paramToString(method, param))
             .join(', ');
         buffer.writeln(
-          "Result$asynchronyType<$returnType> ${method.name}($params) "
-          "$asyncText {",
+          'Result$asynchronyType<$returnType> ${method.name}($params) '
+          '$asyncText {',
         );
         if (!isStream) {
-          buffer.writeln("try {");
-          buffer.writeln(
-              "${result}await _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')});");
-          buffer.writeln(
-              "return ${returnResult == 'null' ? 'const ' : ''}Right($returnResult);");
-          buffer.writeln("} on ServerException catch (e) {");
-          buffer.writeln(
-              "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
-          buffer.writeln("}");
+          final commaSeparatedArguments = method.params!
+              .map(_paramToArg)
+              .join(', ');
+          buffer
+            ..writeln('try {')
+            ..writeln(
+              '${result}await '
+              '_remoteDataSource.${method.name}($commaSeparatedArguments);',
+            )
+            ..writeln(
+              'return '
+              "${returnResult == 'null' ? 'const ' : ''}Right($returnResult);",
+            )
+            ..writeln('} on ServerException catch (e) {')
+            ..writeln(
+              'return Left(ServerFailure(message: e.message, '
+              'statusCode: e.statusCode));',
+            )
+            ..writeln('}');
         } else {
+          final commaSeparatedArguments = method.params!
+              .map(_paramToArg)
+              .join(', ');
           buffer.writeln(
-            "return _remoteDataSource.${method.name}(${method.params!.map((param) => _paramToPass(param)).join(', ')}).transform"
-            "(",
+            'return _remoteDataSource.${method.name}'
+            '($commaSeparatedArguments).transform(',
           );
           _writeTransformer(buffer, method: method);
           buffer.writeln(');');
         }
-        buffer.writeln("}");
+        buffer.writeln('}');
       } else {
         buffer.writeln(
-          "Result$asynchronyType<$returnType> ${method.name}"
-          "() $asyncText {",
+          'Result$asynchronyType<$returnType> ${method.name}'
+          '() $asyncText {',
         );
         if (!isStream) {
-          buffer.writeln("try {");
-          buffer.writeln("${result}await _remoteDataSource.${method.name}();");
-          buffer.writeln("return ${returnResult == 'null' ? 'const ' : ''}Right"
-              "($returnResult)"
-              ";");
-          buffer.writeln("} on ServerException catch (e) {");
-          buffer.writeln(
-              "return Left(ServerFailure(message: e.message, statusCode: e.statusCode));");
-          buffer.writeln("}");
+          buffer
+            ..writeln('try {')
+            ..writeln('${result}await _remoteDataSource.${method.name}();')
+            ..writeln(
+              'return '
+              "${returnResult == 'null' ? 'const ' : ''}Right($returnResult);",
+            )
+            ..writeln('} on ServerException catch (e) {')
+            ..writeln(
+              'return Left(ServerFailure(message: e.message, '
+              'statusCode: e.statusCode));',
+            )
+            ..writeln('}');
         } else {
-          buffer.writeln("return _remoteDataSource.${method.name}().transform"
-              "(");
+          buffer.writeln(
+            'return _remoteDataSource.${method.name}().transform(',
+          );
           _writeTransformer(buffer, method: method);
           buffer.writeln(');');
         }
-        buffer.writeln("}");
+        buffer.writeln('}');
       }
     }
-    buffer.writeln("}");
+    buffer.writeln('}');
   }
 
-  String _paramToPass(Param param) {
+  String _paramToArg(Param param) {
     if (param.isNamed) {
       return '${param.name}: ${param.name}';
     } else {
@@ -162,23 +194,29 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     // right side is the return type of the calling function, in this
     // case, our repoImpl method
     final modelReturnType = method.returnType.modelizeType;
-    buffer.writeln('StreamTransformer<'
-        '$modelReturnType, ${method.returnType}'
-        '>.fromHandlers(');
-    buffer.writeln('handleData: (data, sink) {');
-    buffer.writeln('sink.add(Right(data));');
-    buffer.writeln('},');
-    buffer.writeln('handleError: (error, stackTrace, sink) {');
-    buffer.writeln('if (error is ServerException) {');
-    buffer.writeln('sink.add(Left(ServerFailure(message: error.message,'
-        ' statusCode: error.statusCode,),),);');
-    buffer.writeln('} else {');
     buffer
-        .writeln('sink.add(Left(ServerFailure(message: \'Something went wrong\''
-            '(), statusCode: 500,),),);');
-    buffer.writeln('}');
-    buffer.writeln('},');
-    buffer.writeln('),');
+      ..writeln(
+        'StreamTransformer<'
+        '$modelReturnType, ${method.returnType}'
+        '>.fromHandlers(',
+      )
+      ..writeln('handleData: (data, sink) {')
+      ..writeln('sink.add(Right(data));')
+      ..writeln('},')
+      ..writeln('handleError: (error, stackTrace, sink) {')
+      ..writeln('if (error is ServerException) {')
+      ..writeln(
+        'sink.add(Left(ServerFailure(message: error.message,'
+        ' statusCode: error.statusCode,),),);',
+      )
+      ..writeln('} else {')
+      ..writeln(
+        'sink.add(Left(ServerFailure(message: '
+        "'Something went wrong'(), statusCode: 500,),),);",
+      )
+      ..writeln('}')
+      ..writeln('},')
+      ..writeln('),');
   }
 }
 

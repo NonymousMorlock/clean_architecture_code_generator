@@ -1,4 +1,5 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
@@ -8,6 +9,10 @@ import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Generator for creating test files for use case classes.
+///
+/// Processes classes annotated with `@UsecaseTestGenAnnotation` and generates
+/// comprehensive test files for use case classes.
 class UsecaseTestGenerator
     extends GeneratorForAnnotation<UsecaseTestGenAnnotation> {
   @override
@@ -22,20 +27,24 @@ class UsecaseTestGenerator
 
     final className = visitor.className;
     final tag =
-        '''// **************************************************************************
+        '''
+// **************************************************************************
 // ${className.snakeCase}.mock.dart
 // **************************************************************************
 ''';
-    buffer.writeln(tag);
-    buffer.writeln('class Mock$className extends Mock implements $className '
-        '{}');
-    for (var method in visitor.methods) {
+    buffer
+      ..writeln(tag)
+      ..writeln(
+        'class Mock$className extends Mock implements $className '
+        '{}',
+      );
+    for (final method in visitor.methods) {
       final hasParams = method.params != null;
-      buffer.writeln("// import '${className.snakeCase}.mock.dart';");
-
-      buffer.writeln('void main() {');
-      buffer.writeln('late Mock$className repo;');
-      buffer.writeln('late ${method.name.upperCamelCase} usecase;');
+      buffer
+        ..writeln("// import '${className.snakeCase}.mock.dart';")
+        ..writeln('void main() {')
+        ..writeln('late Mock$className repo;')
+        ..writeln('late ${method.name.upperCamelCase} usecase;');
       final testNames = <String>[];
       if (hasParams) {
         for (final param in method.params!) {
@@ -45,32 +54,38 @@ class UsecaseTestGenerator
           if (param.type.fallbackValue is List) {
             buffer.writeln('const $testName = <${param.type.stripType}>[];');
           } else {
-            final isCustomType = param.type.fallbackValue is String &&
+            final isCustomType =
+                param.type.fallbackValue is String &&
                 (param.type.fallbackValue as String).isCustomType;
             final testVariable = isCustomType
                 ? '${param.type}.empty();'
                 : param.type.fallbackValue is String
-                    ? "'${param.type.fallbackValue}';"
-                    : '${param.type.fallbackValue};';
-            buffer.writeln('${isCustomType ? 'final' : 'const'} $testName = '
-                '$testVariable');
+                ? "'${param.type.fallbackValue}';"
+                : '${param.type.fallbackValue};';
+            buffer.writeln(
+              '${isCustomType ? 'final' : 'const'} $testName = '
+              '$testVariable',
+            );
           }
         }
       }
       final methodReturnTypeFallback =
           method.returnType.rightType.fallbackValue;
-      final methodReturnsCustomType = methodReturnTypeFallback is String &&
+      final methodReturnsCustomType =
+          methodReturnTypeFallback is String &&
           methodReturnTypeFallback.isCustomType;
       if (methodReturnsCustomType) {
-        buffer.writeln();
-        buffer.writeln('final tResult = $methodReturnTypeFallback;');
+        buffer
+          ..writeln()
+          ..writeln('final tResult = $methodReturnTypeFallback;');
       } else if (methodReturnTypeFallback is String &&
           methodReturnTypeFallback == 'null') {
         // pass
         // means it's got void return type
       } else if (methodReturnTypeFallback is String) {
-        buffer.writeln();
-        buffer.writeln("final tResult = '$methodReturnTypeFallback';");
+        buffer
+          ..writeln()
+          ..writeln("final tResult = '$methodReturnTypeFallback';");
       } else if (methodReturnTypeFallback is List) {
         final listMembersType = method.returnType.rightType.stripType;
         final listMembersDefault = listMembersType.fallbackValue;
@@ -84,8 +99,9 @@ class UsecaseTestGenerator
           'final tResult = <$listMembersType>[$defaultMember];',
         );
       } else {
-        buffer.writeln();
-        buffer.writeln('final tResult = $methodReturnTypeFallback;');
+        buffer
+          ..writeln()
+          ..writeln('final tResult = $methodReturnTypeFallback;');
       }
       buffer.writeln();
       setUp(buffer, className, method);
@@ -96,11 +112,15 @@ class UsecaseTestGenerator
     return buffer.toString();
   }
 
+  /// Generates the setUp method for use case tests.
+  ///
+  /// Initializes mocks and registers fallback values for parameters.
   void setUp(StringBuffer buffer, String className, IFunction method) {
     final hasParams = method.params != null;
-    buffer.writeln('setUp(() {');
-    buffer.writeln('repo = Mock$className();');
-    buffer.writeln('usecase = ${method.name.upperCamelCase}(repo);');
+    buffer
+      ..writeln('setUp(() {')
+      ..writeln('repo = Mock$className();')
+      ..writeln('usecase = ${method.name.upperCamelCase}(repo);');
     if (hasParams) {
       for (final param in method.params!) {
         buffer.writeln('registerFallbackValue(t${param.name.upperCamelCase});');
@@ -109,18 +129,30 @@ class UsecaseTestGenerator
     buffer.writeln('});');
   }
 
-  void test(StringBuffer buffer, String className, IFunction method,
-      List<String> testNames) {
+  /// Generates a test case for a use case.
+  ///
+  /// Creates a comprehensive test that verifies the use case calls
+  /// the repository correctly and returns the expected result.
+  void test(
+    StringBuffer buffer,
+    String className,
+    IFunction method,
+    List<String> testNames,
+  ) {
     final returnType = method.returnType.trim();
     final methodName = method.name;
     final isStream = returnType.startsWith('Stream');
     final action = isStream ? 'emit' : 'return';
-    buffer.writeln('test(');
-    buffer.writeln(returnType.rightType == 'void'
-        ? "'should call the [$className.${method.name}]',"
-        : "'should $action [${method.returnType.rightType}] from the repo',");
-    buffer.writeln('() async {');
-    buffer.writeln('when(() => repo.$methodName(');
+    buffer
+      ..writeln('test(')
+      ..writeln(
+        returnType.rightType == 'void'
+            ? "'should call the [$className.${method.name}]',"
+            : "'should $action [${method.returnType.rightType}] "
+                  "from the repo',",
+      )
+      ..writeln('() async {')
+      ..writeln('when(() => repo.$methodName(');
     if (method.params != null) {
       for (final param in method.params!) {
         final fallback = param.isNamed
@@ -135,17 +167,18 @@ class UsecaseTestGenerator
     final returnTypeFallback = method.returnType.fallbackValue;
     final fallback =
         returnTypeFallback is String && returnTypeFallback == 'null'
-            ? null
-            : 'tResult';
-    var hasCustomReturnType =
+        ? null
+        : 'tResult';
+    final hasCustomReturnType =
         returnTypeFallback is String && returnTypeFallback.isCustomType;
     // if (fallback is String && fallback.isCustomType) {
     //   fallback = 'tResult';
     //   hasCustomReturnType = true;
     // }
-    buffer.writeln('),');
-    buffer.writeln(')');
-    buffer.writeln('.thenAnswer(');
+    buffer
+      ..writeln('),')
+      ..writeln(')')
+      ..writeln('.thenAnswer(');
     final moreThanOneParam = testNames.length > 1;
     final modifier = hasCustomReturnType ? '' : 'const';
     var streamPrefix = '';
@@ -154,16 +187,21 @@ class UsecaseTestGenerator
       streamPrefix = 'Stream.value(';
       streamSuffix = ')';
     }
-    buffer.writeln(
-      '(_) async '
-      '=> $streamPrefix'
-      '$modifier Right($fallback)$streamSuffix,',
-    );
-    buffer.writeln(');');
-    buffer.writeln();
+    buffer
+      ..writeln(
+        '(_) async '
+        '=> $streamPrefix'
+        '$modifier Right($fallback)$streamSuffix,',
+      )
+      ..writeln(');')
+      ..writeln();
     final resultText = isStream ? 'stream' : 'result';
     buffer.writeln(
-      'final $resultText = ${isStream ? '' : 'await'} ${moreThanOneParam ? 'usecase(' : testNames.isNotEmpty ? 'usecase(${testNames.first});' : 'usecase();'}',
+      'final $resultText = ${isStream ? '' : 'await'} ${moreThanOneParam
+          ? 'usecase('
+          : testNames.isNotEmpty
+          ? 'usecase(${testNames.first});'
+          : 'usecase();'}',
     );
     if (moreThanOneParam) {
       final className = '${method.name.upperCamelCase}Params';
@@ -171,14 +209,16 @@ class UsecaseTestGenerator
       for (final name in testNames) {
         buffer.writeln('${name.replaceFirst('t', '').lowerCamelCase}: $name,');
       }
-      buffer.writeln('),');
-      buffer.writeln(');');
+      buffer
+        ..writeln('),')
+        ..writeln(');');
     }
-    buffer.writeln(
-      'expect($resultText, ${isStream ? 'emits' : 'equals'}($modifier '
-      'Right<dynamic, ${method.returnType.rightType}>($fallback)));',
-    );
-    buffer.writeln('verify(() => repo.$methodName(');
+    buffer
+      ..writeln(
+        'expect($resultText, ${isStream ? 'emits' : 'equals'}($modifier '
+        'Right<dynamic, ${method.returnType.rightType}>($fallback)));',
+      )
+      ..writeln('verify(() => repo.$methodName(');
     if (method.params != null) {
       for (final param in method.params!) {
         final fallback = param.isNamed
@@ -187,9 +227,10 @@ class UsecaseTestGenerator
         buffer.writeln(fallback);
       }
     }
-    buffer.writeln('),).called(1);');
-    buffer.writeln('verifyNoMoreInteractions(repo);');
-    buffer.writeln('},');
-    buffer.writeln(');');
+    buffer
+      ..writeln('),).called(1);')
+      ..writeln('verifyNoMoreInteractions(repo);')
+      ..writeln('},')
+      ..writeln(');');
   }
 }

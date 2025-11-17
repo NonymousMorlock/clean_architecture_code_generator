@@ -1,18 +1,19 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
-import 'package:generators/core/config/generator_config.dart';
-import 'package:generators/core/services/feature_file_writer.dart';
-import 'package:generators/core/services/functions.dart';
-import 'package:generators/core/services/string_extensions.dart';
-import 'package:generators/core/utils/utils.dart';
-import 'package:generators/src/visitors/usecase_visitor.dart';
+import 'package:generators/generators.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Generator for creating remote data source classes from
+/// repository annotations.
+///
+/// Processes classes annotated with `@RemoteDataSrcGenAnnotation` and generates
+/// corresponding remote data source interfaces and implementations.
 class RemoteDataSrcGenerator
     extends GeneratorForAnnotation<RemoteDataSrcGenAnnotation> {
   @override
@@ -70,14 +71,18 @@ class RemoteDataSrcGenerator
     // Write to the data source file
     try {
       File(dataSourcePath).writeAsStringSync(completeFile);
-    } catch (e) {
-      print('Warning: Could not write to $dataSourcePath: $e');
+    } on Exception catch (e) {
+      stderr.writeln('Warning: Could not write to $dataSourcePath: $e');
     }
 
     // Return a minimal marker for the .g.dart file
     return '// Remote data source written to: $dataSourcePath\n';
   }
 
+  /// Generates the remote data source interface and implementation.
+  ///
+  /// Creates both the abstract interface and concrete implementation class
+  /// with HTTP client configuration based on the YAML config.
   void remoteDataSource({
     required StringBuffer buffer,
     required RepoVisitor visitor,
@@ -96,28 +101,29 @@ class RemoteDataSrcGenerator
       buffer: buffer,
       methodLength: visitor.methods.length,
     );
-    buffer.writeln('abstract interface class $dataSrcName {');
-    buffer.writeln('const $dataSrcName();');
-
-    buffer.writeln();
+    buffer
+      ..writeln('abstract interface class $dataSrcName {')
+      ..writeln('const $dataSrcName();')
+      ..writeln();
 
     for (final method in visitor.methods) {
-      var returnType = method.returnType.modelizeType;
+      final returnType = method.returnType.modelizeType;
       final isStream = method.returnType.startsWith('Stream');
       final asynchronyType = isStream ? 'Stream' : 'Future';
       if (method.params != null) {
         final params = method.params!
             .map((param) => paramToString(method, param))
             .join(', ');
-        buffer.writeln("$asynchronyType<$returnType> ${method.name}($params);");
+        buffer.writeln('$asynchronyType<$returnType> ${method.name}($params);');
       } else {
-        buffer.writeln("$asynchronyType<$returnType> ${method.name}();");
+        buffer.writeln('$asynchronyType<$returnType> ${method.name}();');
       }
       buffer.writeln();
     }
-    buffer.writeln("}");
-    buffer.writeln();
-    buffer.writeln("class ${dataSrcName}Impl implements $dataSrcName {");
+    buffer
+      ..writeln('}')
+      ..writeln()
+      ..writeln('class ${dataSrcName}Impl implements $dataSrcName {');
 
     // Load configuration instead of prompting user
     final remoteConfig = config.remoteDataSourceConfig;
@@ -135,28 +141,35 @@ class RemoteDataSrcGenerator
         final params = method.params!
             .map((param) => paramToString(method, param))
             .join(', ');
-        buffer.writeln("@override");
-        buffer.writeln(
-          "$asynchronyType<$returnType> ${method.name}"
-          "($params) $modifier {",
-        );
+        buffer
+          ..writeln('@override')
+          ..writeln(
+            '$asynchronyType<$returnType> ${method.name}'
+            '($params) $modifier {',
+          );
         _generateMethodImplementation(buffer, method, remoteConfig);
-        buffer.writeln("}");
-        buffer.writeln();
+        buffer
+          ..writeln('}')
+          ..writeln();
       } else {
-        buffer.writeln("@override");
-        buffer.writeln(
-          "$asynchronyType<$returnType> ${method.name}() "
-          "$modifier {",
-        );
+        buffer
+          ..writeln('@override')
+          ..writeln(
+            '$asynchronyType<$returnType> ${method.name}() '
+            '$modifier {',
+          );
         _generateMethodImplementation(buffer, method, remoteConfig);
-        buffer.writeln("}");
-        buffer.writeln();
+        buffer
+          ..writeln('}')
+          ..writeln();
       }
     }
-    buffer.writeln("}");
+    buffer.writeln('}');
   }
 
+  /// Prompts the user for yes/no input via terminal.
+  ///
+  /// Returns true if the user enters 'yes' or 'y', false otherwise.
   bool getTerminalInfo(String question) {
     stdout.write('$question (yes): ');
     final result = stdin.readLineSync() ?? 'yes';
@@ -166,29 +179,33 @@ class RemoteDataSrcGenerator
   }
 
   void _generateConfigBasedConstructor(
-      StringBuffer buffer, String className, RemoteDataSourceConfig config) {
+    StringBuffer buffer,
+    String className,
+    RemoteDataSourceConfig config,
+  ) {
     final dependencies = config.constructorDependencies;
 
     if (dependencies.isEmpty) {
-      buffer.writeln("const ${className}Impl();");
+      buffer.writeln('const ${className}Impl();');
     } else if (dependencies.length == 1) {
       final dependency = dependencies.first;
       final parts = dependency.split(' ');
       final type = parts[0];
       final name = parts[1];
-      buffer.writeln("const ${className}Impl(this._$name);");
-      buffer.writeln();
-      buffer.writeln("final $type _$name;");
+      buffer
+        ..writeln('const ${className}Impl(this._$name);')
+        ..writeln()
+        ..writeln('final $type _$name;');
     } else {
       // Multiple dependencies
-      buffer.writeln("const ${className}Impl({");
+      buffer.writeln('const ${className}Impl({');
       for (final dependency in dependencies) {
         final parts = dependency.split(' ');
         final type = parts[0];
         final name = parts[1];
-        buffer.writeln("required $type $name,");
+        buffer.writeln('required $type $name,');
       }
-      buffer.writeln("}) : ");
+      buffer.writeln('}) : ');
 
       for (var i = 0; i < dependencies.length; i++) {
         final dependency = dependencies[i];
@@ -205,42 +222,51 @@ class RemoteDataSrcGenerator
         final parts = dependency.split(' ');
         final type = parts[0];
         final name = parts[1];
-        buffer.writeln("final $type _$name;");
+        buffer.writeln('final $type _$name;');
       }
     }
     buffer.writeln();
   }
 
   void _generateMethodImplementation(
-      StringBuffer buffer, dynamic method, RemoteDataSourceConfig config) {
-    buffer.writeln("\t// TODO(${method.name}): implement ${method.name}");
+    StringBuffer buffer,
+    IFunction method,
+    RemoteDataSourceConfig config,
+  ) {
+    buffer.writeln('\t// TODO(${method.name}): implement ${method.name}');
 
     // Add configuration-aware implementation hints
     if (config.useFirebaseFirestore &&
         method.name.toLowerCase().contains('get')) {
       buffer.writeln(
-          "\t// Hint: Use _firestore.collection('...').get() for Firestore");
+        "\t// Hint: Use _firestore.collection('...').get() for Firestore",
+      );
     } else if (config.useFirebaseAuth &&
         method.name.toLowerCase().contains('auth')) {
       buffer.writeln(
-          "\t// Hint: Use _firebaseAuth.signInWithEmailAndPassword() for auth");
+        '\t// Hint: Use _firebaseAuth.signInWithEmailAndPassword() for auth',
+      );
     } else if (config.useGraphQL &&
         (method.name.toLowerCase().contains('get') ||
             method.name.toLowerCase().contains('fetch'))) {
-      buffer
-          .writeln("\t// Hint: Use _graphQLClient.query() for GraphQL queries");
+      buffer.writeln(
+        '\t// Hint: Use _graphQLClient.query() for GraphQL queries',
+      );
     } else if (config.useWebSockets &&
         method.name.toLowerCase().contains('stream')) {
       buffer.writeln(
-          "\t// Hint: Use _webSocketChannel.stream for WebSocket streams");
+        '\t// Hint: Use _webSocketChannel.stream for WebSocket streams',
+      );
     } else if (config.useSupabase) {
       if (method.name.toLowerCase().contains('get')) {
         buffer.writeln(
-            "\t// Hint: Use _supabaseClient.from('table').select() for Supabase queries");
+          "\t// Hint: Use _supabaseClient.from('table').select() for Supabase queries",
+        );
       } else if (method.name.toLowerCase().contains('create') ||
           method.name.toLowerCase().contains('insert')) {
         buffer.writeln(
-            "\t// Hint: Use _supabaseClient.from('table').insert() for Supabase inserts");
+          "\t// Hint: Use _supabaseClient.from('table').insert() for Supabase inserts",
+        );
       }
     } else {
       // Default HTTP implementation hint
@@ -248,42 +274,45 @@ class RemoteDataSrcGenerator
         case HttpClientType.dio:
           if (method.name.toLowerCase().contains('get')) {
             buffer.writeln(
-                "\t// Hint: Use _dio.get('/endpoint') for GET requests");
+              "\t// Hint: Use _dio.get('/endpoint') for GET requests",
+            );
           } else if (method.name.toLowerCase().contains('post') ||
               method.name.toLowerCase().contains('create')) {
             buffer.writeln(
-                "\t// Hint: Use _dio.post('/endpoint', data: data) for POST requests");
+              "\t// Hint: Use _dio.post('/endpoint', data: data) for POST requests",
+            );
           } else if (method.name.toLowerCase().contains('put') ||
               method.name.toLowerCase().contains('update')) {
             buffer.writeln(
-                "\t// Hint: Use _dio.put('/endpoint', data: data) for PUT requests");
+              "\t// Hint: Use _dio.put('/endpoint', data: data) for PUT requests",
+            );
           } else if (method.name.toLowerCase().contains('delete')) {
             buffer.writeln(
-                "\t// Hint: Use _dio.delete('/endpoint') for DELETE requests");
+              "\t// Hint: Use _dio.delete('/endpoint') for DELETE requests",
+            );
           }
-          break;
         case HttpClientType.http:
           buffer.writeln(
-              "\t// Hint: Use _client.get(Uri.parse('url')) for HTTP requests");
-          break;
+            "\t// Hint: Use _client.get(Uri.parse('url')) for HTTP requests",
+          );
         case HttpClientType.chopper:
           buffer.writeln(
-              "\t// Hint: Use _client.getService<ApiService>().method() for Chopper");
-          break;
+            '\t// Hint: Use _client.getService<ApiService>().method() for Chopper',
+          );
         case HttpClientType.retrofit:
-          buffer.writeln("\t// Hint: Use _client.method() for Retrofit");
-          break;
-        default:
-          buffer.writeln(
-              "\t// Hint: Implement using configured HTTP client: ${config.httpClient}");
+          buffer.writeln('\t// Hint: Use _client.method() for Retrofit');
+        case HttpClientType.custom:
+          buffer.writeln('\t// Hint: Implement custom HTTP logic here');
       }
     }
 
-    buffer.writeln("\tthrow UnimplementedError();");
+    buffer.writeln('\tthrow UnimplementedError();');
   }
 
   void _generateConfigBasedImports(
-      StringBuffer buffer, GeneratorConfig config) {
+    StringBuffer buffer,
+    GeneratorConfig config,
+  ) {
     final imports = config.remoteDataSourceConfig.requiredImports;
 
     if (imports.isNotEmpty) {

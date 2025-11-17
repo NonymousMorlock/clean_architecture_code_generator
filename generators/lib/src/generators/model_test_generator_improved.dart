@@ -1,4 +1,5 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
@@ -8,6 +9,10 @@ import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Improved generator for creating test files for model classes.
+///
+/// An enhanced version of ModelTestGenerator with better test coverage
+/// and more comprehensive test scenarios.
 class ModelTestGeneratorImproved
     extends GeneratorForAnnotation<ModelTestGenAnnotation> {
   @override
@@ -39,7 +44,12 @@ class ModelTestGeneratorImproved
 
     // Generate test model using fixture-based approach
     _generateTestModel(
-        buffer, className, modelClassName, entityClassName, visitor);
+      buffer,
+      className,
+      modelClassName,
+      entityClassName,
+      visitor,
+    );
 
     // Generate tests
     _generateEntitySubclassTest(buffer, modelClassName, entityClassName);
@@ -62,197 +72,251 @@ class ModelTestGeneratorImproved
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
     final appName = config.appName;
 
-    buffer.writeln('import \'dart:convert\';');
-    buffer.writeln();
-    buffer.writeln('import \'package:flutter_test/flutter_test.dart\';');
-    buffer.writeln();
-    buffer.writeln('// Feature imports');
-    buffer.writeln('import \'package:$appName/core/typedefs.dart\';');
-    buffer.writeln(
-        'import \'package:$appName/features/$classSnakeCase/data/models/${classSnakeCase}_model.dart\';');
-    buffer.writeln(
-        'import \'package:$appName/features/$classSnakeCase/domain/entities/$classSnakeCase.dart\';');
-    buffer.writeln();
-    buffer.writeln('// Test utilities');
-    buffer.writeln('import \'../../../fixtures/fixture_reader.dart\';');
-    buffer.writeln();
+    buffer
+      ..writeln("import 'dart:convert';")
+      ..writeln()
+      ..writeln("import 'package:flutter_test/flutter_test.dart';")
+      ..writeln()
+      ..writeln('// Feature imports')
+      ..writeln("import 'package:$appName/core/typedefs.dart';")
+      ..writeln(
+        "import 'package:$appName/features/$classSnakeCase/data/models/${classSnakeCase}_model.dart';",
+      )
+      ..writeln(
+        "import 'package:$appName/features/$classSnakeCase/domain/entities/$classSnakeCase.dart';",
+      )
+      ..writeln()
+      ..writeln('// Test utilities')
+      ..writeln("import '../../../fixtures/fixture_reader.dart';")
+      ..writeln();
   }
 
-  void _generateTestModel(StringBuffer buffer, String className,
-      String modelClassName, String entityClassName, ModelVisitor visitor) {
+  void _generateTestModel(
+    StringBuffer buffer,
+    String className,
+    String modelClassName,
+    String entityClassName,
+    ModelVisitor visitor,
+  ) {
     buffer
-        .writeln('  // Test model created from fixture to ensure consistency');
-    buffer.writeln('  late $modelClassName t$modelClassName;');
-    buffer.writeln('  late DataMap tMap;');
-    buffer.writeln();
-    buffer.writeln('  setUpAll(() {');
-    buffer.writeln('    // Load fixture and create model from it');
-    buffer.writeln(
-        '    final fixtureString = fixture(\'${className.snakeCase}.json\');');
-    buffer.writeln('    tMap = jsonDecode(fixtureString) as DataMap;');
-    buffer.writeln();
+      ..writeln(
+        '  // Test model created from fixture to ensure consistency',
+      )
+      ..writeln('  late $modelClassName t$modelClassName;')
+      ..writeln('  late DataMap tMap;')
+      ..writeln()
+      ..writeln('  setUpAll(() {')
+      ..writeln('    // Load fixture and create model from it')
+      ..writeln(
+        "    final fixtureString = fixture('${className.snakeCase}.json');",
+      )
+      ..writeln('    tMap = jsonDecode(fixtureString) as DataMap;')
+      ..writeln();
 
     // Handle special field transformations for fixtures
     _generateFixtureTransformations(buffer, visitor);
 
-    buffer.writeln('    // Create test model from fixture data');
-    buffer.writeln('    t$modelClassName = $modelClassName.fromMap(tMap);');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln('    // Create test model from fixture data')
+      ..writeln('    t$modelClassName = $modelClassName.fromMap(tMap);')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateFixtureTransformations(
-      StringBuffer buffer, ModelVisitor visitor) {
+    StringBuffer buffer,
+    ModelVisitor visitor,
+  ) {
     buffer.writeln(
-        '    // Transform fixture data to match expected types (YAML config-aware)');
+      '    // Transform fixture data to match expected types (YAML config-aware)',
+    );
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
 
     for (final field in visitor.fields.entries) {
       final fieldName = field.key;
       final fieldType = field.value;
-      final configuredType =
-          _getConfiguredFieldType(config, 'className', fieldName, fieldType);
+      final configuredType = _getConfiguredFieldType(
+        config,
+        'className',
+        fieldName,
+        fieldType,
+      );
 
       if (fieldType.toLowerCase().contains('datetime')) {
         buffer.writeln(
-            '    // Handle DateTime field: $fieldName (configured as: $configuredType)');
+          '    // Handle DateTime field: '
+          '$fieldName (configured as: $configuredType)',
+        );
 
         switch (configuredType) {
           case 'timestamp_ms':
           case 'timestamp_s':
-            buffer.writeln('    if (tMap[\'$fieldName\'] is String) {');
+            buffer.writeln("    if (tMap['$fieldName'] is String) {");
             buffer.writeln(
-                '      // Convert ISO string to timestamp for API consistency');
+              '      // Convert ISO string to timestamp for API consistency',
+            );
             buffer.writeln(
-                '      final dateTime = DateTime.parse(tMap[\'$fieldName\'] as String);');
+              '      final dateTime = '
+              "DateTime.parse(tMap['$fieldName'] as String);",
+            );
             if (configuredType == 'timestamp_ms') {
               buffer.writeln(
-                  '      tMap[\'$fieldName\'] = dateTime.millisecondsSinceEpoch;');
+                "      tMap['$fieldName'] = dateTime.millisecondsSinceEpoch;",
+              );
             } else {
               buffer.writeln(
-                  '      tMap[\'$fieldName\'] = dateTime.millisecondsSinceEpoch ~/ 1000;');
+                "      tMap['$fieldName'] = "
+                'dateTime.millisecondsSinceEpoch ~/ 1000;',
+              );
             }
             buffer.writeln('    }');
-            break;
           case 'iso_string':
           default:
-            buffer.writeln('    if (tMap[\'$fieldName\'] is int) {');
+            buffer.writeln("    if (tMap['$fieldName'] is int) {");
             buffer.writeln(
-                '      // Convert timestamp to ISO string for API consistency');
+              '      // Convert timestamp to ISO string for API consistency',
+            );
             buffer.writeln(
-                '      final timestamp = tMap[\'$fieldName\'] as int;');
+              "      final timestamp = tMap['$fieldName'] as int;",
+            );
             buffer.writeln('      final dateTime = timestamp > 1000000000000');
             buffer.writeln(
-                '          ? DateTime.fromMillisecondsSinceEpoch(timestamp)');
+              '          ? DateTime.fromMillisecondsSinceEpoch(timestamp)',
+            );
             buffer.writeln(
-                '          : DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);');
+              '          : DateTime.fromMillisecondsSinceEpoch(timestamp '
+              '* 1000);',
+            );
             buffer.writeln(
-                '      tMap[\'$fieldName\'] = dateTime.toIso8601String();');
+              "      tMap['$fieldName'] = dateTime.toIso8601String();",
+            );
             buffer.writeln('    }');
-            break;
         }
       } else if (fieldType.toLowerCase().contains('double') &&
           configuredType.isNotEmpty) {
         buffer.writeln(
-            '    // Handle double field: $fieldName (configured as: $configuredType)');
+          '    // Handle double field: $fieldName '
+          '(configured as: $configuredType)',
+        );
         switch (configuredType) {
           case 'int':
-            buffer.writeln('    if (tMap[\'$fieldName\'] is double) {');
+            buffer.writeln("    if (tMap['$fieldName'] is double) {");
             buffer.writeln(
-                '      tMap[\'$fieldName\'] = (tMap[\'$fieldName\'] as double).toInt();');
+              "      tMap['$fieldName'] = (tMap['$fieldName'] "
+              'as double).toInt();',
+            );
             buffer.writeln('    }');
-            break;
           case 'string':
-            buffer.writeln('    if (tMap[\'$fieldName\'] is num) {');
+            buffer.writeln("    if (tMap['$fieldName'] is num) {");
             buffer.writeln(
-                '      tMap[\'$fieldName\'] = tMap[\'$fieldName\'].toString();');
+              "      tMap['$fieldName'] = tMap['$fieldName'].toString();",
+            );
             buffer.writeln('    }');
-            break;
           case 'double':
           default:
-            buffer.writeln('    if (tMap[\'$fieldName\'] is int) {');
+            buffer.writeln("    if (tMap['$fieldName'] is int) {");
             buffer.writeln(
-                '      tMap[\'$fieldName\'] = (tMap[\'$fieldName\'] as int).toDouble();');
+              "      tMap['$fieldName'] = (tMap['$fieldName'] "
+              'as int).toDouble();',
+            );
             buffer.writeln('    }');
-            break;
         }
       } else if (fieldType.toLowerCase().contains('int') &&
           configuredType == 'string') {
-        buffer.writeln(
-            '    // Handle int field: $fieldName (configured as: string)');
-        buffer.writeln('    if (tMap[\'$fieldName\'] is int) {');
-        buffer.writeln(
-            '      tMap[\'$fieldName\'] = tMap[\'$fieldName\'].toString();');
-        buffer.writeln('    }');
+        buffer
+          ..writeln(
+            '    // Handle int field: $fieldName (configured as: string)',
+          )
+          ..writeln("    if (tMap['$fieldName'] is int) {")
+          ..writeln(
+            "      tMap['$fieldName'] = tMap['$fieldName'].toString();",
+          )
+          ..writeln('    }');
       }
     }
     buffer.writeln();
   }
 
   void _generateEntitySubclassTest(
-      StringBuffer buffer, String modelClassName, String entityClassName) {
-    buffer.writeln(
-        '  test(\'should be a subclass of $entityClassName entity\', () {');
-    buffer.writeln('    expect(t$modelClassName, isA<$entityClassName>());');
-    buffer.writeln('  });');
-    buffer.writeln();
+    StringBuffer buffer,
+    String modelClassName,
+    String entityClassName,
+  ) {
+    buffer
+      ..writeln(
+        "  test('should be a subclass of $entityClassName entity', () {",
+      )
+      ..writeln('    expect(t$modelClassName, isA<$entityClassName>());')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateFromMapTest(StringBuffer buffer, String modelClassName) {
-    buffer.writeln('  group(\'fromMap\', () {');
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return a valid model when the map is valid\',');
-    buffer.writeln('      () {');
-    buffer.writeln('        final result = $modelClassName.fromMap(tMap);');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<$modelClassName>());');
-    buffer.writeln('        expect(result, equals(t$modelClassName));');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln();
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should handle null values gracefully for optional fields\',');
-    buffer.writeln('      () {');
-    buffer.writeln(
-        '        final mapWithNulls = Map<String, dynamic>.from(tMap);');
-    buffer.writeln('        // Set optional fields to null');
-    buffer.writeln('        // mapWithNulls[\'optionalField\'] = null;');
-    buffer.writeln();
-    buffer.writeln(
-        '        final result = $modelClassName.fromMap(mapWithNulls);');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<$modelClassName>());');
-    buffer.writeln('        // Add specific assertions for null handling');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln("  group('fromMap', () {")
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return a valid model when the map is valid',",
+      )
+      ..writeln('      () {')
+      ..writeln('        final result = $modelClassName.fromMap(tMap);')
+      ..writeln()
+      ..writeln('        expect(result, isA<$modelClassName>());')
+      ..writeln('        expect(result, equals(t$modelClassName));')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln()
+      ..writeln('    test(')
+      ..writeln(
+        "      'should handle null values gracefully for optional fields',",
+      )
+      ..writeln('      () {')
+      ..writeln(
+        '        final mapWithNulls = Map<String, dynamic>.from(tMap);',
+      )
+      ..writeln('        // Set optional fields to null')
+      ..writeln("        // mapWithNulls['optionalField'] = null;")
+      ..writeln()
+      ..writeln(
+        '        final result = $modelClassName.fromMap(mapWithNulls);',
+      )
+      ..writeln()
+      ..writeln('        expect(result, isA<$modelClassName>());')
+      ..writeln('        // Add specific assertions for null handling')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateToMapTest(StringBuffer buffer, String modelClassName) {
-    buffer.writeln('  group(\'toMap\', () {');
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return a JSON map containing the proper data\',');
-    buffer.writeln('      () {');
-    buffer.writeln('        final result = t$modelClassName.toMap();');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<DataMap>());');
-    buffer.writeln(
-        '        // Compare key fields to ensure proper serialization');
-    buffer.writeln('        expect(result[\'id\'], t$modelClassName.id);');
-    buffer.writeln('        // Add more field comparisons as needed');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln("  group('toMap', () {")
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return a JSON map containing the proper data',",
+      )
+      ..writeln('      () {')
+      ..writeln('        final result = t$modelClassName.toMap();')
+      ..writeln()
+      ..writeln('        expect(result, isA<DataMap>());')
+      ..writeln(
+        '        // Compare key fields to ensure proper serialization',
+      )
+      ..writeln("        expect(result['id'], t$modelClassName.id);")
+      ..writeln('        // Add more field comparisons as needed')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateCopyWithTest(
-      StringBuffer buffer, String modelClassName, ModelVisitor visitor) {
-    buffer.writeln('  group(\'copyWith\', () {');
+    StringBuffer buffer,
+    String modelClassName,
+    ModelVisitor visitor,
+  ) {
+    buffer.writeln("  group('copyWith', () {");
 
     // Find a string field for testing
     String? testField;
@@ -272,14 +336,16 @@ class ModelTestGeneratorImproved
       testFieldType = firstField.value;
     }
 
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return a copy of the model with updated fields\',');
-    buffer.writeln('      () {');
+    buffer
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return a copy of the model with updated fields',",
+      )
+      ..writeln('      () {');
 
     String testValue;
     if (testFieldType?.toLowerCase().contains('string') ?? false) {
-      testValue = '\'Updated $testField\'';
+      testValue = "'Updated $testField'";
     } else if (testFieldType?.toLowerCase().contains('int') ?? false) {
       testValue = '999';
     } else if (testFieldType?.toLowerCase().contains('double') ?? false) {
@@ -290,98 +356,118 @@ class ModelTestGeneratorImproved
       testValue = 'null'; // For complex types
     }
 
-    buffer.writeln(
-        '        final result = t$modelClassName.copyWith($testField: $testValue);');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<$modelClassName>());');
-    buffer.writeln('        expect(result.$testField, $testValue);');
-    buffer.writeln('        // Ensure other fields remain unchanged');
+    buffer
+      ..writeln(
+        '        final result = '
+        't$modelClassName.copyWith($testField: $testValue);',
+      )
+      ..writeln()
+      ..writeln('        expect(result, isA<$modelClassName>());')
+      ..writeln('        expect(result.$testField, $testValue);')
+      ..writeln('        // Ensure other fields remain unchanged');
 
     // Test that other fields remain the same
     for (final field in visitor.fields.entries) {
       final fieldName = field.key.camelCase;
       if (fieldName != testField) {
         buffer.writeln(
-            '        expect(result.$fieldName, t$modelClassName.$fieldName);');
+          '        expect(result.$fieldName, t$modelClassName.$fieldName);',
+        );
         break; // Just test one other field to keep it concise
       }
     }
 
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln();
-
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return the same instance when no parameters are provided\',');
-    buffer.writeln('      () {');
-    buffer.writeln('        final result = t$modelClassName.copyWith();');
-    buffer.writeln();
-    buffer.writeln('        expect(result, equals(t$modelClassName));');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln()
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return the same instance when no "
+        "parameters are provided',",
+      )
+      ..writeln('      () {')
+      ..writeln('        final result = t$modelClassName.copyWith();')
+      ..writeln()
+      ..writeln('        expect(result, equals(t$modelClassName));')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateFromJsonTest(StringBuffer buffer, String modelClassName) {
-    buffer.writeln('  group(\'fromJson\', () {');
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return a valid model when the JSON string is valid\',');
-    buffer.writeln('      () {');
-    buffer.writeln('        final jsonString = jsonEncode(tMap);');
-    buffer.writeln(
-        '        final result = $modelClassName.fromJson(jsonString);');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<$modelClassName>());');
-    buffer.writeln('        expect(result, equals(t$modelClassName));');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln("  group('fromJson', () {")
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return a valid model when the JSON string is valid',",
+      )
+      ..writeln('      () {')
+      ..writeln('        final jsonString = jsonEncode(tMap);')
+      ..writeln(
+        '        final result = $modelClassName.fromJson(jsonString);',
+      )
+      ..writeln()
+      ..writeln('        expect(result, isA<$modelClassName>());')
+      ..writeln('        expect(result, equals(t$modelClassName));')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateToJsonTest(StringBuffer buffer, String modelClassName) {
-    buffer.writeln('  group(\'toJson\', () {');
-    buffer.writeln('    test(');
-    buffer.writeln(
-        '      \'should return a JSON string containing the proper data\',');
-    buffer.writeln('      () {');
-    buffer.writeln('        final result = t$modelClassName.toJson();');
-    buffer.writeln('        final expectedJson = jsonEncode(tMap);');
-    buffer.writeln();
-    buffer.writeln('        expect(result, isA<String>());');
-    buffer.writeln(
-        '        // Parse both to compare as maps (order-independent)');
-    buffer.writeln('        final resultMap = jsonDecode(result) as DataMap;');
-    buffer.writeln(
-        '        final expectedMap = jsonDecode(expectedJson) as DataMap;');
-    buffer.writeln('        expect(resultMap, equals(expectedMap));');
-    buffer.writeln('      },');
-    buffer.writeln('    );');
-    buffer.writeln('  });');
-    buffer.writeln();
+    buffer
+      ..writeln("  group('toJson', () {")
+      ..writeln('    test(')
+      ..writeln(
+        "      'should return a JSON string containing the proper data',",
+      )
+      ..writeln('      () {')
+      ..writeln('        final result = t$modelClassName.toJson();')
+      ..writeln('        final expectedJson = jsonEncode(tMap);')
+      ..writeln()
+      ..writeln('        expect(result, isA<String>());')
+      ..writeln(
+        '        // Parse both to compare as maps (order-independent)',
+      )
+      ..writeln('        final resultMap = jsonDecode(result) as DataMap;')
+      ..writeln(
+        '        final expectedMap = jsonDecode(expectedJson) as DataMap;',
+      )
+      ..writeln('        expect(resultMap, equals(expectedMap));')
+      ..writeln('      },')
+      ..writeln('    );')
+      ..writeln('  });')
+      ..writeln();
   }
 
   void _generateFixtureFile(
-      StringBuffer buffer, String className, ModelVisitor visitor) {
+    StringBuffer buffer,
+    String className,
+    ModelVisitor visitor,
+  ) {
     // Load configuration to determine field types
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
 
-    buffer.writeln();
-    buffer.writeln(
-        '// **************************************************************************');
-    buffer.writeln('// Fixture Generator - $className Fixture');
-    buffer.writeln(
-        '// **************************************************************************');
-    buffer.writeln();
-    buffer.writeln('// GENERATED FIXTURE FILE (YAML Config-Aware)');
-    buffer.writeln(
-        '// Create this file at: test/fixtures/${className.snakeCase}.json');
-    buffer.writeln('// Content generated based on YAML configuration:');
-    buffer.writeln('/*');
-    buffer.writeln('{');
+    buffer
+      ..writeln()
+      ..writeln(
+        '// **************************************************************************',
+      )
+      ..writeln('// Fixture Generator - $className Fixture')
+      ..writeln(
+        '// **************************************************************************',
+      )
+      ..writeln()
+      ..writeln('// GENERATED FIXTURE FILE (YAML Config-Aware)')
+      ..writeln(
+        '// Create this file at: test/fixtures/${className.snakeCase}.json',
+      )
+      ..writeln('// Content generated based on YAML configuration:')
+      ..writeln('/*')
+      ..writeln('{');
 
     final fields = visitor.fields.entries.toList();
     for (var i = 0; i < fields.length; i++) {
@@ -391,18 +477,27 @@ class ModelTestGeneratorImproved
       final isLast = i == fields.length - 1;
 
       // Get configured field type from YAML, fallback to default
-      final configuredType =
-          _getConfiguredFieldType(config, className, fieldName, fieldType);
-      final jsonValue =
-          _getJsonValueForConfiguredType(fieldType, fieldName, configuredType);
+      final configuredType = _getConfiguredFieldType(
+        config,
+        className,
+        fieldName,
+        fieldType,
+      );
+      final jsonValue = _getJsonValueForConfiguredType(
+        fieldType,
+        fieldName,
+        configuredType,
+      );
 
       buffer.writeln(
-          '  "$fieldName": $jsonValue${isLast ? '' : ','} // ${configuredType.isNotEmpty ? 'Configured as: $configuredType' : 'Default type'}');
+        '  "$fieldName": $jsonValue${isLast ? '' : ','} // ${configuredType.isNotEmpty ? 'Configured as: $configuredType' : 'Default type'}',
+      );
     }
 
-    buffer.writeln('}');
-    buffer.writeln('*/');
-    buffer.writeln();
+    buffer
+      ..writeln('}')
+      ..writeln('*/')
+      ..writeln();
 
     // Generate configuration template for unconfigured fields
     _generateConfigurationTemplate(buffer, className, visitor, config);
@@ -431,14 +526,21 @@ class ModelTestGeneratorImproved
     }
   }
 
-  String _getConfiguredFieldType(GeneratorConfig config, String className,
-      String fieldName, String fieldType) {
+  String _getConfiguredFieldType(
+    GeneratorConfig config,
+    String className,
+    String fieldName,
+    String fieldType,
+  ) {
     // Use the actual YAML configuration
     return config.modelTestConfig.getFieldType(className, fieldName, fieldType);
   }
 
   String _getJsonValueForConfiguredType(
-      String fieldType, String fieldName, String configuredType) {
+    String fieldType,
+    String fieldName,
+    String configuredType,
+  ) {
     final type = fieldType.toLowerCase();
 
     if (type.contains('datetime')) {
@@ -478,14 +580,19 @@ class ModelTestGeneratorImproved
     }
   }
 
-  void _generateConfigurationTemplate(StringBuffer buffer, String className,
-      ModelVisitor visitor, GeneratorConfig config) {
-    buffer.writeln('// CONFIGURATION OPTIONS');
-    buffer.writeln('// Add to clean_arch_config.yaml:');
-    buffer.writeln('/*');
-    buffer.writeln('model_test_config:');
-    buffer.writeln('  ${className.snakeCase}:');
-    buffer.writeln('    field_types:');
+  void _generateConfigurationTemplate(
+    StringBuffer buffer,
+    String className,
+    ModelVisitor visitor,
+    GeneratorConfig config,
+  ) {
+    buffer
+      ..writeln('// CONFIGURATION OPTIONS')
+      ..writeln('// Add to clean_arch_config.yaml:')
+      ..writeln('/*')
+      ..writeln('model_test_config:')
+      ..writeln('  ${className.snakeCase}:')
+      ..writeln('    field_types:');
 
     // Generate configuration options for fields that can have multiple formats
     for (final field in visitor.fields.entries) {
@@ -493,44 +600,58 @@ class ModelTestGeneratorImproved
       final fieldType = field.value;
 
       if (fieldType.toLowerCase().contains('datetime')) {
-        buffer.writeln(
-            '      $fieldName: "iso_string"  # Options: iso_string, timestamp_ms, timestamp_s');
-        buffer.writeln('        # iso_string: "2024-01-01T00:00:00.000Z"');
-        buffer.writeln('        # timestamp_ms: 1704067200000');
-        buffer.writeln('        # timestamp_s: 1704067200');
+        buffer
+          ..writeln(
+            '      $fieldName: "iso_string"  # Options: iso_string, '
+            'timestamp_ms, timestamp_s',
+          )
+          ..writeln('        # iso_string: "2024-01-01T00:00:00.000Z"')
+          ..writeln('        # timestamp_ms: 1704067200000')
+          ..writeln('        # timestamp_s: 1704067200');
       } else if (fieldType.toLowerCase().contains('double')) {
-        buffer.writeln(
-            '      $fieldName: "double"      # Options: double, int, string');
-        buffer.writeln('        # double: 1.0, int: 1, string: "1.0"');
+        buffer
+          ..writeln(
+            '      $fieldName: "double"      # Options: double, int, string',
+          )
+          ..writeln('        # double: 1.0, int: 1, string: "1.0"');
       } else if (fieldType.toLowerCase().contains('int')) {
         buffer
-            .writeln('      $fieldName: "int"         # Options: int, string');
-        buffer.writeln('        # int: 1, string: "1"');
+          ..writeln(
+            '      $fieldName: "int"         # Options: int, string',
+          )
+          ..writeln('        # int: 1, string: "1"');
       }
     }
 
-    buffer.writeln();
-    buffer.writeln('  # Global defaults for all models:');
-    buffer.writeln('  defaults:');
-    buffer.writeln(
-        '    datetime_format: "iso_string"  # Default DateTime format');
     buffer
-        .writeln('    number_format: "double"        # Default number format');
-    buffer.writeln('*/');
-    buffer.writeln();
-
-    // Show current configuration being used
-    buffer.writeln('// CURRENT CONFIGURATION DETECTED:');
-    buffer.writeln('// (Based on YAML config or defaults)');
+      ..writeln()
+      ..writeln('  # Global defaults for all models:')
+      ..writeln('  defaults:')
+      ..writeln(
+        '    datetime_format: "iso_string"  # Default DateTime format',
+      )
+      ..writeln(
+        '    number_format: "double"        # Default number format',
+      )
+      ..writeln('*/')
+      ..writeln()
+      // Show current configuration being used
+      ..writeln('// CURRENT CONFIGURATION DETECTED:')
+      ..writeln('// (Based on YAML config or defaults)');
     for (final field in visitor.fields.entries) {
       final fieldName = field.key;
       final fieldType = field.value;
-      final configuredType =
-          _getConfiguredFieldType(config, className, fieldName, fieldType);
+      final configuredType = _getConfiguredFieldType(
+        config,
+        className,
+        fieldName,
+        fieldType,
+      );
 
       if (configuredType.isNotEmpty) {
         buffer.writeln(
-            '// $fieldName ($fieldType) -> configured as: $configuredType');
+          '// $fieldName ($fieldType) -> configured as: $configuredType',
+        );
       }
     }
   }

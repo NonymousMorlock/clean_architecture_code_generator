@@ -1,6 +1,8 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
@@ -12,6 +14,10 @@ import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Generator for creating repository interface classes.
+///
+/// Processes classes annotated with `@RepoGenAnnotation` and generates
+/// repository interfaces in the domain layer.
 class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
   @override
   String generateForAnnotatedElement(
@@ -67,22 +73,27 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     // Write to the actual repository file
     try {
       File(repoPath).writeAsStringSync(completeFile);
-    } catch (e) {
-      print('Warning: Could not write to $repoPath: $e');
+    } on Exception catch (e) {
+      stderr.writeln('Warning: Could not write to $repoPath: $e');
     }
 
     // Return a minimal marker for the .g.dart file
     return '// Repository interface written to: $repoPath\n';
   }
 
+  /// Generates the repository interface.
+  ///
+  /// Creates an abstract interface class defining the contract
+  /// for repository implementations.
   void repo(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
     Utils.oneMemberAbstractHandler(
       buffer: buffer,
       methodLength: visitor.methods.length,
     );
-    buffer.writeln('abstract interface class $className {');
-    buffer.writeln('const $className();');
+    buffer
+      ..writeln('abstract interface class $className {')
+      ..writeln('const $className();');
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
       final isStream = method.returnType.startsWith('Stream');
@@ -91,7 +102,8 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
           : method.params!.map((e) => paramToString(method, e)).join(', ');
       final asynchronyType = isStream ? 'Stream' : 'Future';
       buffer.writeln(
-          'Result$asynchronyType<$returnType> ${method.name}($param);');
+        'Result$asynchronyType<$returnType> ${method.name}($param);',
+      );
     }
     buffer.writeln('}');
   }

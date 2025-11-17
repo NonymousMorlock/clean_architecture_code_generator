@@ -1,4 +1,5 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
@@ -7,6 +8,10 @@ import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Generator for creating dependency injection container code.
+///
+/// Processes classes annotated with `@InjectionGenAnnotation` and generates
+/// dependency injection setup code for the application.
 class InjectionGenerator
     extends GeneratorForAnnotation<InjectionGenAnnotation> {
   @override
@@ -30,29 +35,30 @@ class InjectionGenerator
   }
 
   void _generateInjectionContainerBase(StringBuffer buffer) {
-    buffer.writeln('// Generated injection container base file');
-    buffer.writeln(
-      '// This file contains all imports for the injection container',
-    );
-    buffer.writeln(
-      '// It is automatically updated when new dependencies are added',
-    );
-    buffer.writeln();
-    buffer.writeln('library injection_container;');
-    buffer.writeln();
-    buffer.writeln('import \'package:get_it/get_it.dart\';');
-    buffer.writeln(
-      'import \'package:shared_preferences/shared_preferences.dart\';',
-    );
-    buffer.writeln('import \'package:dio/dio.dart\';');
-    buffer.writeln();
-    buffer.writeln('// TODO: Add additional imports here as needed');
-    buffer.writeln(
-      '// These imports will be automatically managed by the generator',
-    );
-    buffer.writeln();
-    buffer.writeln('part \'injection_container.main.dart\';');
-    buffer.writeln();
+    buffer
+      ..writeln('// Generated injection container base file')
+      ..writeln(
+        '// This file contains all imports for the injection container',
+      )
+      ..writeln(
+        '// It is automatically updated when new dependencies are added',
+      )
+      ..writeln()
+      ..writeln('library injection_container;')
+      ..writeln()
+      ..writeln("import 'package:get_it/get_it.dart';")
+      ..writeln(
+        "import 'package:shared_preferences/shared_preferences.dart';",
+      )
+      ..writeln("import 'package:dio/dio.dart';")
+      ..writeln()
+      ..writeln('// TODO: Add additional imports here as needed')
+      ..writeln(
+        '// These imports will be automatically managed by the generator',
+      )
+      ..writeln()
+      ..writeln("part 'injection_container.main.dart';")
+      ..writeln();
   }
 
   void _generateInjectionContainerMain(
@@ -60,26 +66,28 @@ class InjectionGenerator
     RepoVisitor visitor,
   ) {
     final className = visitor.className;
-    final featureName =
-        className.replaceAll('RepoTBG', '').replaceAll('Repo', '');
+    final featureName = className
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
 
-    buffer.writeln(
-      '// **************************************************************************',
-    );
-    buffer.writeln('// InjectionGenerator - $featureName Module');
-    buffer.writeln(
-      '// **************************************************************************',
-    );
-    buffer.writeln();
-    buffer.writeln('part of \'injection_container.dart\';');
-    buffer.writeln();
-    buffer.writeln('final sl = GetIt.instance;');
-    buffer.writeln();
-    buffer.writeln('Future<void> init() async {');
-    buffer.writeln('  await _initServices();');
-    buffer.writeln('  await _init$featureName();');
-    buffer.writeln('}');
-    buffer.writeln();
+    buffer
+      ..writeln(
+        '// **************************************************************************',
+      )
+      ..writeln('// InjectionGenerator - $featureName Module')
+      ..writeln(
+        '// **************************************************************************',
+      )
+      ..writeln()
+      ..writeln("part of 'injection_container.dart';")
+      ..writeln()
+      ..writeln('final sl = GetIt.instance;')
+      ..writeln()
+      ..writeln('Future<void> init() async {')
+      ..writeln('  await _initServices();')
+      ..writeln('  await _init$featureName();')
+      ..writeln('}')
+      ..writeln();
 
     // Generate feature-specific initialization
     _generateFeatureInit(buffer, visitor, featureName);
@@ -97,22 +105,22 @@ class InjectionGenerator
     final repoName = className.replaceAll('TBG', '');
     final cubitName = '${featureName}Cubit';
 
-    buffer.writeln('Future<void> _init$featureName() async {');
-    buffer.writeln('  sl');
-
-    // Register Cubit/BLoC (factory)
-    buffer.writeln('    ..registerFactory(() {');
-    buffer.writeln('      return $cubitName(');
+    buffer
+      ..writeln('Future<void> _init$featureName() async {')
+      ..writeln('  sl')
+      // Register Cubit/BLoC (factory)
+      ..writeln('    ..registerFactory(() {')
+      ..writeln('      return $cubitName(');
 
     // Add use cases as named parameters
     for (final method in visitor.methods) {
-      final usecaseName = method.name.upperCamelCase;
       final paramName = method.name.camelCase;
       buffer.writeln('        $paramName: sl(),');
     }
 
-    buffer.writeln('      );');
-    buffer.writeln('    })');
+    buffer
+      ..writeln('      );')
+      ..writeln('    })');
 
     // Register Use Cases (lazy singletons)
     for (final method in visitor.methods) {
@@ -129,49 +137,51 @@ class InjectionGenerator
     // Register Remote Data Source (lazy singleton)
     final remoteSrcName = '${featureName}RemoteDataSrc';
     final remoteSrcImplName = '${remoteSrcName}Impl';
-    buffer.writeln('    ..registerLazySingleton<$remoteSrcName>(');
-    buffer.writeln('      () => $remoteSrcImplName(sl()),');
-    buffer.writeln('    )');
+    buffer
+      ..writeln('    ..registerLazySingleton<$remoteSrcName>(')
+      ..writeln('      () => $remoteSrcImplName(sl()),')
+      ..writeln('    )');
 
     // Register Local Data Source (lazy singleton)
     final localSrcName = '${featureName}LocalDataSrc';
     final localSrcImplName = '${localSrcName}Impl';
-    buffer.writeln('    ..registerLazySingleton<$localSrcName>(');
-    buffer.writeln('      () => $localSrcImplName(sl()),');
-    buffer.writeln('    );');
-
-    buffer.writeln('}');
-    buffer.writeln();
+    buffer
+      ..writeln('    ..registerLazySingleton<$localSrcName>(')
+      ..writeln('      () => $localSrcImplName(sl()),')
+      ..writeln('    );')
+      ..writeln('}')
+      ..writeln();
   }
 
   void _generateServicesInit(StringBuffer buffer) {
-    buffer.writeln('Future<void> _initServices() async {');
-    buffer.writeln('  // Initialize core services');
-    buffer.writeln(
-      '  final sharedPreferences = await SharedPreferences.getInstance();',
-    );
-    buffer.writeln('  sl.registerLazySingleton(() => sharedPreferences);');
-    buffer.writeln();
-    buffer.writeln('  // Initialize Dio with base configuration');
-    buffer.writeln('  final dioOptions = BaseOptions(');
-    buffer.writeln('    contentType: \'application/json\',');
-    buffer.writeln('    // TODO: Add your base URL here');
-    buffer.writeln('    // baseUrl: NetworkConstants.baseUrl,');
-    buffer.writeln('  );');
-    buffer.writeln('  final dio = Dio(dioOptions);');
-    buffer.writeln('  ');
-    buffer.writeln('  // Add interceptors');
-    buffer.writeln('  dio.interceptors.addAll([');
-    buffer.writeln(
-      '    LogInterceptor(requestBody: true, responseBody: true),',
-    );
-    buffer.writeln('    // TODO: Add additional interceptors as needed');
-    buffer.writeln(
-      '    // RefreshTokenInterceptor(dio: dio, sessionBloc: sl<SessionBloc>()),',
-    );
-    buffer.writeln('  ]);');
-    buffer.writeln('  ');
-    buffer.writeln('  sl.registerLazySingleton(() => dio);');
-    buffer.writeln('}');
+    buffer
+      ..writeln('Future<void> _initServices() async {')
+      ..writeln('  // Initialize core services')
+      ..writeln(
+        '  final sharedPreferences = await SharedPreferences.getInstance();',
+      )
+      ..writeln('  sl.registerLazySingleton(() => sharedPreferences);')
+      ..writeln()
+      ..writeln('  // Initialize Dio with base configuration')
+      ..writeln('  final dioOptions = BaseOptions(')
+      ..writeln("    contentType: 'application/json',")
+      ..writeln('    // TODO: Add your base URL here')
+      ..writeln('    // baseUrl: NetworkConstants.baseUrl,')
+      ..writeln('  );')
+      ..writeln('  final dio = Dio(dioOptions);')
+      ..writeln('  ')
+      ..writeln('  // Add interceptors')
+      ..writeln('  dio.interceptors.addAll([')
+      ..writeln(
+        '    LogInterceptor(requestBody: true, responseBody: true),',
+      )
+      ..writeln('    // TODO: Add additional interceptors as needed')
+      ..writeln(
+        '    // RefreshTokenInterceptor(dio: dio, sessionBloc: sl<SessionBloc>()),',
+      )
+      ..writeln('  ]);')
+      ..writeln('  ')
+      ..writeln('  sl.registerLazySingleton(() => dio);')
+      ..writeln('}');
   }
 }

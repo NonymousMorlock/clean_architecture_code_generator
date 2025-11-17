@@ -1,6 +1,8 @@
-// ignore_for_file: implementation_imports, depend_on_referenced_packages
+// We need to import from build package internals to access BuildStep
+// ignore_for_file: implementation_imports
 
 import 'dart:io';
+
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/string_extensions.dart';
@@ -9,9 +11,13 @@ import 'package:path/path.dart' as path;
 /// Service for resolving and writing generated code to feature files
 /// instead of .g.dart files when multi-file output is enabled.
 class FeatureFileWriter {
+  /// Creates a [FeatureFileWriter] with the given configuration and build step.
   FeatureFileWriter(this.config, this.buildStep);
 
+  /// The generator configuration.
   final GeneratorConfig config;
+
+  /// The current build step.
   final BuildStep buildStep;
 
   /// Determines if multi-file output is enabled
@@ -185,7 +191,8 @@ class FeatureFileWriter {
     String newContent;
     if (startIndex != -1 && endIndex != -1) {
       // Replace existing generated section
-      newContent = existingContent.substring(0, startIndex) +
+      newContent =
+          existingContent.substring(0, startIndex) +
           generatedContent +
           existingContent.substring(endIndex + endMarker.length);
     } else {
@@ -206,14 +213,13 @@ class FeatureFileWriter {
 
     // Add header comment
     if (header != null) {
-      buffer.writeln(header);
-      buffer.writeln();
+      buffer
+        ..writeln(header)
+        ..writeln();
     }
 
     // Add imports
-    for (final import in imports) {
-      buffer.writeln(import);
-    }
+    imports.forEach(buffer.writeln);
 
     if (imports.isNotEmpty) {
       buffer.writeln();
@@ -256,15 +262,14 @@ class FeatureFileWriter {
 
   /// Get standard imports for a remote data source file
   List<String> getRemoteDataSrcImports(String featureName, String baseName) {
-    final imports = <String>[];
-
-    // Add HTTP client imports based on config
-    imports.addAll(
-      config.remoteDataSourceConfig.requiredImports.map((i) => "import '$i';"),
-    );
-
-    // Add model import
-    imports.add("import '../models/${baseName}_model.dart';");
+    final imports = <String>[
+      // Add HTTP client imports based on config
+      ...config.remoteDataSourceConfig.requiredImports.map(
+        (i) => "import '$i';",
+      ),
+      // Add model import
+      "import '../models/${baseName}_model.dart';",
+    ];
 
     return imports;
   }

@@ -1,15 +1,23 @@
-// ignore_for_file: depend_on_referenced_packages
-
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/field.dart';
 
+/// Type alias for a map containing dynamic data.
 typedef DataMap = Map<String, dynamic>;
 
+/// Visitor for extracting model information from Dart AST elements.
+///
+/// This visitor traverses the AST of a class annotated with `@modelGen`
+/// and extracts information about its fields and constructor.
 class ModelVisitor extends SimpleElementVisitor<void> {
+  /// The name of the class being visited.
   String className = '';
-  DataMap fields = {};
+
+  /// Map of field names to their types.
+  Map<String, String> fields = {};
+
+  /// Map of field names to their [Field] properties.
   Map<String, Field> fieldProperties = {};
 
   @override
