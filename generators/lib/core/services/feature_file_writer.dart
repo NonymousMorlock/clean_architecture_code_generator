@@ -205,8 +205,8 @@ class FeatureFileWriter {
 
   /// Generate a complete file with imports and generated code
   String generateCompleteFile({
-    required List<String> imports,
     required String generatedCode,
+    List<String>? imports,
     String? header,
   }) {
     final buffer = StringBuffer();
@@ -219,9 +219,9 @@ class FeatureFileWriter {
     }
 
     // Add imports
-    imports.forEach(buffer.writeln);
+    imports?.forEach(buffer.writeln);
 
-    if (imports.isNotEmpty) {
+    if (imports?.isNotEmpty ?? false) {
       buffer.writeln();
     }
 
