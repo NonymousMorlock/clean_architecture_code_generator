@@ -316,7 +316,6 @@ class RemoteDataSrcGenerator
     final imports = config.remoteDataSourceConfig.requiredImports;
 
     if (imports.isNotEmpty) {
-      buffer.writeln('// Configuration-based imports');
       for (final import in imports) {
         buffer.writeln("import '$import';");
       }
