@@ -3,7 +3,7 @@ library;
 
 import 'package:build/build.dart';
 // Import generator classes for builder functions
-import 'package:generators/src/generators/cubit_generator.dart';
+import 'package:generators/src/generators/adapter_generator.dart';
 import 'package:generators/src/generators/data_src_impl_generator.dart';
 import 'package:generators/src/generators/entity_generator.dart';
 import 'package:generators/src/generators/injection_generator.dart';
@@ -24,7 +24,7 @@ export 'core/services/functions.dart';
 export 'core/services/string_extensions.dart';
 export 'core/utils/utils.dart';
 // Generator exports
-export 'src/generators/cubit_generator.dart';
+export 'src/generators/adapter_generator.dart';
 export 'src/generators/data_src_impl_generator.dart';
 export 'src/generators/entity_generator.dart';
 export 'src/generators/injection_generator.dart';
@@ -86,9 +86,9 @@ Builder generateLocalDataSrc(BuilderOptions options) =>
 Builder generateInjectionContainer(BuilderOptions options) =>
     SharedPartBuilder([InjectionGenerator()], 'injection');
 
-/// Builder function for generating Cubit/Bloc classes.
-Builder generateCubit(BuilderOptions options) =>
-    SharedPartBuilder([CubitGenerator()], 'cubit');
+/// Builder function for generating interface adapter classes.
+Builder generateAdapter(BuilderOptions options) =>
+    SharedPartBuilder([AdapterGenerator()], 'adapter');
 
 /// Builder function for generating repository implementation test files.
 Builder generateRepoImplTest(BuilderOptions options) =>

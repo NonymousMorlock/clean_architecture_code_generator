@@ -21,7 +21,7 @@ This package provides a comprehensive set of code generators for implementing Cl
 - **Repository Implementation Generator** - Generate repository implementations
 
 ### Presentation Layer Generators
-- **Cubit Generator** - Generate Cubit/Bloc state management classes
+- **Interface Adapter Generator** - Generate Cubit/Bloc interface adapter classes
 
 ### Testing Generators
 - **Model Test Generator** - Generate comprehensive model tests
@@ -93,7 +93,7 @@ builders:
       - generateRepoImpl
       - generateRemoteDataSrc
       - generateLocalDataSrc
-      - generateCubit
+      - generateAdapter
       - generateModelTest
       - generateUsecasesTest
       - generateRepoImplTest
@@ -118,17 +118,17 @@ dart run build_runner watch
 
 ## Available Annotations
 
-| Annotation | Purpose | Generator |
-|------------|---------|-----------|
-| `@entityGen` | Domain entities | `EntityGenerator` |
-| `@modelGen` | Data models | `ModelGenerator` |
-| `@repoGen` | Repository interfaces | `RepoGenerator` |
-| `@usecaseGen` | Use cases | `UsecaseGenerator` |
-| `@remoteDataSrcGen` | Remote data sources | `RemoteDataSrcGenerator` |
-| `@localDataSrcGen` | Local data sources | `LocalDataSrcGenerator` |
-| `@repoImplGen` | Repository implementations | `RepoImplGenerator` |
-| `@cubitGen` | Cubits/Blocs | `CubitGenerator` |
-| `@injectionGen` | DI containers | `InjectionGenerator` |
+| Annotation          | Purpose                    | Generator                |
+|---------------------|----------------------------|--------------------------|
+| `@entityGen`        | Domain entities            | `EntityGenerator`        |
+| `@modelGen`         | Data models                | `ModelGenerator`         |
+| `@repoGen`          | Repository interfaces      | `RepoGenerator`          |
+| `@usecaseGen`       | Use cases                  | `UsecaseGenerator`       |
+| `@remoteDataSrcGen` | Remote data sources        | `RemoteDataSrcGenerator` |
+| `@localDataSrcGen`  | Local data sources         | `LocalDataSrcGenerator`  |
+| `@repoImplGen`      | Repository implementations | `RepoImplGenerator`      |
+| `@adapterGen`       | Interface Adapter          | `AdapterGenerator`       |
+| `@injectionGen`     | DI containers              | `InjectionGenerator`     |
 
 ## Advanced Features
 

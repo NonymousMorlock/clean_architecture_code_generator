@@ -15,7 +15,7 @@ class CreateCommand extends Command<int> {
         'type',
         abbr: 't',
         help: 'Type of component to create',
-        allowed: ['feature', 'entity', 'repository', 'usecase', 'cubit'],
+        allowed: ['feature', 'entity', 'repository', 'usecase', 'adapter'],
         mandatory: true,
       )
       ..addOption(
@@ -75,8 +75,8 @@ class CreateCommand extends Command<int> {
         await _createRepository(projectPath, feature!, name);
       case 'usecase':
         await _createUsecase(projectPath, feature!, name);
-      case 'cubit':
-        await _createCubit(projectPath, feature!, name);
+      case 'adapter':
+        await _createAdapter(projectPath, feature!, name);
     }
 
     _logger
@@ -97,7 +97,7 @@ class CreateCommand extends Command<int> {
       'domain/entities',
       'domain/repositories',
       'domain/usecases',
-      'presentation/bloc',
+      'presentation/adapter',
       'presentation/pages',
       'presentation/widgets',
     ];
@@ -221,19 +221,19 @@ class ${_toPascalCase(usecaseName)} extends UsecaseWithoutParams<void> {
     _logger.detail('📄 Created usecase: ${usecaseName.toLowerCase()}.dart');
   }
 
-  Future<void> _createCubit(
+  Future<void> _createAdapter(
     String projectPath,
     String featureName,
-    String cubitName,
+    String adapterName,
   ) async {
-    final cubitPath = path.join(
+    final adapterPath = path.join(
       projectPath,
       'lib',
       'features',
       featureName,
       'presentation',
-      'bloc',
-      '${cubitName.toLowerCase()}_cubit.dart',
+      'adapter',
+      '${adapterName.toLowerCase()}_adapter.dart',
     );
 
     final statePath = path.join(
@@ -242,36 +242,36 @@ class ${_toPascalCase(usecaseName)} extends UsecaseWithoutParams<void> {
       'features',
       featureName,
       'presentation',
-      'bloc',
-      '${cubitName.toLowerCase()}_state.dart',
+      'adapter',
+      '${adapterName.toLowerCase()}_state.dart',
     );
 
-    final cubitContent =
+    final adapterContent =
         '''
 import 'package:annotations/annotations.dart';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../domain/usecases/get_${featureName.toLowerCase()}.dart';
 
-part '${cubitName.toLowerCase()}_state.dart';
+part '${adapterName.toLowerCase()}_state.dart';
 
-@cubitGen
-class ${_toPascalCase(cubitName)}CubitTBG extends Cubit<${_toPascalCase(cubitName)}State> {
-  ${_toPascalCase(cubitName)}CubitTBG({
+@adapterGen
+class ${_toPascalCase(adapterName)}AdapterTBG extends Cubit<${_toPascalCase(adapterName)}State> {
+  ${_toPascalCase(adapterName)}AdapterTBG({
     required Get${_toPascalCase(featureName)} get${_toPascalCase(featureName)},
   }) : _get${_toPascalCase(featureName)} = get${_toPascalCase(featureName)},
-       super(const ${_toPascalCase(cubitName)}Initial());
+       super(const ${_toPascalCase(adapterName)}Initial());
 
   final Get${_toPascalCase(featureName)} _get${_toPascalCase(featureName)};
 
   Future<void> get${_toPascalCase(featureName)}() async {
-    emit(const ${_toPascalCase(cubitName)}Loading());
+    emit(const ${_toPascalCase(adapterName)}Loading());
 
     final result = await _get${_toPascalCase(featureName)}();
 
     result.fold(
-      (failure) => emit(${_toPascalCase(cubitName)}Error.fromFailure(failure)),
-      (data) => emit(${_toPascalCase(cubitName)}Loaded(data)),
+      (failure) => emit(${_toPascalCase(adapterName)}Error.fromFailure(failure)),
+      (data) => emit(${_toPascalCase(adapterName)}Loaded(data)),
     );
   }
 }
@@ -279,25 +279,25 @@ class ${_toPascalCase(cubitName)}CubitTBG extends Cubit<${_toPascalCase(cubitNam
 
     final stateContent =
         '''
-part of '${cubitName.toLowerCase()}_cubit.dart';
+part of '${adapterName.toLowerCase()}_adapter.dart';
 
-sealed class ${_toPascalCase(cubitName)}State extends Equatable {
-  const ${_toPascalCase(cubitName)}State();
+sealed class ${_toPascalCase(adapterName)}State extends Equatable {
+  const ${_toPascalCase(adapterName)}State();
 
   @override
   List<Object> get props => [];
 }
 
-final class ${_toPascalCase(cubitName)}Initial extends ${_toPascalCase(cubitName)}State {
-  const ${_toPascalCase(cubitName)}Initial();
+final class ${_toPascalCase(adapterName)}Initial extends ${_toPascalCase(adapterName)}State {
+  const ${_toPascalCase(adapterName)}Initial();
 }
 
-final class ${_toPascalCase(cubitName)}Loading extends ${_toPascalCase(cubitName)}State {
-  const ${_toPascalCase(cubitName)}Loading();
+final class ${_toPascalCase(adapterName)}Loading extends ${_toPascalCase(adapterName)}State {
+  const ${_toPascalCase(adapterName)}Loading();
 }
 
-final class ${_toPascalCase(cubitName)}Loaded extends ${_toPascalCase(cubitName)}State {
-  const ${_toPascalCase(cubitName)}Loaded(this.data);
+final class ${_toPascalCase(adapterName)}Loaded extends ${_toPascalCase(adapterName)}State {
+  const ${_toPascalCase(adapterName)}Loaded(this.data);
 
   final dynamic data; // TODO: Replace with actual data type
 
@@ -305,10 +305,10 @@ final class ${_toPascalCase(cubitName)}Loaded extends ${_toPascalCase(cubitName)
   List<Object> get props => [data];
 }
 
-final class ${_toPascalCase(cubitName)}Error extends ${_toPascalCase(cubitName)}State {
-  const ${_toPascalCase(cubitName)}Error({required this.message, required this.title});
+final class ${_toPascalCase(adapterName)}Error extends ${_toPascalCase(adapterName)}State {
+  const ${_toPascalCase(adapterName)}Error({required this.message, required this.title});
 
-  ${_toPascalCase(cubitName)}Error.fromFailure(Failure failure)
+  ${_toPascalCase(adapterName)}Error.fromFailure(Failure failure)
     : this(message: failure.message, title: 'Error \${failure.statusCode}');
 
   final String message;
@@ -319,12 +319,12 @@ final class ${_toPascalCase(cubitName)}Error extends ${_toPascalCase(cubitName)}
 }
 ''';
 
-    await File(cubitPath).writeAsString(cubitContent);
+    await File(adapterPath).writeAsString(adapterContent);
     await File(statePath).writeAsString(stateContent);
 
     _logger
-      ..detail('📄 Created cubit: ${cubitName.toLowerCase()}_cubit.dart')
-      ..detail('📄 Created state: ${cubitName.toLowerCase()}_state.dart');
+      ..detail('📄 Created adapter: ${adapterName.toLowerCase()}_adapter.dart')
+      ..detail('📄 Created state: ${adapterName.toLowerCase()}_state.dart');
   }
 
   String _toPascalCase(String input) {

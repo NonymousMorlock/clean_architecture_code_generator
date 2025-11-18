@@ -15,7 +15,7 @@ void main() {
       expect(ModelGenerator, isNotNull);
       expect(RepoGenerator, isNotNull);
       expect(UsecaseGenerator, isNotNull);
-      expect(CubitGenerator, isNotNull);
+      expect(AdapterGenerator, isNotNull);
       expect(RemoteDataSrcGenerator, isNotNull);
       expect(LocalDataSrcGenerator, isNotNull);
       expect(RepoImplGenerator, isNotNull);

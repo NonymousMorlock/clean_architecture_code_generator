@@ -13,11 +13,12 @@ import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/usecase_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
-/// Generator for creating Cubit/Bloc classes from repository annotations.
+/// Generator for creating an Adapter (Cubit/Bloc classes) from repository
+/// annotations.
 ///
-/// Processes classes annotated with `@CubitGenAnnotation` and generates
-/// corresponding Cubit classes for state management.
-class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
+/// Processes classes annotated with `@AdapterGenAnnotation` and generates
+/// corresponding Adapter classes for the interface adapter.
+class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
   @override
   String generateForAnnotatedElement(
     Element element,
@@ -33,7 +34,7 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
 
     // Debug: Write to log file
     try {
-      File('/tmp/cubit_gen_debug.log').writeAsStringSync(
+      File('/tmp/adapter_gen_debug.log').writeAsStringSync(
         'isMultiFileEnabled: ${writer.isMultiFileEnabled}\n'
         'config.multiFileOutput.enabled: ${config.multiFileOutput.enabled}\n'
         'inputPath: ${buildStep.inputId.path}\n',
@@ -50,8 +51,8 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
     // Default behavior: generate to .g.dart
     final buffer = StringBuffer();
 
-    // Generate Cubit
-    _generateCubit(
+    // Generate Adapter
+    _generateAdapter(
       buffer: buffer,
       visitor: visitor,
       isMultiMode: writer.isMultiFileEnabled,
@@ -73,18 +74,18 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
     BuildStep buildStep,
   ) {
     final featureName = writer.extractFeatureName();
-    stderr
-      ..writeln('[CubitGenerator] Input path: ${buildStep.inputId.path}')
-      ..writeln('[CubitGenerator] Extracted feature name: $featureName');
+    stdout
+      ..writeln('[AdapterGenerator] Input path: ${buildStep.inputId.path}')
+      ..writeln('[AdapterGenerator] Extracted feature name: $featureName');
 
     if (featureName == null) {
-      stderr.writeln(
-        '[CubitGenerator] Feature name is null, falling back to '
+      stdout.writeln(
+        '[AdapterGenerator] Feature name is null, falling back to '
         'default generation',
       );
       // Fallback to default if feature name can't be extracted
       final buffer = StringBuffer();
-      _generateCubit(
+      _generateAdapter(
         buffer: buffer,
         visitor: visitor,
         isMultiMode: writer.isMultiFileEnabled,
@@ -101,76 +102,84 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
     final baseName = className
         .replaceAll('CubitTBG', '')
         .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '')
         .replaceAll('RepoTBG', '')
         .replaceAll('Repo', '');
 
-    // Generate cubit file
-    final cubitBuffer = StringBuffer();
-    _generateCubitBody(cubitBuffer, visitor);
+    // Generate adapter file
+    final adapterBuffer = StringBuffer();
+    _generateAdapterBody(adapterBuffer, visitor);
 
-    final cubitPath =
-        '${writer.getFeatureRoot(featureName)}/presentation/bloc/${baseName.snakeCase}_cubit.dart';
-    final cubitImports = [
+    final adapterPath =
+        '${writer.getFeatureRoot(featureName)}/presentation/adapter/${baseName.snakeCase}_adapter.dart';
+
+    final importsBuffer = StringBuffer();
+    _generateAdapterImports(
+      buffer: importsBuffer,
+      visitor: visitor,
+      isMultiMode: writer.isMultiFileEnabled,
+      featureName: featureName,
+    );
+    final adapterImports = [
       "import 'package:bloc/bloc.dart';",
       "import 'package:equatable/equatable.dart';",
       "import 'package:${writer.config.appName}/core/errors/failures.dart';",
-      ...visitor.methods.map((method) {
-        final usecaseFile = method.name.snakeCase;
-        return "import '../../../domain/usecases/$usecaseFile.dart';";
-      }),
+      ...importsBuffer.toString().split('\n'),
     ];
-    final completeCubit = writer.generateCompleteFile(
-      imports: cubitImports,
-      generatedCode: cubitBuffer.toString(),
+    final completeAdapter = writer.generateCompleteFile(
+      imports: adapterImports,
+      generatedCode: adapterBuffer.toString(),
       header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
     );
 
     // Generate state file
     final stateBuffer = StringBuffer();
+    _generateStatesImport(
+      buffer: stateBuffer,
+      isMultiMode: writer.isMultiFileEnabled,
+      featureName: featureName,
+    );
+    stateBuffer.writeln();
     _generateStatesBody(stateBuffer, visitor);
 
     final statePath =
-        '${writer.getFeatureRoot(featureName)}/presentation/bloc/${baseName.snakeCase}_state.dart';
-    final stateImports = [
-      "import 'package:equatable/equatable.dart';",
-      "import 'package:${writer.config.appName}/core/errors/failures.dart';",
-      "// import '${baseName.snakeCase}_cubit.dart';",
-    ];
+        '${writer.getFeatureRoot(featureName)}/presentation/adapter/${baseName.snakeCase}_state.dart';
+
     final completeState = writer.generateCompleteFile(
-      imports: stateImports,
       generatedCode: stateBuffer.toString(),
       header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
     );
 
     // Write to actual files
-    stderr
-      ..writeln('[CubitGenerator] Writing cubit to: $cubitPath')
-      ..writeln('[CubitGenerator] Writing state to: $statePath');
+    stdout
+      ..writeln('[AdapterGenerator] Writing adapter to: $adapterPath')
+      ..writeln('[AdapterGenerator] Writing state to: $statePath');
 
     try {
-      File(cubitPath)
+      File(adapterPath)
         ..createSync(recursive: true)
-        ..writeAsStringSync(completeCubit);
+        ..writeAsStringSync(completeAdapter);
 
       File(statePath)
         ..createSync(recursive: true)
         ..writeAsStringSync(completeState);
 
-      stderr.writeln('[CubitGenerator] Successfully wrote files');
+      stdout.writeln('[AdapterGenerator] Successfully wrote files');
     } on Exception catch (e) {
       stderr
-        ..writeln('[CubitGenerator] ERROR: Could not write cubit files: $e')
-        ..writeln('[CubitGenerator] Stack trace: ${StackTrace.current}');
+        ..writeln('[AdapterGenerator] ERROR: Could not write adapter files: $e')
+        ..writeln('[AdapterGenerator] Stack trace: ${StackTrace.current}');
     }
 
     // Return minimal marker for .g.dart file
     return '''
-// Cubit written to: $cubitPath
+// Adapter written to: $adapterPath
 // State written to: $statePath
 ''';
   }
 
-  void _generateCubit({
+  void _generateAdapter({
     required StringBuffer buffer,
     required RepoVisitor visitor,
     required bool isMultiMode,
@@ -178,13 +187,15 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
     final className = visitor.className;
     final featureName = className
         .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '');
+        .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '');
 
     buffer
       ..writeln(
         '// **************************************************************************',
       )
-      ..writeln('// CubitGenerator - $featureName Cubit')
+      ..writeln('// AdapterGenerator - $featureName Adapter')
       ..writeln(
         '// **************************************************************************',
       )
@@ -194,6 +205,22 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
         "import 'package:equatable/equatable.dart';",
       );
 
+    _generateAdapterImports(
+      buffer: buffer,
+      visitor: visitor,
+      isMultiMode: isMultiMode,
+      featureName: featureName,
+    );
+
+    _generateAdapterBody(buffer, visitor);
+  }
+
+  void _generateAdapterImports({
+    required StringBuffer buffer,
+    required RepoVisitor visitor,
+    required bool isMultiMode,
+    required String featureName,
+  }) {
     // Import use cases
     for (final method in visitor.methods) {
       final usecaseFile = method.name.snakeCase;
@@ -206,23 +233,22 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
       ..writeln()
       ..writeln(
         "${optionalPartComment}part '${featureName.snakeCase}_state.dart';",
-      )
-      ..writeln();
-
-    _generateCubitBody(buffer, visitor);
+      );
   }
 
-  void _generateCubitBody(StringBuffer buffer, RepoVisitor visitor) {
+  void _generateAdapterBody(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
     final featureName = className
         .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '');
-    final cubitName = '${featureName}Cubit';
+        .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '');
+    final adapterName = '${featureName}Adapter';
     final stateName = '${featureName}State';
 
     buffer
-      ..writeln('class $cubitName extends Cubit<$stateName> {')
-      ..writeln('  $cubitName({');
+      ..writeln('class $adapterName extends Cubit<$stateName> {')
+      ..writeln('  $adapterName({');
 
     // Add use cases as constructor parameters
     for (final method in visitor.methods) {
@@ -256,7 +282,7 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
 
     // Generate methods for each use case
     for (final method in visitor.methods) {
-      _generateCubitMethod(buffer, method, featureName);
+      _generateAdapterMethod(buffer, method, featureName);
     }
 
     buffer
@@ -264,7 +290,7 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
       ..writeln();
   }
 
-  void _generateCubitMethod(
+  void _generateAdapterMethod(
     StringBuffer buffer,
     IFunction method,
     String featureName,
@@ -420,9 +446,9 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
     final className = visitor.className;
     final featureName = className
         .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '');
-
-    final optionalPartComment = isMultiMode ? '' : '// ';
+        .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '');
 
     buffer
       ..writeln(
@@ -432,21 +458,35 @@ class CubitGenerator extends GeneratorForAnnotation<CubitGenAnnotation> {
       ..writeln(
         '// **************************************************************************',
       )
-      ..writeln()
-      ..writeln(
-        '${optionalPartComment}part of '
-        "'${featureName.snakeCase}_cubit.dart';",
-      )
       ..writeln();
 
+    _generateStatesImport(
+      buffer: buffer,
+      isMultiMode: isMultiMode,
+      featureName: featureName,
+    );
     _generateStatesBody(buffer, visitor);
+  }
+
+  void _generateStatesImport({
+    required StringBuffer buffer,
+    required bool isMultiMode,
+    required String featureName,
+  }) {
+    final optionalPartComment = isMultiMode ? '' : '// ';
+
+    buffer.writeln(
+      "${optionalPartComment}part of '${featureName.snakeCase}_adapter.dart';",
+    );
   }
 
   void _generateStatesBody(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
     final featureName = className
         .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '');
+        .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '');
     final stateName = '${featureName}State';
 
     buffer

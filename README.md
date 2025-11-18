@@ -9,7 +9,7 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 - **Repository Pattern**: Generate abstract repositories and implementations
 - **Use Cases**: Create use cases following the single responsibility principle
 - **Data Sources**: Generate both remote (HTTP/API) and local (SharedPreferences) data sources
-- **State Management**: Generate Cubit/BLoC with comprehensive state management
+- **Interface Adapter**: Generate Cubit/BLoC with comprehensive state management
 - **Dependency Injection**: Create GetIt service locator patterns automatically
 - **CLI Tool**: Command-line interface for easy project management
 - **Configuration**: YAML-based configuration for customization
@@ -127,7 +127,7 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
    │       │   ├── repositories/
    │       │   └── usecases/
    │       └── presentation/
-   │           ├── bloc/
+   │           ├── adapter/
    │           ├── pages/
    │           └── widgets/
    └── injection_container/
@@ -167,7 +167,7 @@ dart run clean_arch_cli:clean_arch_cli create --type <type> --name <name> [optio
 - `entity`: Create a domain entity
 - `repository`: Create a repository interface
 - `usecase`: Create a use case
-- `cubit`: Create a cubit with states
+- `adapter`: Create an interface adapter with states
 
 **Options:**
 - `--type, -t`: Type of component (required)
@@ -232,9 +232,9 @@ class AuthRepoTBG {
 ### State Management Generation
 
 ```dart
-@cubitGen  // Generates Cubit with states
-class AuthCubitTBG {
-  // This will generate a cubit based on the repository methods
+@adapterGen  // Generates Interface Adapter with states
+class AuthAdapterTBG {
+  // This will generate an interface adapter based on the repository methods
   // with proper state management including loading, success, and error states
 }
 ```
@@ -275,8 +275,8 @@ lib/features/user/
 │       ├── register.dart                     # Register use case
 │       └── get_current_user.dart            # Get user use case
 └── presentation/
-    └── bloc/
-        ├── user_cubit.dart                   # State management
+    └── adapter/
+        ├── user_adapter.dart                   # State management
         └── user_state.dart                  # State definitions
 ```
 
@@ -287,7 +287,7 @@ lib/features/user/
 Future<void> _initUser() async {
   sl
     ..registerFactory(() {
-      return UserCubit(
+      return UserAdapter(
         login: sl(),
         register: sl(),
         getCurrentUser: sl(),
@@ -341,8 +341,8 @@ dependency_injection:
   generate_injection_container: true
   container_name: injection_container
 
-# State management
-state_management:
+# Interface adapter
+interface_adapter:
   type: cubit  # Options: cubit, bloc
   generate_states: true
   error_handling: true
@@ -438,7 +438,7 @@ remote_data_source:
    @remoteSrcGen
    @localSrcGen
    @injectionGen
-   @cubitGen
+   @adapterGen
    class ProductRepoTBG {
      external ResultFuture<List<Product>> getProducts({int? page, int? limit});
      external ResultFuture<Product> getProductById(String id);
@@ -467,7 +467,7 @@ remote_data_source:
 
    // In your widget
    BlocProvider(
-     create: (context) => di.sl<ProductCubit>(),
+     create: (context) => di.sl<ProductAdapter>(),
      child: ProductListPage(),
    )
    ```
@@ -518,7 +518,7 @@ class UserTBG {
 
 The generator creates comprehensive error handling:
 ```dart
-// Generated cubit method
+// Generated interface adapter method
 Future<void> getProducts() async {
   emit(const ProductLoading());
   

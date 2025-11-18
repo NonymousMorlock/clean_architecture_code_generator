@@ -144,7 +144,7 @@ void main() {
         );
         expect(
           Directory(
-            path.join(featurePath, 'presentation', 'bloc'),
+            path.join(featurePath, 'presentation', 'adapter'),
           ).existsSync(),
           isTrue,
         );
@@ -330,10 +330,10 @@ void main() {
       });
     });
 
-    group('cubit creation', () {
-      test('creates cubit and state files with correct content', () async {
+    group('adapter creation', () {
+      test('creates adapter and state files with correct content', () async {
         const featureName = 'authentication';
-        const cubitName = 'auth';
+        const adapterName = 'auth';
         final libPath = path.join(tempDir.path, 'lib');
 
         // First create the feature structure
@@ -350,9 +350,9 @@ void main() {
         final result = await commandRunner.run([
           'create',
           '--type',
-          'cubit',
+          'adapter',
           '--name',
-          cubitName,
+          adapterName,
           '--feature',
           featureName,
           '--path',
@@ -361,16 +361,16 @@ void main() {
 
         expect(result, equals(ExitCode.success.code));
 
-        // Verify cubit file was created
-        final cubitPath = path.join(
+        // Verify adapter file was created
+        final adapterPath = path.join(
           libPath,
           'features',
           featureName,
           'presentation',
-          'bloc',
-          '${cubitName}_cubit.dart',
+          'adapter',
+          '${adapterName}_adapter.dart',
         );
-        expect(File(cubitPath).existsSync(), isTrue);
+        expect(File(adapterPath).existsSync(), isTrue);
 
         // Verify state file was created
         final statePath = path.join(
@@ -378,15 +378,15 @@ void main() {
           'features',
           featureName,
           'presentation',
-          'bloc',
-          '${cubitName}_state.dart',
+          'adapter',
+          '${adapterName}_state.dart',
         );
         expect(File(statePath).existsSync(), isTrue);
 
-        // Verify cubit content
-        final cubitContent = File(cubitPath).readAsStringSync();
-        expect(cubitContent, contains('@cubitGen'));
-        expect(cubitContent, contains('class AuthCubitTBG extends Cubit'));
+        // Verify adapter content
+        final adapterContent = File(adapterPath).readAsStringSync();
+        expect(adapterContent, contains('@adapterGen'));
+        expect(adapterContent, contains('class AuthAdapterTBG extends Cubit'));
 
         // Verify state content
         final stateContent = File(statePath).readAsStringSync();
@@ -396,8 +396,12 @@ void main() {
         expect(stateContent, contains('class AuthLoaded'));
         expect(stateContent, contains('class AuthError'));
 
-        verify(() => logger.info('🏗️  Creating cubit: $cubitName')).called(1);
-        verify(() => logger.success('✅ cubit created successfully!')).called(1);
+        verify(
+          () => logger.info('🏗️  Creating adapter: $adapterName'),
+        ).called(1);
+        verify(
+          () => logger.success('✅ adapter created successfully!'),
+        ).called(1);
       });
     });
 

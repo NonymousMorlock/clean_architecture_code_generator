@@ -119,7 +119,7 @@ class InjectionGenerator
   ) {
     final className = visitor.className;
     final repoName = className.replaceAll('TBG', '');
-    final cubitName = '${featureName}Cubit';
+    final cubitName = '${featureName}Adapter';
 
     buffer
       ..writeln('Future<void> _init$featureName() async {')

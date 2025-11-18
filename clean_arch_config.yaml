@@ -42,8 +42,8 @@ dependency_injection:
   generate_injection_container: true
   container_name: injection_container
   
-# State management configuration
-state_management:
+# Interface Adapter configuration
+interface_adapter:
   type: cubit # Options: cubit, bloc
   generate_states: true
   base_state_name: State

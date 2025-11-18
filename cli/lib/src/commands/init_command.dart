@@ -107,7 +107,7 @@ class InitCommand extends Command<int> {
         'features/authentication/domain/entities',
         'features/authentication/domain/repositories',
         'features/authentication/domain/usecases',
-        'features/authentication/presentation/bloc',
+        'features/authentication/presentation/adapter',
         'features/authentication/presentation/pages',
         'features/authentication/presentation/widgets',
       ]);
