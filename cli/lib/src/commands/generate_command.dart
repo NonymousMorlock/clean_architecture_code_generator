@@ -45,7 +45,12 @@ class GenerateCommand extends Command<int> {
     final watch = argResults!['watch'] as bool;
     final deleteConflicting = argResults!['delete-conflicting-outputs'] as bool;
 
-    _logger.info('🔧 Running code generation...');
+    _logger
+      ..info('🔧 Running code generation...')
+      // Diagnostic logs to help detect stale global binaries / wrong executable
+      ..info('🔎 Dart executable: ${Platform.resolvedExecutable}')
+      ..info('🔎 Script path: ${Platform.script.toFilePath()}')
+      ..info('🔎 Current working directory: ${Directory.current.path}');
 
     // Check if pubspec.yaml exists
     final pubspecPath = '$projectPath/pubspec.yaml';
@@ -114,6 +119,40 @@ class GenerateCommand extends Command<int> {
       final exitCode = await buildProcess.exitCode;
 
       if (exitCode == 0) {
+        try {
+          if (!watch && deleteConflicting) {
+            _logger.info(
+              '🧹 Deleting existing .g.dart files in project $projectPath...',
+            );
+            final dir = Directory(projectPath);
+            final gFiles = dir
+                .listSync(recursive: true)
+                .whereType<File>()
+                .where(
+                  (file) =>
+                      file.path.endsWith('.g.dart') ||
+                      file.path.endsWith('.g.part'),
+                );
+            for (final file in gFiles) {
+              file.deleteSync();
+            }
+          }
+        } on Exception catch (e) {
+          _logger.err('❌ Failed to delete .g.dart files: $e');
+        }
+
+        // run the dart format command on the directory
+        _logger.info('🎨 Formatting generated code...');
+
+        final formatResult = await Process.run(
+          'dart',
+          ['format', 'lib', 'test'],
+          workingDirectory: projectPath,
+        );
+
+        if (formatResult.exitCode != 0) {
+          _logger.err('❌ Failed to format code: ${formatResult.stderr}');
+        }
         if (watch) {
           _logger.success('👀 Watching for changes... Press Ctrl+C to stop.');
         } else {
