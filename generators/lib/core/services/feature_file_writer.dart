@@ -281,14 +281,16 @@ class FeatureFileWriter {
       "import 'package:${config.appName}/core/errors/failures.dart';",
       "import 'package:${config.appName}/core/typedefs.dart';",
       "import 'package:dartz/dartz.dart';",
-      "import '../../domain/entities/$baseName.dart';",
       "import '../../domain/repositories/${baseName}_repository.dart';",
       "import '../datasources/${baseName}_remote_data_src.dart';",
     ];
   }
 
   /// Get standard imports for a test file
-  List<String> getTestImports(String featureName, String baseName) {
+  List<String> getRepoTestImports({
+    required String featureName,
+    required String baseName,
+  }) {
     return [
       "import 'package:flutter_test/flutter_test.dart';",
       "import 'package:mocktail/mocktail.dart';",
