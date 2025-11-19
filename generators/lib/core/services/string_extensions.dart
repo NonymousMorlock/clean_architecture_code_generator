@@ -58,47 +58,71 @@ extension StringExt on String {
   /// Converts entity types to model types by appending 'Model'.
   ///
   /// Example: `User` becomes `UserModel`
+  /// Handles nested generics: `List<User>` -> `List<UserModel>`
   String get modelizeType {
-    var returnType = rightType;
-    final tempReturnType = returnType
-        .split('<')
-        .last
-        .replaceAll('<', '')
-        .replaceAll('>', '');
-    final returnTypeFallback = tempReturnType.fallbackValue;
-    if (returnTypeFallback is String && returnTypeFallback.isCustomType) {
-      returnType = returnType.replaceAll(
-        tempReturnType,
-        '${tempReturnType}Model',
-      );
+    final current = trim();
+
+    // 1. If it's a container, recurse into arguments
+    if (current.contains('<')) {
+      final base = baseType;
+      final args = typeArguments;
+      final modelizedArgs = args.map((e) => e.modelizeType).join(', ');
+      return '$base<$modelizedArgs>';
     }
-    return returnType;
+
+    // 2. If it is a primitive, leave it alone
+    if (!isCustomType) {
+      return current;
+    }
+
+    // 3. It is a custom type (e.g. "User" or "UserTBG"), append Model
+    // Remove '?' temporarily
+    final cleanName = current.replaceAll('?', '');
+    final isNullable = current.endsWith('?');
+
+    // Logic to avoid double naming if it already ends in Model (optional)
+    if (cleanName.endsWith('Model')) return current;
+
+    return '${cleanName}Model${isNullable ? '?' : ''}';
   }
 
   /// Returns a fallback value for testing based on the type.
   ///
   /// Used in test generation to provide appropriate default values.
   dynamic get fallbackValue {
-    if (toLowerCase().startsWith('list')) {
-      return <dynamic>[];
-    } else if (rightType.toLowerCase().startsWith('list')) {
-      return <dynamic>[];
-    } else if (toLowerCase().startsWith('string')) {
-      return 'Test String';
-    } else if (toLowerCase().startsWith('int') ||
-        toLowerCase().startsWith('double')) {
-      return 1;
-    } else if (toLowerCase().startsWith('bool')) {
-      return true;
-    } else if (toLowerCase().startsWith('datetime')) {
-      return 'DateTime.now()';
-    } else if (toLowerCase().startsWith('map')) {
-      return <dynamic, dynamic>{};
-    } else if (rightType.trim().startsWith('void')) {
-      return 'null';
-    } else {
-      return '$this.empty()';
+    // 1. Analyze the "Right Type" (ignoring Futures/Streams for the value)
+    final targetType = rightType;
+    final base = targetType.baseType.toLowerCase().replaceAll('?', '');
+
+    if (base == 'list' || base == 'iterable' || base == 'set') {
+      return '[]'; // Works for List<User> too
     }
+    if (base == 'map') {
+      return '{}';
+    }
+    if (base == 'string') {
+      return '"Test String"'; // standardized with quotes
+    }
+    if (base == 'int' || base == 'num') {
+      return '1';
+    }
+    if (base == 'double') {
+      return '1.0';
+    }
+    if (base == 'bool') {
+      return 'true';
+    }
+    if (base == 'datetime') {
+      return 'DateTime.now()';
+    }
+    if (base == 'void') {
+      return 'null';
+    }
+
+    // Fallback for Custom Types: Use `.empty()` constructor
+    // We strip the '?' in case it's nullable, because usually we want
+    // the concrete empty object for tests/defaults.
+    return '${targetType.replaceAll('?', '')}.empty()';
   }
 
   /// Returns a different value for copyWith tests.
@@ -158,6 +182,27 @@ extension StringExt on String {
     return result;
   }
 
+  /// Returns the outer container name.
+  /// `Map<String, int>` -> `Map`
+  /// `List<String>` -> `List`
+  /// `String` -> `String`
+  String get baseType {
+    final index = indexOf('<');
+    if (index == -1) return trim();
+    return substring(0, index).trim();
+  }
+
+  /// Returns a list of the immediate generic arguments.
+  ///
+  /// * `List<String>` -> `['String']`
+  /// * `Map<String, List<int>>` -> `['String', 'List<int>']`
+  /// * `String` -> `[]`
+  List<String> get typeArguments {
+    final content = _rawContentInsideBrackets;
+    if (content == null) return [];
+    return _splitGenericParams(content);
+  }
+
   /// Extracts the inner type argument.
   ///
   /// * `List` -> Returns `null` (Or empty string if you prefer, but
@@ -179,26 +224,22 @@ extension StringExt on String {
   String get rightType {
     var current = trim();
 
-    // 1. Recursive Unwrap: Remove Future<...> and Stream<...> layers
-    while (current.startsWith('Future<') || current.startsWith('Stream<')) {
-      final inner = current._rawContentInsideBrackets;
-      if (inner == null) break;
-      current = inner.trim();
-    }
-
-    // 2. Handle Either: specifically looks for Either<L, R> pattern
-    if (current.startsWith('Either<')) {
-      final content = current._rawContentInsideBrackets;
-      if (content != null) {
-        final params = _splitGenericParams(content);
-        // Either should have 2 params. We want the Right (2nd) one.
-        if (params.length >= 2) {
-          return params[1].trim(); // Return the Right side
+    // Unwrap Wrappers
+    while (true) {
+      if (current.startsWith('Future<') || current.startsWith('Stream<')) {
+        current = current._rawContentInsideBrackets?.trim() ?? current;
+      } else if (current.startsWith('Either<')) {
+        final args = current.typeArguments;
+        if (args.length >= 2) {
+          current = args[1]; // Take the Right side
+        } else {
+          break; // Malformed Either
         }
+      } else {
+        break; // No more wrappers
       }
     }
 
-    // 3. Return the remaining type (e.g., List<String>, User, int)
     return current;
   }
 
@@ -206,12 +247,10 @@ extension StringExt on String {
   ///
   /// Uses a recursive check on the "base" type structure.
   bool get isCustomType {
-    // 1. Clean the type (remove formatting, ? nullable indicators)
-    final typeToCheck = trim().replaceAll('?', '');
+    final core = rightType; // Inspect the core type
+    final base = core.baseType.toLowerCase().replaceAll('?', '');
 
-    // 2. Base Primitive Check (Fast fail)
-    // If the whole string is a primitive, we are done.
-    const primitives = {
+    const systemTypes = {
       'int',
       'double',
       'num',
@@ -221,44 +260,22 @@ extension StringExt on String {
       'dynamic',
       'object',
       'datetime',
+      'list',
+      'map',
+      'set',
+      'iterable',
     };
-    if (primitives.contains(typeToCheck.toLowerCase())) return false;
 
-    // 3. If it's a generic container (List, Map, Future, Stream),
-    // check INNER types.
-    // We check if it starts with standard containers.
-    if (typeToCheck.contains('<')) {
-      final baseContainer = typeToCheck
-          .substring(0, typeToCheck.indexOf('<'))
-          .trim();
-      final innerContent = typeToCheck._rawContentInsideBrackets;
+    if (systemTypes.contains(base)) {
+      // It's a system container, but check the children!
+      // e.g. List<User> -> List is system, but User is custom.
+      final args = core.typeArguments;
+      if (args.isEmpty) return false;
 
-      const standardContainers = {
-        'list',
-        'map',
-        'set',
-        'future',
-        'stream',
-        'either',
-      };
-
-      if (standardContainers.contains(baseContainer.toLowerCase())) {
-        // It is a standard container, so we must check the children.
-        if (innerContent == null) return false;
-
-        final children = _splitGenericParams(innerContent);
-        // Recursion: If ANY child is custom, the whole
-        // thing implies custom handling
-        return children.any((child) => child.isCustomType);
-      }
-
-      // If the container itself is not standard
-      // (e.g. PaginatedList<User>), it is custom.
-      return true;
+      // If ANY argument is custom, the whole thing is custom
+      return args.any((arg) => arg.isCustomType);
     }
 
-    // 4. If we are here, it's a single word (e.g. "User", "ArtworkTBG")
-    // that isn't a primitive.
     return true;
   }
 }
