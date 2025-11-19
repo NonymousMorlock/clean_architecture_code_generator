@@ -10,7 +10,7 @@ import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
-import 'package:generators/src/visitors/usecase_visitor.dart';
+import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
 /// Generator for creating test files for repository implementations.

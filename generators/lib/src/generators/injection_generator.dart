@@ -6,7 +6,7 @@ import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/string_extensions.dart';
-import 'package:generators/src/visitors/usecase_visitor.dart';
+import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
 /// Generator for creating dependency injection container code.

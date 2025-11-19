@@ -41,7 +41,7 @@ export 'src/models/field.dart';
 export 'src/models/function.dart';
 // Visitor exports
 export 'src/visitors/model_visitor.dart';
-export 'src/visitors/usecase_visitor.dart';
+export 'src/visitors/repo_visitor.dart';
 
 // Builder functions for build.yaml
 
