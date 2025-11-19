@@ -24,40 +24,24 @@ class ModelVisitor extends SimpleElementVisitor<void> {
   void visitConstructorElement(ConstructorElement element) {
     final returnType = element.returnType.toString();
     className = returnType.replaceFirst('*', '').replaceAll('TBG', '');
-  }
 
-  @override
-  void visitFieldElement(FieldElement element) {
-    fields[element.name] = element.type.toString().replaceFirst('*', '');
-    fieldProperties[element.name.camelCase] = Field.fromMap({
-      'name': element.name.camelCase,
-      'required': element.hasRequired,
-      'initialized': element.hasInitializer,
-      'filePath': '${element.location.toString().split(';')[0]};'.trim(),
-    });
+    for (final param in element.parameters) {
+      final typeStr = param.type
+          .toString()
+          .replaceFirst('*', '')
+          .replaceFirst('?', '');
+
+      fields[param.name] = typeStr;
+      final isRequired = param.isRequiredNamed || param.isRequiredPositional;
+
+      fieldProperties[param.name.camelCase] = Field.fromMap({
+        'name': param.name.camelCase,
+        'required': isRequired,
+        // For parameters, "initialized" usually implies having a default value
+        'initialized': param.hasDefaultValue,
+        // Use the parameter's location, or fall back to the library source
+        'filePath': '${element.library.source.fullName};'.trim(),
+      });
+    }
   }
 }
-
-// declaration = bool? is_adult
-
-// children = []
-
-// context = Instance of 'AnalysisContextImpl'
-
-// displayName = is_adult
-
-// docComment = null
-
-// enclosingElement = class PersonTBG
-
-// useResult = false
-
-// kind = FIELD
-
-// library =
-
-// libSource = /example/lib/person.dart
-
-// location = package:example/person.dart;package:example/person.dart;PersonTBG;is_adult
-
-// metdata = [@Required get required]

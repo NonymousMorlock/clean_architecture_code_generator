@@ -19,8 +19,21 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
+    if (element is! ClassElement) {
+      throw InvalidGenerationSourceError(
+        'Generator cannot target non-classes.',
+      );
+    }
+
     final visitor = ModelVisitor();
-    element.visitChildren(visitor);
+
+    final constructor = element.unnamedConstructor;
+
+    if (constructor != null) {
+      visitor.visitConstructorElement(constructor);
+    } else {
+      return '// Error: No default constructor found for ${element.name}';
+    }
 
     final buffer = StringBuffer();
     final className = visitor.className;
