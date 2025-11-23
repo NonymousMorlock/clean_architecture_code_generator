@@ -153,33 +153,22 @@ class RepoImplTestGenerator
 
   /// Scans all methods to find strict Entity dependencies
   Set<String> _discoverRequiredEntities(RepoVisitor visitor) {
-    final entities = <String>{};
-
-    void scanType(String typeString) {
-      // 1. Break down complex types (Future<Either<Failure,
-      // List<User>>> -> {User})
-      final allTypes = typeString.allConstituentTypes;
-
-      // 2. Filter for actual Entities
-      for (final type in allTypes) {
-        if (type.isPotentialEntity) {
-          entities.add(type);
-        }
-      }
-    }
+    final candidates = <String>{};
 
     for (final method in visitor.methods) {
-      // Scan Return Type
-      scanType(method.returnType);
+      // 1. Scan Return Type (e.g. Future<Either<Failure, List<User>>>)
+      // This will automatically strip Future, discard Failure,
+      // strip List, and find "User"
+      candidates.addAll(method.returnType.entityCandidates);
 
-      // Scan Parameters
+      // 2. Scan Parameters (e.g. method(User params))
       if (method.params != null) {
         for (final param in method.params!) {
-          scanType(param.type);
+          candidates.addAll(param.type.entityCandidates);
         }
       }
     }
-    return entities;
+    return candidates;
   }
 
   void _generateSmartImports(
@@ -188,7 +177,7 @@ class RepoImplTestGenerator
     String repoName,
     String repoImplName,
     String remoteDataSourceName,
-    Set<String> entities,
+    Set<String> candidates,
   ) {
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
     final appName = config.appName;
@@ -215,52 +204,43 @@ class RepoImplTestGenerator
       );
 
     // Dynamic Entity Imports
-    if (entities.isNotEmpty) {
+    if (candidates.isNotEmpty) {
       buffer
         ..writeln()
         ..writeln('// Entity Imports');
 
-      for (final entity in entities) {
+      for (final entity in candidates) {
         final entitySnake = entity.snakeCase;
 
-        // LOGIC: Where does this entity live?
+        // DEFINE PATHS
+        final pathsToCheck = [
+          // 1. Current Feature Domain (Most likely)
+          'features/$currentFeatureSnake/domain/entities/$entitySnake.dart',
+          // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
+          'features/$entitySnake/domain/entities/$entitySnake.dart',
+          // 3. Core (Shared entities)
+          'core/entities/$entitySnake.dart',
+          // 4. Common (Shared entities)
+          'common/entities/$entitySnake.dart',
+        ];
 
-        // Path 1: Is it in the current feature?
-        // lib/features/auth/domain/entities/user.dart
-        final currentFeaturePath =
-            'features/$currentFeatureSnake/domain/entities/$entitySnake.dart';
-
-        // Path 2: Is it in a feature named after itself?
-        // (Common convention: User entity in User feature)
-        // lib/features/user/domain/entities/user.dart
-        final selfFeaturePath =
-            'features/$entitySnake/domain/entities/$entitySnake.dart';
-
-        // Path 3: Is it in core?
-        // lib/core/entities/user.dart
-        final corePath = 'core/entities/$entitySnake.dart';
-
-        final modelPath =
-            'features/$currentFeatureSnake/data/models/${entity.snakeCase}_model.dart';
-        if (_fileExists('lib/$modelPath')) {
-          buffer.writeln("import 'package:$appName/$modelPath';");
+        var found = false;
+        for (final path in pathsToCheck) {
+          // We check strict file existence
+          if (_fileExists('lib/$path')) {
+            buffer.writeln("import 'package:${config.appName}/$path';");
+            found = true;
+            break; // Stop looking once found
+          }
         }
 
-        // We use a heuristic here because we are generating code string.
-        // Ideally, we check file existence using basic File I/O relative to project root.
-
-        if (_fileExists('lib/$currentFeaturePath')) {
-          buffer.writeln("import 'package:$appName/$currentFeaturePath';");
-        } else if (_fileExists('lib/$selfFeaturePath')) {
-          buffer.writeln("import 'package:$appName/$selfFeaturePath';");
-        } else if (_fileExists('lib/$corePath')) {
-          buffer.writeln("import 'package:$appName/$corePath';");
-        } else {
-          // Fallback: Assume it's in the current feature to prevent
-          // breaking compilation
-          // entirely, or add a TODO comment.
+        if (!found) {
+          // Fallback: If we identified it as a candidate but couldn't find
+          // the file,
+          // it might be in a weird location. We comment it out so the
+          // dev notices.
           buffer.writeln(
-            "import 'package:$appName/$currentFeaturePath'; // Warning: File check failed",
+            "// import '.../domain/entities/$entitySnake.dart'; // Warning: Could not locate file for $entity",
           );
         }
       }
