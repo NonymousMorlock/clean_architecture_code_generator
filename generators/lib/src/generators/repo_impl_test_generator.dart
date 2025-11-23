@@ -98,19 +98,21 @@ class RepoImplTestGenerator
         '${className.substring(0, className.length - 4)}RemoteDataSource';
     final mockDataSourceName = 'Mock$remoteDataSourceName';
 
-    final featureName = className
+    final currentFeatureName = className
         .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-    final featureSnakeCase = featureName.snakeCase;
+        .replaceAll('Repo', '')
+        .snakeCase;
 
-    // Generate imports
-    _generateImports(
+    final usedEntities = _discoverRequiredEntities(visitor);
+
+    // Generate Imports (Dynamic based on discovery)
+    _generateSmartImports(
       buffer,
-      featureName,
-      featureSnakeCase,
+      currentFeatureName,
       repoName,
       repoImplName,
       remoteDataSourceName,
+      usedEntities,
     );
 
     // Generate mock class
@@ -126,8 +128,8 @@ class RepoImplTestGenerator
       ..writeln('  late $repoImplName repoImpl;')
       ..writeln();
 
-    // Generate test entities for registration
-    _generateTestEntities(buffer, visitor, featureName);
+    // Register Fallbacks for discovered entities
+    _generateFallbackRegistration(buffer, usedEntities);
 
     buffer
       ..writeln('  setUp(() {')
@@ -138,90 +140,161 @@ class RepoImplTestGenerator
 
     // Generate tests for each method
     for (final method in visitor.methods) {
-      _generateMethodTest(buffer, method, featureName, remoteDataSourceName);
+      _generateMethodTest(
+        buffer,
+        method,
+        currentFeatureName,
+        remoteDataSourceName,
+      );
     }
 
     buffer.writeln('}');
   }
 
-  void _generateImports(
+  /// Scans all methods to find strict Entity dependencies
+  Set<String> _discoverRequiredEntities(RepoVisitor visitor) {
+    final entities = <String>{};
+
+    void scanType(String typeString) {
+      // 1. Break down complex types (Future<Either<Failure,
+      // List<User>>> -> {User})
+      final allTypes = typeString.allConstituentTypes;
+
+      // 2. Filter for actual Entities
+      for (final type in allTypes) {
+        if (type.isPotentialEntity) {
+          entities.add(type);
+        }
+      }
+    }
+
+    for (final method in visitor.methods) {
+      // Scan Return Type
+      scanType(method.returnType);
+
+      // Scan Parameters
+      if (method.params != null) {
+        for (final param in method.params!) {
+          scanType(param.type);
+        }
+      }
+    }
+    return entities;
+  }
+
+  void _generateSmartImports(
     StringBuffer buffer,
-    String featureName,
-    String featureSnakeCase,
+    String currentFeatureSnake,
     String repoName,
     String repoImplName,
     String remoteDataSourceName,
+    Set<String> entities,
   ) {
-    // Load configuration to get app name
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
     final appName = config.appName;
 
+    // Standard Imports
     buffer
       ..writeln("import 'package:dartz/dartz.dart';")
       ..writeln("import 'package:flutter_test/flutter_test.dart';")
       ..writeln("import 'package:mocktail/mocktail.dart';")
       ..writeln()
-      ..writeln('// Core imports')
       ..writeln("import 'package:$appName/core/errors/exceptions.dart';")
       ..writeln("import 'package:$appName/core/errors/failures.dart';")
       ..writeln("import 'package:$appName/core/typedefs.dart';")
       ..writeln()
-      ..writeln('// Feature imports')
+      // Current Feature Data Layer
       ..writeln(
-        "import 'package:$appName/features/$featureSnakeCase/data/datasources/${featureSnakeCase}_remote_data_source.dart';",
+        "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
       )
       ..writeln(
-        "import 'package:$appName/features/$featureSnakeCase/data/models/${featureSnakeCase}_model.dart';",
+        "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
       )
       ..writeln(
-        "import 'package:$appName/features/$featureSnakeCase/data/repositories/${featureSnakeCase}_repository_impl.dart';",
-      )
-      ..writeln(
-        "import 'package:$appName/features/$featureSnakeCase/domain/entities/$featureSnakeCase.dart';",
-      )
-      ..writeln();
-  }
+        "import 'package:$appName/features/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
+      );
 
-  void _generateTestEntities(
-    StringBuffer buffer,
-    RepoVisitor visitor,
-    String featureName,
-  ) {
-    // Find entity types used in methods
-    final entityTypes = <String>{};
+    // Dynamic Entity Imports
+    if (entities.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln('// Entity Imports');
 
-    for (final method in visitor.methods) {
-      final returnType = method.returnType.rightType;
-      if (returnType.contains(featureName)) {
-        entityTypes.add(featureName);
-      }
+      for (final entity in entities) {
+        final entitySnake = entity.snakeCase;
 
-      // Check parameters for entity types
-      if (method.params != null) {
-        for (final param in method.params!) {
-          if (param.type.contains(featureName)) {
-            entityTypes.add(featureName);
-          }
+        // LOGIC: Where does this entity live?
+
+        // Path 1: Is it in the current feature?
+        // lib/features/auth/domain/entities/user.dart
+        final currentFeaturePath =
+            'features/$currentFeatureSnake/domain/entities/$entitySnake.dart';
+
+        // Path 2: Is it in a feature named after itself?
+        // (Common convention: User entity in User feature)
+        // lib/features/user/domain/entities/user.dart
+        final selfFeaturePath =
+            'features/$entitySnake/domain/entities/$entitySnake.dart';
+
+        // Path 3: Is it in core?
+        // lib/core/entities/user.dart
+        final corePath = 'core/entities/$entitySnake.dart';
+
+        final modelPath =
+            'features/$currentFeatureSnake/data/models/${entity.snakeCase}_model.dart';
+        if (_fileExists('lib/$modelPath')) {
+          buffer.writeln("import 'package:$appName/$modelPath';");
+        }
+
+        // We use a heuristic here because we are generating code string.
+        // Ideally, we check file existence using basic File I/O relative to project root.
+
+        if (_fileExists('lib/$currentFeaturePath')) {
+          buffer.writeln("import 'package:$appName/$currentFeaturePath';");
+        } else if (_fileExists('lib/$selfFeaturePath')) {
+          buffer.writeln("import 'package:$appName/$selfFeaturePath';");
+        } else if (_fileExists('lib/$corePath')) {
+          buffer.writeln("import 'package:$appName/$corePath';");
+        } else {
+          // Fallback: Assume it's in the current feature to prevent
+          // breaking compilation
+          // entirely, or add a TODO comment.
+          buffer.writeln(
+            "import 'package:$appName/$currentFeaturePath'; // Warning: File check failed",
+          );
         }
       }
     }
+    buffer.writeln();
+  }
 
-    // Generate test entities
-    for (final entityType in entityTypes) {
-      buffer.writeln('  final t$entityType = $entityType.empty();');
+  void _generateFallbackRegistration(
+    StringBuffer buffer,
+    Set<String> entities,
+  ) {
+    if (entities.isEmpty) return;
+
+    // Create instances
+    for (final entity in entities) {
+      buffer.writeln('  final t$entity = $entity.empty();');
     }
 
-    if (entityTypes.isNotEmpty) {
-      buffer
-        ..writeln()
-        ..writeln('  setUpAll(() {');
-      for (final entityType in entityTypes) {
-        buffer.writeln('    registerFallbackValue(t$entityType);');
-      }
-      buffer
-        ..writeln('  });')
-        ..writeln();
+    buffer
+      ..writeln()
+      ..writeln('  setUpAll(() {');
+
+    for (final entity in entities) {
+      buffer.writeln('    registerFallbackValue(t$entity);');
     }
+
+    buffer
+      ..writeln('  });')
+      ..writeln();
+  }
+
+  /// Helper to check file existence relative to project root
+  bool _fileExists(String relativePath) {
+    return File(relativePath).existsSync();
   }
 
   void _generateMethodTest(
