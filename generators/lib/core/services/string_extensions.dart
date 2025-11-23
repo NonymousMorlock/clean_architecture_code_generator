@@ -278,4 +278,145 @@ extension StringExt on String {
 
     return true;
   }
+
+  /// Recursively extracts all leaf types from a complex generic signature.
+  ///
+  /// Input: `Future<Either<Failure, Map<Category, List<Product>>>>`
+  /// Output:
+  /// `{'Future', 'Either', 'Failure', 'Map', 'Category', 'List', 'Product'}`
+  Set<String> get allConstituentTypes {
+    final types = <String>{};
+    final current = trim();
+
+    // If it has generics, split and recurse
+    if (current.contains('<')) {
+      // Add the container itself (e.g., "Map")
+      types.add(current.baseType);
+
+      // Recurse into arguments
+      for (final arg in current.typeArguments) {
+        types.addAll(arg.allConstituentTypes);
+      }
+    } else {
+      // It's a leaf type
+      types.add(current.replaceAll('?', ''));
+    }
+
+    return types;
+  }
+
+  /// Checks if a type is likely a clean architecture Entity.
+  /// Filters out primitives, collections, and core types like Failure/Either.
+  bool get isPotentialEntity {
+    final lower = toLowerCase();
+    const ignored = {
+      // Primitives
+      'int',
+      'double',
+      'num',
+      'bool',
+      'string',
+      'void',
+      'dynamic',
+      'object',
+      'datetime',
+      // Collections
+      'list',
+      'map',
+      'set',
+      'iterable',
+      'future',
+      'stream',
+      // Core Architecture
+      'either',
+      'failure',
+      'serverfailure',
+      'cachefailure',
+      'nointernetfailure',
+    };
+
+    return !ignored.contains(lower);
+  }
+
+  /// Recursively digs for the "Success" entity type based on
+  /// Clean Arch patterns.
+  ///
+  /// Rules:
+  /// 1. Wrappers (Future, Stream, List, Set) -> Dig into the inner type.
+  /// 2. Biased Types (Either) -> Dig into the RIGHT type (Success).
+  /// 3. Map -> Dig into the RIGHT type (Value).
+  /// 4. Leaf -> If it's not a primitive, it's a candidate.
+  Set<String> get entityCandidates {
+    final candidates = <String>{};
+    final cleanType = trim().replaceAll('?', ''); // Remove nullability
+
+    // 1. Base case: No generics? Check if it's a custom type.
+    if (!cleanType.contains('<')) {
+      if (_isCustomType(cleanType)) {
+        candidates.add(cleanType);
+      }
+      return candidates;
+    }
+
+    // 2. Analyze Container
+    final base = cleanType.baseType; // "Future", "Either", "Map"
+    final args = cleanType.typeArguments; // ["Failure", "User"]
+
+    if (args.isEmpty) return candidates;
+
+    // 3. Apply Structural Rules
+    switch (base.toLowerCase()) {
+      // --- ONE-HAND WRAPPERS ---
+      case 'future':
+      case 'stream':
+      case 'list':
+      case 'set':
+      case 'iterable':
+        // Just dig deeper into the single argument
+        // e.g., List<User> -> User
+        candidates.addAll(args.first.entityCandidates);
+
+      // --- TWO-HAND BIASED (Clean Arch / Dartz) ---
+      case 'either':
+        // The 'Left' is Failure. We ONLY care about the 'Right' (Index 1).
+        if (args.length >= 2) {
+          candidates.addAll(args[1].entityCandidates);
+        }
+
+      // --- KEY-VALUE ---
+      case 'map':
+        // Usually Map<Id, Entity>. We prioritize the Value (Index 1).
+        // If you have Map<Entity, int>, this might miss,
+        // but that's rare in Repos.
+        if (args.length >= 2) {
+          candidates.addAll(args[1].entityCandidates);
+        }
+
+      // --- UNKNOWN GENERICS (e.g. PaginatedResponse<User>) ---
+      default:
+        // Safest bet: Check ALL arguments.
+        for (final arg in args) {
+          candidates.addAll(arg.entityCandidates);
+        }
+    }
+
+    return candidates;
+  }
+
+  /// Helper to filter out primitives
+  bool _isCustomType(String type) {
+    const primitives = {
+      'int',
+      'double',
+      'num',
+      'bool',
+      'string',
+      'void',
+      'dynamic',
+      'object',
+      'datetime',
+      'null',
+    };
+    return !primitives.contains(type.toLowerCase());
+  }
 }
