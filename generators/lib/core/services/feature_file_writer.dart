@@ -304,10 +304,7 @@ class FeatureFileWriter {
   }
 
   /// Get standard imports for a test file
-  List<String> getRepoTestImports({
-    required String featureName,
-    required String baseName,
-  }) {
+  List<String> getRepoTestImports() {
     return [
       "import 'package:flutter_test/flutter_test.dart';",
       "import 'package:mocktail/mocktail.dart';",
@@ -380,10 +377,7 @@ class FeatureFileWriter {
 
     final imports = [
       // Standard Imports
-      ...getRepoTestImports(
-        featureName: currentFeatureSnake,
-        baseName: repoName,
-      ),
+      ...getRepoTestImports(),
       // Current Feature Data Layer Imports
       "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
       "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
