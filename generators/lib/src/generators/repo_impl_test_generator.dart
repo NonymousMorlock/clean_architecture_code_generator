@@ -39,7 +39,7 @@ class RepoImplTestGenerator
 
     // Default behavior: generate to .g.dart
     final buffer = StringBuffer();
-    _generateRepoImplTest(buffer, visitor);
+    _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
     return buffer.toString();
   }
 
@@ -52,7 +52,7 @@ class RepoImplTestGenerator
     if (featureName == null) {
       // Fallback to default
       final buffer = StringBuffer();
-      _generateRepoImplTest(buffer, visitor);
+      _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
       return buffer.toString();
     }
 
@@ -61,7 +61,7 @@ class RepoImplTestGenerator
 
     // Generate test code
     final buffer = StringBuffer();
-    _generateRepoImplTest(buffer, visitor);
+    _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
 
     // Generate complete file with imports (imports are already
     // in the generated code)
@@ -91,7 +91,11 @@ class RepoImplTestGenerator
     return '// Repository implementation test written to: $testPath\n';
   }
 
-  void _generateRepoImplTest(StringBuffer buffer, RepoVisitor visitor) {
+  void _generateRepoImplTest({
+    required StringBuffer buffer,
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+  }) {
     final className = visitor.className;
     final repoName = className.replaceAll('TBG', '');
     final repoImplName = '${repoName}Impl';
@@ -107,17 +111,19 @@ class RepoImplTestGenerator
     final usedEntities = visitor.discoverRequiredEntities();
 
     // Generate Imports (Dynamic based on discovery)
-    _generateSmartImports(
-      buffer,
-      currentFeatureName,
-      repoName,
-      repoImplName,
-      remoteDataSourceName,
-      usedEntities,
-    );
+    writer
+        .generateSmartRepoImplTestImports(
+          currentFeatureName,
+          repoName,
+          repoImplName,
+          remoteDataSourceName,
+          usedEntities,
+        )
+        .forEach(buffer.writeln);
 
-    // Generate mock class
     buffer
+      ..writeln()
+      // Generate mock class
       ..writeln(
         'class $mockDataSourceName extends Mock '
         'implements $remoteDataSourceName {}',
@@ -152,83 +158,6 @@ class RepoImplTestGenerator
     buffer.writeln('}');
   }
 
-  void _generateSmartImports(
-    StringBuffer buffer,
-    String currentFeatureSnake,
-    String repoName,
-    String repoImplName,
-    String remoteDataSourceName,
-    Set<String> candidates,
-  ) {
-    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final appName = config.appName;
-
-    // Standard Imports
-    buffer
-      ..writeln("import 'package:dartz/dartz.dart';")
-      ..writeln("import 'package:flutter_test/flutter_test.dart';")
-      ..writeln("import 'package:mocktail/mocktail.dart';")
-      ..writeln()
-      ..writeln("import 'package:$appName/core/errors/exceptions.dart';")
-      ..writeln("import 'package:$appName/core/errors/failures.dart';")
-      ..writeln("import 'package:$appName/core/typedefs.dart';")
-      ..writeln()
-      // Current Feature Data Layer
-      ..writeln(
-        "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
-      )
-      ..writeln(
-        "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
-      )
-      ..writeln(
-        "import 'package:$appName/features/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
-      );
-
-    // Dynamic Entity Imports
-    if (candidates.isNotEmpty) {
-      buffer
-        ..writeln()
-        ..writeln('// Entity Imports');
-
-      for (final entity in candidates) {
-        final entitySnake = entity.snakeCase;
-
-        // DEFINE PATHS
-        final pathsToCheck = [
-          // 1. Current Feature Domain (Most likely)
-          'features/$currentFeatureSnake/domain/entities/$entitySnake.dart',
-          // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
-          'features/$entitySnake/domain/entities/$entitySnake.dart',
-          // 3. Core (Shared entities)
-          'core/entities/$entitySnake.dart',
-          // 4. Common (Shared entities)
-          'common/entities/$entitySnake.dart',
-        ];
-
-        var found = false;
-        for (final path in pathsToCheck) {
-          // We check strict file existence
-          if (_fileExists('lib/$path')) {
-            buffer.writeln("import 'package:${config.appName}/$path';");
-            found = true;
-            break; // Stop looking once found
-          }
-        }
-
-        if (!found) {
-          // Fallback: If we identified it as a candidate but couldn't find
-          // the file,
-          // it might be in a weird location. We comment it out so the
-          // dev notices.
-          buffer.writeln(
-            "// import '.../domain/entities/$entitySnake.dart'; // Warning: Could not locate file for $entity",
-          );
-        }
-      }
-    }
-    buffer.writeln();
-  }
-
   void _generateFallbackRegistration(
     StringBuffer buffer,
     Set<String> entities,
@@ -251,11 +180,6 @@ class RepoImplTestGenerator
     buffer
       ..writeln('  });')
       ..writeln();
-  }
-
-  /// Helper to check file existence relative to project root
-  bool _fileExists(String relativePath) {
-    return File(relativePath).existsSync();
   }
 
   void _generateMethodTest(

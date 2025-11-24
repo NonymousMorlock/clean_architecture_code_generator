@@ -300,4 +300,90 @@ class FeatureFileWriter {
       "import 'package:${config.appName}/core/typedefs.dart';",
     ];
   }
+
+  /// Generates import statements for a set of entities by checking
+  /// their existence
+  /// in the file system (Current Feature -> Self Feature -> Core -> Common).
+  List<String> getSmartEntityImports({
+    required Set<String> entities,
+    required String currentFeature,
+  }) {
+    if (entities.isEmpty) return [];
+
+    final imports = <String>[];
+    final currentFeatureSnake = currentFeature.snakeCase;
+
+    for (final entity in entities) {
+      final entitySnake = entity.snakeCase;
+      var found = false;
+
+      // DEFINE PATHS
+      final pathsToCheck = [
+        // 1. Current Feature Domain (Most likely)
+        'features/$currentFeatureSnake/domain/entities/$entitySnake.dart',
+        // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
+        'features/$entitySnake/domain/entities/$entitySnake.dart',
+        // 3. Core (Shared entities)
+        'core/entities/$entitySnake.dart',
+        // 4. Common (Shared entities)
+        'common/entities/$entitySnake.dart',
+      ];
+
+      for (final relativePath in pathsToCheck) {
+        // We check strict file existence
+        if (fileExists('lib/$relativePath')) {
+          imports.add("import 'package:${config.appName}/$relativePath';");
+          found = true;
+          break; // Stop looking once found
+        }
+      }
+
+      if (!found) {
+        // Fallback: If we identified it as a candidate but couldn't find
+        // the file,
+        // it might be in a weird location. We comment it out so the
+        // dev notices.
+        imports.add(
+          "// import '.../domain/entities/$entitySnake.dart'; // Warning: Could not locate file for $entity",
+        );
+      }
+    }
+    return imports;
+  }
+
+  /// Generate smart imports for a repository implementation test file
+  List<String> generateSmartRepoImplTestImports(
+    String currentFeatureSnake,
+    String repoName,
+    String repoImplName,
+    String remoteDataSourceName,
+    Set<String> candidates,
+  ) {
+    final appName = config.appName;
+
+    final imports = [
+      // Standard Imports
+      "import 'package:dartz/dartz.dart';",
+      "import 'package:flutter_test/flutter_test.dart';",
+      "import 'package:mocktail/mocktail.dart';",
+      "import 'package:$appName/core/errors/exceptions.dart';",
+      "import 'package:$appName/core/errors/failures.dart';",
+      "import 'package:$appName/core/typedefs.dart';",
+      // Current Feature Data Layer Imports
+      "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
+      "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
+      "import 'package:$appName/features/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
+    ];
+
+    // Dynamic Entity Imports
+    if (candidates.isNotEmpty) {
+      imports.addAll(
+        getSmartEntityImports(
+          entities: candidates,
+          currentFeature: currentFeatureSnake,
+        ),
+      );
+    }
+    return imports;
+  }
 }
