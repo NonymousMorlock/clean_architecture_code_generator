@@ -363,12 +363,10 @@ class FeatureFileWriter {
 
     final imports = [
       // Standard Imports
-      "import 'package:dartz/dartz.dart';",
-      "import 'package:flutter_test/flutter_test.dart';",
-      "import 'package:mocktail/mocktail.dart';",
-      "import 'package:$appName/core/errors/exceptions.dart';",
-      "import 'package:$appName/core/errors/failures.dart';",
-      "import 'package:$appName/core/typedefs.dart';",
+      ...getRepoTestImports(
+        featureName: currentFeatureSnake,
+        baseName: repoName,
+      ),
       // Current Feature Data Layer Imports
       "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
       "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
