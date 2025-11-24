@@ -130,6 +130,26 @@ class FeatureFileWriter {
     );
   }
 
+  /// Get the usecases test directory path
+  /// e.g., test/features/auth/domain/usecases/
+  String getUsecasesTestDirPath(String featureName) {
+    return path.join(
+      'test',
+      'features',
+      featureName,
+      'domain',
+      'usecases',
+    );
+  }
+
+  /// Get the usecases mock file path
+  String getUsecasesRepoMockPath(String featureName) {
+    return path.join(
+      getUsecasesTestDirPath(featureName),
+      '${featureName.snakeCase}.mock.dart',
+    );
+  }
+
   /// Get the test file path for a usecase
   /// e.g., test/features/auth/domain/usecases/register_test.dart
   String getUsecaseTestPath(String featureName, String methodName) {
@@ -157,11 +177,11 @@ class FeatureFileWriter {
   }
 
   /// Write content to a file, optionally creating it if it doesn't exist
-  Future<void> writeToFile(
+  void writeToFile(
     String filePath,
     String content, {
     bool createIfMissing = true,
-  }) async {
+  }) {
     final file = File(filePath);
 
     if (!file.existsSync()) {
@@ -174,7 +194,7 @@ class FeatureFileWriter {
       }
     }
 
-    await file.writeAsString(content);
+    file.writeAsStringSync(content);
   }
 
   /// Merge generated content into an existing file
@@ -190,7 +210,7 @@ class FeatureFileWriter {
     if (!file.existsSync()) {
       if (shouldAutoCreate) {
         // Create new file with generated content
-        await writeToFile(filePath, generatedContent);
+        writeToFile(filePath, generatedContent);
         return;
       } else {
         throw Exception(
@@ -275,6 +295,14 @@ class FeatureFileWriter {
     }
 
     return imports;
+  }
+
+  /// Get repository import statement for a usecase file
+  String getRepositoryImportStatement({
+    required String baseName,
+    required String featureName,
+  }) {
+    return "import 'package:${config.appName}/features/${featureName.snakeCase}/domain/repositories/${baseName}_repository.dart';";
   }
 
   /// Get standard imports for a remote data source file
