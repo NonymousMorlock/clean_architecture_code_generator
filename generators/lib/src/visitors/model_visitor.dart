@@ -1,6 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
-import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/src/models/field.dart';
 
 /// Type alias for a map containing dynamic data.

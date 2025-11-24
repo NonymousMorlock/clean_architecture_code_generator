@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
-import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:path/path.dart' as path;
 
 /// Service for resolving and writing generated code to feature files

@@ -1,4 +1,4 @@
-import 'package:generators/core/services/string_extensions.dart';
+import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 
 /// Extensions for RepoVisitor

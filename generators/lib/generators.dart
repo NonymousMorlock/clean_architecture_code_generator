@@ -19,9 +19,9 @@ import 'package:source_gen/source_gen.dart';
 
 // Core exports
 export 'core/config/generator_config.dart';
+export 'core/extensions/string_extensions.dart';
 export 'core/services/feature_file_writer.dart';
 export 'core/services/functions.dart';
-export 'core/services/string_extensions.dart';
 export 'core/utils/utils.dart';
 // Generator exports
 export 'src/generators/adapter_generator.dart';
