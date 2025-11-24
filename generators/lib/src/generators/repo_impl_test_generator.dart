@@ -8,6 +8,7 @@ import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
+import 'package:generators/core/services/repo_visitor_extensions.dart';
 import 'package:generators/core/services/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
@@ -103,7 +104,7 @@ class RepoImplTestGenerator
         .replaceAll('Repo', '')
         .snakeCase;
 
-    final usedEntities = _discoverRequiredEntities(visitor);
+    final usedEntities = visitor.discoverRequiredEntities();
 
     // Generate Imports (Dynamic based on discovery)
     _generateSmartImports(
@@ -149,26 +150,6 @@ class RepoImplTestGenerator
     }
 
     buffer.writeln('}');
-  }
-
-  /// Scans all methods to find strict Entity dependencies
-  Set<String> _discoverRequiredEntities(RepoVisitor visitor) {
-    final candidates = <String>{};
-
-    for (final method in visitor.methods) {
-      // 1. Scan Return Type (e.g. Future<Either<Failure, List<User>>>)
-      // This will automatically strip Future, discard Failure,
-      // strip List, and find "User"
-      candidates.addAll(method.returnType.entityCandidates);
-
-      // 2. Scan Parameters (e.g. method(User params))
-      if (method.params != null) {
-        for (final param in method.params!) {
-          candidates.addAll(param.type.entityCandidates);
-        }
-      }
-    }
-    return candidates;
   }
 
   void _generateSmartImports(
