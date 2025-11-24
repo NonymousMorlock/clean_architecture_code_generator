@@ -4,9 +4,8 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
-import 'package:generators/core/services/string_extensions.dart';
-import 'package:generators/src/models/function.dart';
-import 'package:generators/src/visitors/repo_visitor.dart';
+import 'package:generators/core/extensions/repo_visitor_extensions.dart';
+import 'package:generators/generators.dart';
 import 'package:source_gen/source_gen.dart';
 
 /// Generator for creating test files for use case classes.
@@ -25,7 +24,24 @@ class UsecaseTestGenerator
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+    final writer = FeatureFileWriter(config, buildStep);
+
     final className = visitor.className;
+
+    final usedEntities = visitor.discoverRequiredEntities();
+
+    writer.getRepoTestImports()
+      ..add("import '${className.snakeCase}.mock.dart';")
+      ..forEach(buffer.writeln);
+
+    final featureName = writer.extractFeatureName()!;
+
+    writer.getSmartEntityImports(
+      entities: usedEntities,
+      currentFeature: featureName,
+    );
+
     final tag =
         '''
 // **************************************************************************
@@ -38,78 +54,189 @@ class UsecaseTestGenerator
         'class Mock$className extends Mock implements $className '
         '{}',
       );
+
     for (final method in visitor.methods) {
-      final hasParams = method.params != null;
-      buffer
-        ..writeln("// import '${className.snakeCase}.mock.dart';")
-        ..writeln('void main() {')
-        ..writeln('late Mock$className repo;')
-        ..writeln('late ${method.name.upperCamelCase} usecase;');
-      final testNames = <String>[];
-      if (hasParams) {
-        for (final param in method.params!) {
-          buffer.writeln();
-          final testName = 't${param.name.upperCamelCase}';
-          testNames.add(testName);
-          if (param.type.fallbackValue is List) {
-            buffer.writeln('const $testName = <${param.type.stripType}>[];');
-          } else {
-            final isCustomType =
-                param.type.fallbackValue is String &&
-                (param.type.fallbackValue as String).isCustomType;
-            final testVariable = isCustomType
-                ? '${param.type}.empty();'
-                : param.type.fallbackValue is String
-                ? "'${param.type.fallbackValue}';"
-                : '${param.type.fallbackValue};';
-            buffer.writeln(
-              '${isCustomType ? 'final' : 'const'} $testName = '
-              '$testVariable',
-            );
-          }
-        }
-      }
-      final methodReturnTypeFallback =
-          method.returnType.rightType.fallbackValue;
-      final methodReturnsCustomType =
-          methodReturnTypeFallback is String &&
-          methodReturnTypeFallback.isCustomType;
-      if (methodReturnsCustomType) {
-        buffer
-          ..writeln()
-          ..writeln('final tResult = $methodReturnTypeFallback;');
-      } else if (methodReturnTypeFallback is String &&
-          methodReturnTypeFallback == 'null') {
-        // pass
-        // means it's got void return type
-      } else if (methodReturnTypeFallback is String) {
-        buffer
-          ..writeln()
-          ..writeln("final tResult = '$methodReturnTypeFallback';");
-      } else if (methodReturnTypeFallback is List) {
-        final listMembersType = method.returnType.rightType.stripType;
-        final listMembersDefault = listMembersType.fallbackValue;
-        var defaultMember = listMembersDefault;
-        if (listMembersDefault is String && listMembersDefault.isCustomType) {
-          defaultMember = listMembersDefault;
-        } else if (listMembersDefault is String) {
-          defaultMember = "'$listMembersDefault'";
-        }
-        buffer.writeln(
-          'final tResult = <$listMembersType>[$defaultMember];',
-        );
-      } else {
-        buffer
-          ..writeln()
-          ..writeln('final tResult = $methodReturnTypeFallback;');
-      }
-      buffer.writeln();
-      setUp(buffer, className, method);
-      buffer.writeln();
-      test(buffer, className, method, testNames);
-      buffer.writeln('}');
+      _generateMethodTest(buffer: buffer, className: className, method: method);
     }
     return buffer.toString();
+  }
+
+  void _generateMethodTest({
+    required StringBuffer buffer,
+    required String className,
+    required IFunction method,
+  }) {
+    final hasParams = method.params != null;
+
+    buffer
+      ..writeln('void main() {')
+      ..writeln('  late Mock$className repo;')
+      ..writeln('  late ${method.name.upperCamelCase} usecase;');
+
+    final testNames = <String>[];
+
+    // 3. PARAMETER GENERATION (Simplified)
+    if (hasParams) {
+      for (final param in method.params!) {
+        buffer.writeln();
+        final testName = 't${param.name.upperCamelCase}';
+        testNames.add(testName);
+
+        // LOGIC: Trust the extension.
+        // fallbackValue returns code string: "User.empty()", "[]", "1", "\"Test\""
+        final value = param.type.fallbackValue;
+
+        // LOGIC: isCustomType on the type string decides const/final
+        final isCustom = param.type.isCustomType;
+
+        // Exception: Lists are always not const if they contain custom types,
+        // but '[]' can be const. For safety in tests, 'final'
+        // is usually fine for lists.
+        final keyword = (isCustom || param.type.toLowerCase().contains('list'))
+            ? 'final'
+            : 'const';
+
+        buffer.writeln('  $keyword $testName = $value;');
+      }
+    }
+
+    // 4. RESULT GENERATION (Simplified)
+    final methodReturnType =
+        method.returnType.rightType; // Handle Future/Either automatically
+    final resultValue = methodReturnType.fallbackValue;
+
+    // Only generate tResult if it's not void
+    if (resultValue != 'null') {
+      final isResultCustom = methodReturnType.isCustomType;
+      final keyword =
+          (isResultCustom || methodReturnType.toLowerCase().contains('list'))
+          ? 'final'
+          : 'const';
+
+      buffer
+        ..writeln()
+        ..writeln('  $keyword tResult = $resultValue;');
+    }
+
+    buffer.writeln();
+    _generateSetUp(buffer, className, method);
+    buffer.writeln();
+    _generateActualTest(buffer, className, method, testNames, resultValue);
+    buffer.writeln('}');
+  }
+
+  void _generateSetUp(StringBuffer buffer, String className, IFunction method) {
+    buffer
+      ..writeln('  setUp(() {')
+      ..writeln('    repo = Mock$className();')
+      ..writeln('    usecase = ${method.name.upperCamelCase}(repo);');
+
+    if (method.params != null) {
+      for (final param in method.params!) {
+        // Only register fallback if it's a custom type that might need it
+        if (param.type.isCustomType) {
+          buffer.writeln(
+            '    registerFallbackValue(t${param.name.upperCamelCase});',
+          );
+        }
+      }
+    }
+    buffer.writeln('  });');
+  }
+
+  void _generateActualTest(
+    StringBuffer buffer,
+    String className,
+    IFunction method,
+    List<String> testNames,
+    dynamic resultValue, // The code string for the result
+  ) {
+    final returnType = method.returnType; // Raw return type
+    final methodName = method.name;
+    final isStream = returnType.startsWith('Stream');
+    final rightType = returnType.rightType; // The success type
+
+    buffer
+      ..writeln('  test(')
+      ..writeln("    'should call the [$className.$methodName]',")
+      ..writeln('    () async {')
+      // WHEN BLOCK
+      ..writeln('      when(() => repo.$methodName(');
+    if (method.params != null) {
+      for (final param in method.params!) {
+        final matcher = param.isNamed
+            ? '${param.name}: any(named: "${param.name}"),'
+            : 'any(),';
+        buffer.writeln('        $matcher');
+      }
+    }
+    buffer.writeln('      )).thenAnswer(');
+
+    // ANSWER BLOCK
+    final responsePayload = resultValue == 'null' ? 'null' : 'tResult';
+    final prefix = isStream ? 'Stream.value(' : '';
+    final suffix = isStream ? ')' : '';
+    var modifier = (resultValue == 'null') ? '' : 'const';
+    // If tResult is used (variable), remove const
+    if (responsePayload == 'tResult') modifier = '';
+
+    // Wrap in Right/Left. clean architecture assumes success path for this basic test.
+    buffer
+      ..writeln(
+        '        (_) async => $prefix$modifier Right($responsePayload)$suffix,',
+      )
+      ..writeln('      );') // Close thenAnswer
+      ..writeln();
+
+    // ACT BLOCK
+    final resultVar = isStream ? 'stream' : 'result';
+    final awaitKey = isStream ? '' : 'await';
+
+    // Handle Params Call
+    var paramsCall = '()';
+    if (testNames.length > 1) {
+      // Assuming you have a Params class for multiple args
+      // (UseCase specific pattern)
+      final paramsClassName = '${method.name.upperCamelCase}Params';
+      // We need to construct the params object
+      final args = testNames
+          .map((t) {
+            final paramName = t.replaceFirst('t', '').lowerCamelCase;
+            return '$paramName: $t';
+          })
+          .join(', ');
+      paramsCall = '($paramsClassName($args))';
+    } else if (testNames.isNotEmpty) {
+      paramsCall = '(${testNames.first})';
+    }
+
+    buffer.writeln('      final $resultVar = $awaitKey usecase$paramsCall;');
+
+    // ASSERT BLOCK
+    final expectMatcher = isStream ? 'emits' : 'equals';
+    buffer
+      ..writeln('      expect(')
+      ..writeln('        $resultVar,')
+      ..writeln(
+        '        $expectMatcher($modifier Right<dynamic, '
+        '$rightType>($responsePayload)),',
+      )
+      ..writeln('      );')
+      // VERIFY BLOCK
+      ..writeln('      verify(() => repo.$methodName(');
+    if (method.params != null) {
+      for (final param in method.params!) {
+        final matcher = param.isNamed
+            ? '${param.name}: any(named: "${param.name}"),'
+            : 'any(),';
+        buffer.writeln('        $matcher');
+      }
+    }
+    buffer
+      ..writeln('      )).called(1);')
+      ..writeln('      verifyNoMoreInteractions(repo);')
+      ..writeln('    },')
+      ..writeln('  );');
   }
 
   /// Generates the setUp method for use case tests.
