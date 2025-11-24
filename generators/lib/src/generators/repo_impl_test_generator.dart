@@ -69,20 +69,7 @@ class RepoImplTestGenerator
 
     // Write to the test file
     try {
-      File(testPath).writeAsStringSync(completeFile);
-    } on PathNotFoundException catch (e) {
-      if (writer.shouldAutoCreate) {
-        // Create the file and write
-        File(testPath)
-          ..createSync(recursive: true)
-          ..writeAsStringSync(completeFile);
-        stdout.writeln('Info: Created missing file at $testPath');
-      } else {
-        stderr.writeln(
-          'Warning: Path not found for $testPath. '
-          'Ensure the target file exists or enable auto-creation. $e',
-        );
-      }
+      writer.writeToFile(testPath, completeFile);
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $testPath: $e');
     }
