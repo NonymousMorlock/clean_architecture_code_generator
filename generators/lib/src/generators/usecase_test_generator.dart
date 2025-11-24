@@ -1,6 +1,8 @@
 // We need to import from build package internals to access BuildStep
 // ignore_for_file: implementation_imports
 
+import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
@@ -20,13 +22,101 @@ class UsecaseTestGenerator
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
-    final buffer = StringBuffer();
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
     final writer = FeatureFileWriter(config, buildStep);
 
+    if (writer.isMultiFileEnabled) {
+      return _generateMultiFile(
+        visitor: visitor,
+        writer: writer,
+        buildStep: buildStep,
+      );
+    }
+    final buffer = StringBuffer();
+
+    _generateUsecaseTests(buffer: buffer, visitor: visitor, writer: writer);
+    return buffer.toString();
+  }
+
+  String _generateMultiFile({
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+    required BuildStep buildStep,
+  }) {
+    final className = visitor.className;
+    final featureName = writer.extractFeatureName(repoName: className);
+    final baseName = writer.extractBaseName(className);
+
+    if (featureName == null) {
+      final buffer = StringBuffer();
+      _generateUsecaseTests(buffer: buffer, visitor: visitor, writer: writer);
+      return buffer.toString();
+    }
+
+    final mockFilePath = writer.getUsecasesRepoMockPath(featureName);
+    final mockBuffer = StringBuffer();
+    // write to the .mock file
+    _writeMockFile(
+      filePath: mockFilePath,
+      buffer: mockBuffer,
+      writer: writer,
+      className: className,
+      featureName: featureName,
+      baseName: baseName,
+    );
+    for (final method in visitor.methods) {
+      final usecaseBuffer = StringBuffer();
+      _generateMethodTest(
+        buffer: usecaseBuffer,
+        className: className,
+        method: method,
+      );
+      final usecaseFilePath = writer.getUsecaseTestPath(
+        featureName,
+        method.name,
+      );
+      try {
+        writer.writeToFile(usecaseFilePath, usecaseBuffer.toString());
+      } on Exception catch (e) {
+        stderr.writeln('Warning: Could not write to $usecaseFilePath: $e');
+      }
+    }
+    return '';
+  }
+
+  void _writeMockFile({
+    required String filePath,
+    required StringBuffer buffer,
+    required FeatureFileWriter writer,
+    required String className,
+    required String featureName,
+    required String baseName,
+  }) {
+    buffer
+      ..writeln("import 'package:mocktail/mocktail.dart';")
+      ..writeln(
+        writer.getRepositoryImportStatement(
+          baseName: baseName,
+          featureName: featureName,
+        ),
+      )
+      ..writeln()
+      ..writeln('class Mock$className extends Mock implements $className {}');
+    try {
+      writer.writeToFile(filePath, buffer.toString());
+    } on Exception catch (e) {
+      stderr.writeln('Warning: Could not write to $filePath: $e');
+    }
+  }
+
+  void _generateUsecaseTests({
+    required StringBuffer buffer,
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+  }) {
     final className = visitor.className;
 
     final usedEntities = visitor.discoverRequiredEntities();
@@ -58,7 +148,6 @@ class UsecaseTestGenerator
     for (final method in visitor.methods) {
       _generateMethodTest(buffer: buffer, className: className, method: method);
     }
-    return buffer.toString();
   }
 
   void _generateMethodTest({
