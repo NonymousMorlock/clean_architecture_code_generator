@@ -47,7 +47,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     FeatureFileWriter writer,
     BuildStep buildStep,
   ) {
-    final featureName = writer.extractFeatureName();
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
     if (featureName == null) {
       // Fallback to default if feature name can't be extracted
       final buffer = StringBuffer();

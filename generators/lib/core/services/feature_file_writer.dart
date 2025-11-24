@@ -28,14 +28,31 @@ class FeatureFileWriter {
 
   /// Extract feature name from the build step input path
   /// e.g., lib/features/auth/domain/repositories/auth_repository.dart -> auth
-  String? extractFeatureName() {
+  String? extractFeatureName({String? repoName}) {
     final inputPath = buildStep.inputId.path;
     final parts = inputPath.split('/');
 
+    // Helper to get the segment after a given directory name
+    String? segmentAfter(String key) {
+      final idx = parts.indexOf(key);
+      if (idx != -1 && idx + 1 < parts.length) {
+        return parts[idx + 1];
+      }
+      return null;
+    }
+
     // Look for 'features' in the path
-    final featuresIndex = parts.indexOf('features');
-    if (featuresIndex != -1 && featuresIndex + 1 < parts.length) {
-      return parts[featuresIndex + 1];
+    final featuresSegment = segmentAfter('features');
+    if (featuresSegment != null) return featuresSegment;
+
+    // if not found there, check for src directory
+    final srcSegment = segmentAfter('src');
+    if (srcSegment != null) return srcSegment;
+
+    // otherwise, I'll look in the repo name and remove the "repo part"
+    if (repoName != null) {
+      final repoBaseName = extractBaseName(repoName);
+      return repoBaseName;
     }
 
     return null;

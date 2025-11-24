@@ -73,7 +73,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     FeatureFileWriter writer,
     BuildStep buildStep,
   ) {
-    final featureName = writer.extractFeatureName();
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
     stdout
       ..writeln('[AdapterGenerator] Input path: ${buildStep.inputId.path}')
       ..writeln('[AdapterGenerator] Extracted feature name: $featureName');

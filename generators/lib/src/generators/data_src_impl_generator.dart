@@ -45,7 +45,7 @@ class RemoteDataSrcGenerator
     BuildStep buildStep,
     GeneratorConfig config,
   ) {
-    final featureName = writer.extractFeatureName();
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
     if (featureName == null) {
       // Fallback to default
       final buffer = StringBuffer();
