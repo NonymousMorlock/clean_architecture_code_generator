@@ -103,6 +103,7 @@ multi_file_output:
 
 # Feature scaffolding configuration
 feature_scaffolding:
+  root_name: features          # Root folder for features. e.g., 'features' or 'modules' or 'src'
   enabled: false                  # Pre-generate files when running 'create -t feature'
   features:                       # Define features and their methods for scaffolding
 #    auth:

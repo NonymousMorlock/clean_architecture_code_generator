@@ -32,22 +32,12 @@ class FeatureFileWriter {
     final inputPath = buildStep.inputId.path;
     final parts = inputPath.split('/');
 
-    // Helper to get the segment after a given directory name
-    String? segmentAfter(String key) {
-      final idx = parts.indexOf(key);
-      if (idx != -1 && idx + 1 < parts.length) {
-        return parts[idx + 1];
-      }
-      return null;
+    final rootName = config.featureScaffolding.rootName;
+
+    final idx = parts.indexOf(rootName);
+    if (idx != -1 && idx + 1 < parts.length) {
+      return parts[idx + 1];
     }
-
-    // Look for 'features' in the path
-    final featuresSegment = segmentAfter('features');
-    if (featuresSegment != null) return featuresSegment;
-
-    // if not found there, check for src directory
-    final srcSegment = segmentAfter('src');
-    if (srcSegment != null) return srcSegment;
 
     // otherwise, I'll look in the repo name and remove the "repo part"
     if (repoName != null) {
@@ -70,7 +60,11 @@ class FeatureFileWriter {
   /// Get the feature root directory path
   /// e.g., lib/features/auth
   String getFeatureRoot(String featureName) {
-    return path.join(config.outputPath, 'features', featureName);
+    return path.join(
+      config.outputPath,
+      config.featureScaffolding.rootName,
+      featureName,
+    );
   }
 
   /// Get the domain repository file path
@@ -122,7 +116,7 @@ class FeatureFileWriter {
   String getRepoImplTestPath(String featureName, String baseName) {
     return path.join(
       'test',
-      'features',
+      config.featureScaffolding.rootName,
       featureName,
       'data',
       'repositories',
@@ -135,7 +129,7 @@ class FeatureFileWriter {
   String getUsecasesTestDirPath(String featureName) {
     return path.join(
       'test',
-      'features',
+      config.featureScaffolding.rootName,
       featureName,
       'domain',
       'usecases',
@@ -155,7 +149,7 @@ class FeatureFileWriter {
   String getUsecaseTestPath(String featureName, String methodName) {
     return path.join(
       'test',
-      'features',
+      config.featureScaffolding.rootName,
       featureName,
       'domain',
       'usecases',
@@ -302,7 +296,8 @@ class FeatureFileWriter {
     required String baseName,
     required String featureName,
   }) {
-    return "import 'package:${config.appName}/features/${featureName.snakeCase}/domain/repositories/${baseName}_repository.dart';";
+    final rootName = config.featureScaffolding.rootName;
+    return "import 'package:${config.appName}/$rootName/${featureName.snakeCase}/domain/repositories/${baseName}_repository.dart';";
   }
 
   /// Get usecase import statement for a file
@@ -310,7 +305,8 @@ class FeatureFileWriter {
     required String featureName,
     required String methodName,
   }) {
-    return "import 'package:${config.appName}/features/${featureName.snakeCase}/domain/usecases/${methodName.snakeCase}.dart';";
+    final rootName = config.featureScaffolding.rootName;
+    return "import 'package:${config.appName}/$rootName/${featureName.snakeCase}/domain/usecases/${methodName.snakeCase}.dart';";
   }
 
   /// Get standard imports for a remote data source file
@@ -362,6 +358,7 @@ class FeatureFileWriter {
 
     final imports = <String>[];
     final currentFeatureSnake = currentFeature.snakeCase;
+    final rootName = config.featureScaffolding.rootName;
 
     for (final entity in entities) {
       final entitySnake = entity.snakeCase;
@@ -370,9 +367,9 @@ class FeatureFileWriter {
       // DEFINE PATHS
       final pathsToCheck = [
         // 1. Current Feature Domain (Most likely)
-        'features/$currentFeatureSnake/domain/entities/$entitySnake.dart',
+        '$rootName/$currentFeatureSnake/domain/entities/$entitySnake.dart',
         // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
-        'features/$entitySnake/domain/entities/$entitySnake.dart',
+        '$rootName/$entitySnake/domain/entities/$entitySnake.dart',
         // 3. Core (Shared entities)
         'core/entities/$entitySnake.dart',
         // 4. Common (Shared entities)
@@ -410,14 +407,15 @@ class FeatureFileWriter {
     Set<String> candidates,
   ) {
     final appName = config.appName;
+    final rootName = config.featureScaffolding.rootName;
 
     final imports = [
       // Standard Imports
       ...getRepoTestImports(),
       // Current Feature Data Layer Imports
-      "import 'package:$appName/features/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
-      "import 'package:$appName/features/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
-      "import 'package:$appName/features/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
+      "import 'package:$appName/$rootName/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
+      "import 'package:$appName/$rootName/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
+      "import 'package:$appName/$rootName/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
     ];
 
     // Dynamic Entity Imports

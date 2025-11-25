@@ -633,6 +633,7 @@ class MultiFileOutputConfig {
 class FeatureScaffoldingConfig {
   /// Creates a [FeatureScaffoldingConfig] with the given settings.
   const FeatureScaffoldingConfig({
+    this.rootName = 'feature',
     this.enabled = false,
     this.features = const {},
   });
@@ -649,10 +650,14 @@ class FeatureScaffoldingConfig {
     }
 
     return FeatureScaffoldingConfig(
+      rootName: map['root_name'] as String? ?? 'feature',
       enabled: map['enabled'] as bool? ?? false,
       features: features,
     );
   }
+
+  /// The root name for feature scaffolding.
+  final String rootName;
 
   /// Whether feature scaffolding is enabled.
   final bool enabled;
@@ -663,6 +668,7 @@ class FeatureScaffoldingConfig {
   /// Converts this configuration to a map.
   Map<String, dynamic> toMap() {
     return {
+      'root_name': rootName,
       'enabled': enabled,
       'features': features.map((key, value) => MapEntry(key, value.toMap())),
     };

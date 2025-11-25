@@ -71,6 +71,7 @@ class ModelTestGeneratorImproved
     // Load configuration to get app name
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
     final appName = config.appName;
+    final rootName = config.featureScaffolding.rootName;
 
     buffer
       ..writeln("import 'dart:convert';")
@@ -80,10 +81,10 @@ class ModelTestGeneratorImproved
       ..writeln('// Feature imports')
       ..writeln("import 'package:$appName/core/typedefs.dart';")
       ..writeln(
-        "import 'package:$appName/features/$classSnakeCase/data/models/${classSnakeCase}_model.dart';",
+        "import 'package:$appName/$rootName/$classSnakeCase/data/models/${classSnakeCase}_model.dart';",
       )
       ..writeln(
-        "import 'package:$appName/features/$classSnakeCase/domain/entities/$classSnakeCase.dart';",
+        "import 'package:$appName/$rootName/$classSnakeCase/domain/entities/$classSnakeCase.dart';",
       )
       ..writeln()
       ..writeln('// Test utilities')
