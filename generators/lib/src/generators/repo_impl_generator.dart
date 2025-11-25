@@ -67,7 +67,6 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     final completeFile = writer.generateCompleteFile(
       imports: imports,
       generatedCode: buffer.toString(),
-      header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
     );
 
     // Write to the repository implementation file

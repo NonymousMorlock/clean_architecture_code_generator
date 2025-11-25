@@ -130,7 +130,6 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     final completeAdapter = writer.generateCompleteFile(
       imports: adapterImports,
       generatedCode: adapterBuffer.toString(),
-      header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
     );
 
     // Generate state file
@@ -148,7 +147,6 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
     final completeState = writer.generateCompleteFile(
       generatedCode: stateBuffer.toString(),
-      header: '// GENERATED CODE - DO NOT MODIFY BY HAND',
     );
 
     // Write to actual files

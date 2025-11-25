@@ -65,11 +65,10 @@ class RepoImplTestGenerator
 
     // Generate complete file with imports (imports are already
     // in the generated code)
-    final completeFile = '// GENERATED CODE - DO NOT MODIFY BY HAND\n\n$buffer';
 
     // Write to the test file
     try {
-      writer.writeToFile(testPath, completeFile);
+      writer.writeToFile(testPath, buffer.toString());
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $testPath: $e');
     }
