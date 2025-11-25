@@ -78,7 +78,6 @@ class ModelTestGeneratorImproved
       ..writeln()
       ..writeln("import 'package:flutter_test/flutter_test.dart';")
       ..writeln()
-      ..writeln('// Feature imports')
       ..writeln("import 'package:$appName/core/typedefs.dart';")
       ..writeln(
         "import 'package:$appName/$rootName/$classSnakeCase/data/models/${classSnakeCase}_model.dart';",
