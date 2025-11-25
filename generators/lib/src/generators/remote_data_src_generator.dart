@@ -35,7 +35,7 @@ class RemoteDataSrcGenerator
 
     // Default behavior: generate to .g.dart
     final buffer = StringBuffer();
-    remoteDataSource(buffer: buffer, visitor: visitor);
+    remoteDataSource(buffer: buffer, visitor: visitor, handleImports: true);
     return buffer.toString();
   }
 
@@ -85,6 +85,7 @@ class RemoteDataSrcGenerator
   void remoteDataSource({
     required StringBuffer buffer,
     required RepoVisitor visitor,
+    bool handleImports = false,
   }) {
     final repoName = visitor.className;
     final dataSrcName =
@@ -93,8 +94,10 @@ class RemoteDataSrcGenerator
     // Load configuration for imports
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
 
-    // Generate imports based on configuration
-    _generateConfigBasedImports(buffer, config);
+    if (handleImports) {
+      // Generate imports based on configuration
+      _generateConfigBasedImports(buffer, config);
+    }
 
     Utils.oneMemberAbstractHandler(
       buffer: buffer,
