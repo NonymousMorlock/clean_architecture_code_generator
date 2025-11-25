@@ -68,12 +68,16 @@ class UsecaseTestGenerator
       baseName: baseName,
     );
     for (final method in visitor.methods) {
-      final usecaseBuffer = StringBuffer();
+      final usecaseBuffer = StringBuffer()
+        ..writeln("import '${className.snakeCase}.mock.dart';");
+
       _generateMethodTest(
         buffer: usecaseBuffer,
         className: className,
         method: method,
+        writer: writer,
       );
+
       final usecaseFilePath = writer.getUsecaseTestPath(
         featureName,
         method.name,
@@ -146,7 +150,12 @@ class UsecaseTestGenerator
       );
 
     for (final method in visitor.methods) {
-      _generateMethodTest(buffer: buffer, className: className, method: method);
+      _generateMethodTest(
+        buffer: buffer,
+        className: className,
+        method: method,
+        writer: writer,
+      );
     }
   }
 
@@ -154,8 +163,21 @@ class UsecaseTestGenerator
     required StringBuffer buffer,
     required String className,
     required IFunction method,
+    required FeatureFileWriter writer,
   }) {
     final hasParams = method.params != null;
+    final featureName = writer.extractFeatureName(repoName: className);
+
+    if (featureName != null) {
+      buffer
+        ..writeln(
+          writer.getUsecaseImportStatement(
+            featureName: featureName,
+            methodName: method.name,
+          ),
+        )
+        ..writeln();
+    }
 
     buffer
       ..writeln('void main() {')

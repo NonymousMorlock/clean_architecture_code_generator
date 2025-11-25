@@ -305,6 +305,14 @@ class FeatureFileWriter {
     return "import 'package:${config.appName}/features/${featureName.snakeCase}/domain/repositories/${baseName}_repository.dart';";
   }
 
+  /// Get usecase import statement for a file
+  String getUsecaseImportStatement({
+    required String featureName,
+    required String methodName,
+  }) {
+    return "import 'package:${config.appName}/features/${featureName.snakeCase}/domain/usecases/${methodName.snakeCase}.dart';";
+  }
+
   /// Get standard imports for a remote data source file
   List<String> getRemoteDataSrcImports(String featureName, String baseName) {
     final imports = <String>[
