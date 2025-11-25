@@ -71,7 +71,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
 
     // Write to the repository implementation file
     try {
-      File(repoImplPath).writeAsStringSync(completeFile);
+      writer.writeToFile(repoImplPath, completeFile);
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $repoImplPath: $e');
     }

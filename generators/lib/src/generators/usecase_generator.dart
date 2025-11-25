@@ -88,7 +88,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
 
       // Write to the usecase file
       try {
-        File(usecasePath).writeAsStringSync(completeFile);
+        writer.writeToFile(usecasePath, completeFile);
         results.add('// Usecase ${method.name} written to: $usecasePath');
       } on Exception catch (e) {
         stderr.writeln('Warning: Could not write to $usecasePath: $e');

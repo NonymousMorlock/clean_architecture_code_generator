@@ -71,7 +71,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
 
     // Write to the actual repository file
     try {
-      File(repoPath).writeAsStringSync(completeFile);
+      writer.writeToFile(repoPath, completeFile);
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $repoPath: $e');
     }

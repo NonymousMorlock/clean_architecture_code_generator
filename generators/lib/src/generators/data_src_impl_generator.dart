@@ -69,7 +69,7 @@ class RemoteDataSrcGenerator
 
     // Write to the data source file
     try {
-      File(dataSourcePath).writeAsStringSync(completeFile);
+      writer.writeToFile(dataSourcePath, completeFile);
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $dataSourcePath: $e');
     }
