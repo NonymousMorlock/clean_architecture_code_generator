@@ -67,6 +67,12 @@ class FeatureFileWriter {
     );
   }
 
+  /// Get the feature package path
+  /// e.g., my_app/features/auth
+  String getFeaturePackagePath(String featureName) {
+    return '${config.appName}/${config.featureScaffolding.rootName}/$featureName';
+  }
+
   /// Get the domain repository file path
   /// e.g., lib/features/auth/domain/repositories/auth_repository.dart
   String getDomainRepoPath(String featureName, String baseName) {
@@ -266,7 +272,7 @@ class FeatureFileWriter {
   List<String> getRepositoryImports(String featureName, String baseName) {
     return [
       "import 'package:${config.appName}/core/typedefs.dart';",
-      "import '../entities/$baseName.dart';",
+      "import '${getFeaturePackagePath(featureName)}/domain/entities/$baseName.dart';",
     ];
   }
 
@@ -281,7 +287,7 @@ class FeatureFileWriter {
     final imports = <String>[
       "import 'package:${config.appName}/core/usecases/usecase.dart';",
       "import 'package:${config.appName}/core/typedefs.dart';",
-      "import '../repositories/${baseName}_repository.dart';",
+      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${baseName}_repository.dart';",
     ];
 
     if (hasParams) {
@@ -317,7 +323,7 @@ class FeatureFileWriter {
         (i) => "import '$i';",
       ),
       // Add model import
-      "import '../models/${baseName}_model.dart';",
+      "import '${getFeaturePackagePath(featureName)}/data/models/${baseName}_model.dart';",
     ];
 
     return imports;
@@ -330,8 +336,8 @@ class FeatureFileWriter {
       "import 'package:${config.appName}/core/errors/failures.dart';",
       "import 'package:${config.appName}/core/typedefs.dart';",
       "import 'package:dartz/dartz.dart';",
-      "import '../../domain/repositories/${baseName}_repository.dart';",
-      "import '../datasources/${baseName}_remote_data_src.dart';",
+      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${baseName}_repository.dart';",
+      "import '${getFeaturePackagePath(featureName)}/data/datasources/${baseName}_remote_data_src.dart';",
     ];
   }
 

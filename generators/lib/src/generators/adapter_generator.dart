@@ -56,6 +56,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       buffer: buffer,
       visitor: visitor,
       isMultiMode: writer.isMultiFileEnabled,
+      writer: writer,
     );
 
     // Generate States
@@ -89,6 +90,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         buffer: buffer,
         visitor: visitor,
         isMultiMode: writer.isMultiFileEnabled,
+        writer: writer,
       );
       _generateStates(
         buffer: buffer,
@@ -120,6 +122,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       visitor: visitor,
       isMultiMode: writer.isMultiFileEnabled,
       featureName: featureName,
+      writer: writer,
     );
     final adapterImports = [
       "import 'package:bloc/bloc.dart';",
@@ -181,6 +184,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     required StringBuffer buffer,
     required RepoVisitor visitor,
     required bool isMultiMode,
+    required FeatureFileWriter writer,
   }) {
     final className = visitor.className;
     final featureName = className
@@ -208,6 +212,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       visitor: visitor,
       isMultiMode: isMultiMode,
       featureName: featureName,
+      writer: writer,
     );
 
     _generateAdapterBody(buffer, visitor);
@@ -218,11 +223,15 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     required RepoVisitor visitor,
     required bool isMultiMode,
     required String featureName,
+    required FeatureFileWriter writer,
   }) {
     // Import use cases
     for (final method in visitor.methods) {
       final usecaseFile = method.name.snakeCase;
-      buffer.writeln("import '../../domain/usecases/$usecaseFile.dart';");
+      final packagePath = writer.getFeaturePackagePath(featureName);
+      buffer.writeln(
+        "import '$packagePath/domain/usecases/$usecaseFile.dart';",
+      );
     }
 
     final optionalPartComment = isMultiMode ? '' : '// ';
