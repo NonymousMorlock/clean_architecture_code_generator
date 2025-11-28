@@ -70,7 +70,7 @@ class FeatureFileWriter {
   /// Get the feature package path
   /// e.g., my_app/features/auth
   String getFeaturePackagePath(String featureName) {
-    return '${config.appName}/${config.featureScaffolding.rootName}/$featureName';
+    return '${config.appName}/${config.featureScaffolding.rootName}/${featureName.snakeCase}';
   }
 
   /// Get the domain repository file path
@@ -269,17 +269,15 @@ class FeatureFileWriter {
   }
 
   /// Get standard imports for a repository file
-  List<String> getRepositoryImports(String featureName, String baseName) {
+  List<String> getRepositoryImports(String featureName) {
     return [
       "import 'package:${config.appName}/core/typedefs.dart';",
-      "import '${getFeaturePackagePath(featureName)}/domain/entities/$baseName.dart';",
     ];
   }
 
   /// Get standard imports for a usecase file
   List<String> getUsecaseImports(
     String featureName,
-    String baseName,
     String methodName, {
     bool hasParams = false,
     bool isStream = false,
@@ -287,7 +285,7 @@ class FeatureFileWriter {
     final imports = <String>[
       "import 'package:${config.appName}/core/usecases/usecase.dart';",
       "import 'package:${config.appName}/core/typedefs.dart';",
-      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${baseName}_repository.dart';",
+      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${featureName}_repository.dart';",
     ];
 
     if (hasParams) {
@@ -316,28 +314,21 @@ class FeatureFileWriter {
   }
 
   /// Get standard imports for a remote data source file
-  List<String> getRemoteDataSrcImports(String featureName, String baseName) {
-    final imports = <String>[
-      // Add HTTP client imports based on config
-      ...config.remoteDataSourceConfig.requiredImports.map(
-        (i) => "import '$i';",
-      ),
-      // Add model import
-      "import '${getFeaturePackagePath(featureName)}/data/models/${baseName}_model.dart';",
-    ];
-
-    return imports;
+  List<String> getRemoteDataSrcImports({required String featureName}) {
+    return config.remoteDataSourceConfig.requiredImports
+        .map((i) => "import '$i';")
+        .toList();
   }
 
   /// Get standard imports for a repository implementation file
-  List<String> getRepoImplImports(String featureName, String baseName) {
+  List<String> getRepoImplImports({required String featureName}) {
     return [
       "import 'package:${config.appName}/core/errors/exceptions.dart';",
       "import 'package:${config.appName}/core/errors/failures.dart';",
       "import 'package:${config.appName}/core/typedefs.dart';",
       "import 'package:dartz/dartz.dart';",
-      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${baseName}_repository.dart';",
-      "import '${getFeaturePackagePath(featureName)}/data/datasources/${baseName}_remote_data_src.dart';",
+      "import '${getFeaturePackagePath(featureName)}/domain/repositories/${featureName}_repository.dart';",
+      "import '${getFeaturePackagePath(featureName)}/data/datasources/${featureName}_remote_data_src.dart';",
     ];
   }
 
@@ -359,6 +350,7 @@ class FeatureFileWriter {
   List<String> getSmartEntityImports({
     required Set<String> entities,
     required String currentFeature,
+    bool isModel = false,
   }) {
     if (entities.isEmpty) return [];
 
@@ -366,20 +358,24 @@ class FeatureFileWriter {
     final currentFeatureSnake = currentFeature.snakeCase;
     final rootName = config.featureScaffolding.rootName;
 
+    final layer = isModel ? 'data/models' : 'domain/entities';
+
     for (final entity in entities) {
-      final entitySnake = entity.snakeCase;
+      final entitySnake = entity.snakeCase + (isModel ? '_model' : '');
       var found = false;
 
       // DEFINE PATHS
       final pathsToCheck = [
         // 1. Current Feature Domain (Most likely)
-        '$rootName/$currentFeatureSnake/domain/entities/$entitySnake.dart',
+        '$rootName/$currentFeatureSnake/$layer/$entitySnake.dart',
         // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
-        '$rootName/$entitySnake/domain/entities/$entitySnake.dart',
+        '$rootName/$entitySnake/$layer/$entitySnake.dart',
         // 3. Core (Shared entities)
         'core/entities/$entitySnake.dart',
         // 4. Common (Shared entities)
         'common/entities/$entitySnake.dart',
+        // 4. Common (Shared entities)
+        'core/common/entities/$entitySnake.dart',
       ];
 
       for (final relativePath in pathsToCheck) {
@@ -397,7 +393,7 @@ class FeatureFileWriter {
         // it might be in a weird location. We comment it out so the
         // dev notices.
         imports.add(
-          "// import '.../domain/entities/$entitySnake.dart'; // Warning: Could not locate file for $entity",
+          "// import ${getFeaturePackagePath(currentFeatureSnake)}/$layer/$entitySnake.dart'; // Warning: Could not locate file for $entity",
         );
       }
     }
@@ -415,14 +411,39 @@ class FeatureFileWriter {
     final appName = config.appName;
     final rootName = config.featureScaffolding.rootName;
 
-    final imports = [
-      // Standard Imports
-      ...getRepoTestImports(),
-      // Current Feature Data Layer Imports
-      "import 'package:$appName/$rootName/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
-      "import 'package:$appName/$rootName/$currentFeatureSnake/data/models/${currentFeatureSnake}_model.dart';",
-      "import 'package:$appName/$rootName/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
-    ];
+    return _generateSmartImports(
+      currentFeatureSnake: currentFeatureSnake,
+      candidates: candidates,
+      standardImports: [
+        // Standard Imports
+        ...getRepoTestImports(),
+        // Current Feature Data Layer Imports
+        "import 'package:$appName/$rootName/$currentFeatureSnake/data/datasources/${currentFeatureSnake}_remote_data_source.dart';",
+        "import 'package:$appName/$rootName/$currentFeatureSnake/data/repositories/${currentFeatureSnake}_repository_impl.dart';",
+      ],
+    );
+  }
+
+  /// Generate smart imports for a repository implementation file
+  List<String> generateSmartRepoImplImports({
+    required Set<String> candidates,
+    required String featureName,
+  }) {
+    return _generateSmartImports(
+      currentFeatureSnake: featureName.snakeCase,
+      candidates: candidates,
+      standardImports: getRepoImplImports(featureName: featureName.snakeCase),
+    );
+  }
+
+  /// Generate smart imports for any layer that needs smart entity imports.
+  List<String> _generateSmartImports({
+    required Set<String> candidates,
+    required String currentFeatureSnake,
+    bool customTypeIsModel = false,
+    List<String>? standardImports,
+  }) {
+    final imports = List<String>.from(standardImports ?? []);
 
     // Dynamic Entity Imports
     if (candidates.isNotEmpty) {
@@ -430,9 +451,59 @@ class FeatureFileWriter {
         getSmartEntityImports(
           entities: candidates,
           currentFeature: currentFeatureSnake,
+          isModel: customTypeIsModel,
         ),
       );
     }
     return imports;
+  }
+
+  /// Generate smart imports for a usecase file
+  List<String> generateSmartRemoteDataSrcImports({
+    required Set<String> candidates,
+    required String featureName,
+  }) {
+    return _generateSmartImports(
+      currentFeatureSnake: featureName.snakeCase,
+      candidates: candidates,
+      customTypeIsModel: true,
+      standardImports: getRemoteDataSrcImports(
+        featureName: featureName.snakeCase,
+      ),
+    );
+  }
+
+  /// Generate smart imports for a usecase file
+  List<String> generateSmartUsecaseImports({
+    required Set<String> candidates,
+    required String featureName,
+    required String methodName,
+    bool hasParams = false,
+    bool isStream = false,
+  }) {
+    final standardImports = getUsecaseImports(
+      featureName.snakeCase,
+      methodName,
+      hasParams: hasParams,
+      isStream: isStream,
+    );
+
+    return _generateSmartImports(
+      currentFeatureSnake: featureName.snakeCase,
+      candidates: candidates,
+      standardImports: standardImports,
+    );
+  }
+
+  /// Generate smart imports for a repository file
+  List<String> generateSmartRepoImports({
+    required Set<String> candidates,
+    required String featureName,
+  }) {
+    return _generateSmartImports(
+      currentFeatureSnake: featureName.snakeCase,
+      candidates: candidates,
+      standardImports: getRepositoryImports(featureName.snakeCase),
+    );
   }
 }
