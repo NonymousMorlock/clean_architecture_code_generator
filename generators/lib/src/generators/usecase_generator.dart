@@ -9,6 +9,7 @@ import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
+import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
@@ -58,7 +59,6 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
       return buffer.toString();
     }
 
-    final baseName = writer.extractBaseName(visitor.className);
     final results = <String>[];
 
     // Generate each usecase in its own file
@@ -73,10 +73,10 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
       final needsCustomParams =
           method.params != null && method.params!.length > 1;
       final isStream = method.returnType.startsWith('Stream');
-      final imports = writer.getUsecaseImports(
-        featureName,
-        baseName,
-        method.name,
+      final imports = writer.generateSmartUsecaseImports(
+        featureName: featureName,
+        methodName: method.name,
+        candidates: Utils.discoverMethodEntities(method),
         hasParams: needsCustomParams,
         isStream: isStream,
       );
