@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
+import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/generators.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -61,7 +62,10 @@ class RemoteDataSrcGenerator
     remoteDataSource(buffer: buffer, visitor: visitor);
 
     // Generate complete file with imports
-    final imports = writer.getRemoteDataSrcImports(featureName, baseName);
+    final imports = writer.generateSmartRemoteDataSrcImports(
+      candidates: visitor.discoverRequiredEntities(),
+      featureName: featureName,
+    );
     final completeFile = writer.generateCompleteFile(
       imports: imports,
       generatedCode: buffer.toString(),
@@ -108,14 +112,38 @@ class RemoteDataSrcGenerator
       ..writeln('const $dataSrcName();')
       ..writeln();
 
-    for (final method in visitor.methods) {
-      final returnType = method.returnType.modelizeType;
+    ({
+      String asynchronyType,
+      String? params,
+      String returnType,
+      String modifier,
+    })
+    initMethodGeneration({required IFunction method}) {
+      var returnType = method.returnType.rightType;
+      if (returnType.isCustomType) returnType = returnType.modelizeType;
       final isStream = method.returnType.startsWith('Stream');
       final asynchronyType = isStream ? 'Stream' : 'Future';
-      if (method.params != null) {
-        final params = method.params!
-            .map((param) => paramToString(method, param))
-            .join(', ');
+      final params = method.params
+          ?.map((param) => paramToString(method, param))
+          .join(', ');
+      return (
+        asynchronyType: asynchronyType,
+        params: params,
+        returnType: returnType,
+        modifier: isStream ? '' : 'async',
+      );
+    }
+
+    for (final method in visitor.methods) {
+      final (
+        asynchronyType: asynchronyType,
+        params: params,
+        returnType: returnType,
+        modifier: _,
+      ) = initMethodGeneration(
+        method: method,
+      );
+      if (params != null) {
         buffer.writeln('$asynchronyType<$returnType> ${method.name}($params);');
       } else {
         buffer.writeln('$asynchronyType<$returnType> ${method.name}();');
@@ -135,14 +163,15 @@ class RemoteDataSrcGenerator
 
     buffer.writeln();
     for (final method in visitor.methods) {
-      final returnType = method.returnType.modelizeType;
-      final isStream = method.returnType.startsWith('Stream');
-      final asynchronyType = isStream ? 'Stream' : 'Future';
-      final modifier = isStream ? '' : 'async';
-      if (method.params != null) {
-        final params = method.params!
-            .map((param) => paramToString(method, param))
-            .join(', ');
+      final (
+        asynchronyType: asynchronyType,
+        params: params,
+        returnType: returnType,
+        modifier: modifier,
+      ) = initMethodGeneration(
+        method: method,
+      );
+      if (params != null) {
         buffer
           ..writeln('@override')
           ..writeln(
