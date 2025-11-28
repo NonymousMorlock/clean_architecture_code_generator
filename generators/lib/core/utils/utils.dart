@@ -1,5 +1,7 @@
+import 'package:generators/generators.dart';
+
 /// Utility class for code generation helpers.
-abstract class Utils {
+sealed class Utils {
   /// Private constructor to prevent instantiation.
   const Utils();
 
@@ -21,5 +23,26 @@ abstract class Utils {
         '\n',
       );
     }
+  }
+
+  /// Discovers entity candidates used in a repository method.
+  ///
+  /// Scans the return type and parameters of the method to identify
+  /// potential entity dependencies.
+  //// Returns a set of entity names as strings.
+  static Set<String> discoverMethodEntities(IFunction method) {
+    final candidates = <String>{}
+      // 1. Scan Return Type (e.g. Future<Either<Failure, List<User>>>)
+      // This will automatically strip Future, discard Failure,
+      // strip List, and find "User"
+      ..addAll(method.returnType.entityCandidates);
+
+    // 2. Scan Parameters (e.g. method(User params))
+    if (method.params != null) {
+      for (final param in method.params!) {
+        candidates.addAll(param.type.entityCandidates);
+      }
+    }
+    return candidates;
   }
 }
