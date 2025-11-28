@@ -7,6 +7,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/core/services/functions.dart';
@@ -63,7 +64,10 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     repo(buffer, visitor);
 
     // Generate complete file with imports
-    final imports = writer.getRepositoryImports(featureName, baseName);
+    final imports = writer.generateSmartRepoImports(
+      featureName: featureName,
+      candidates: visitor.discoverRequiredEntities(),
+    );
     final completeFile = writer.generateCompleteFile(
       imports: imports,
       generatedCode: buffer.toString(),
