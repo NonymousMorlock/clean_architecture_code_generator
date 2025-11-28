@@ -211,8 +211,8 @@ extension StringExt on String {
   /// * `Map<String, int>` -> Returns `String, int`
   /// * `Stream<Either<Failure, List<Object>>>` ->
   /// `Either<Failure, List<Object>>`
-  String? get innerType {
-    return _rawContentInsideBrackets;
+  String get innerType {
+    return _rawContentInsideBrackets ?? this;
   }
 
   /// Recursively unwraps `Future`, `Stream`, and extracts the Right
