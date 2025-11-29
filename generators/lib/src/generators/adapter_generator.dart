@@ -548,9 +548,9 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       var paramName = 'data';
       if (returnType.isCustomType) {
         if (returnType.toLowerCase().startsWith('list<')) {
-          paramName = '${returnType.innerType.camelCase}List';
+          paramName = '${returnType.innerType.lowerCamelCase}List';
         } else {
-          paramName = returnType.innerType.camelCase;
+          paramName = returnType.innerType.lowerCamelCase;
         }
       }
 
