@@ -71,6 +71,68 @@ sealed class EnglishMorphology {
     return '${verb}ed';
   }
 
+  // ===========================================================================
+  // PLURALIZATION ENGINE
+  // ===========================================================================
+
+  static final Map<String, String> _irregularPlurals = {
+    'person': 'people',
+    'child': 'children',
+    'man': 'men',
+    'woman': 'women',
+    'foot': 'feet',
+    'tooth': 'teeth',
+    'mouse': 'mice',
+    'goose': 'geese',
+    'datum': 'data',
+    'index': 'indices',
+    'analysis': 'analyses',
+    'criterion': 'criteria',
+    'leaf': 'leaves',
+    'life': 'lives',
+    'knife': 'knives',
+    'shelf': 'shelves',
+    'quiz': 'quizzes',
+    'auth': 'Auths', // Technical safety
+  };
+
+  /// Converts a singular noun to its plural form.
+  /// category -> categories, box -> boxes, user -> users
+  static String pluralize(String noun) {
+    final lower = noun.toLowerCase();
+
+    // 1. Check Irregulars
+    if (_irregularPlurals.containsKey(lower)) {
+      // Preserve original casing logic (Title Case usually)
+      final irregular = _irregularPlurals[lower]!;
+      return noun[0] == noun[0].toUpperCase()
+          ? '${irregular[0].toUpperCase()}${irregular.substring(1)}'
+          : irregular;
+    }
+
+    // 2. Handle "Y" endings (Consonant + Y -> ies)
+    // Category -> Categories, but Play -> Plays
+    if (lower.endsWith('y')) {
+      if (_endsWithVowelY(lower)) {
+        return '${noun}s';
+      }
+      return '${noun.substring(0, noun.length - 1)}ies';
+    }
+
+    // 3. Handle Sibilants (s, sh, ch, x, z) -> es
+    // Box -> Boxes, Bus -> Buses, Search -> Searches
+    if (lower.endsWith('s') ||
+        lower.endsWith('sh') ||
+        lower.endsWith('ch') ||
+        lower.endsWith('x') ||
+        lower.endsWith('z')) {
+      return '${noun}es';
+    }
+
+    // 4. Default
+    return '${noun}s';
+  }
+
   /// Checks if word ends in Vowel + Y (e.g., play, destroy)
   static bool _endsWithVowelY(String word) {
     if (word.length < 2) return false;

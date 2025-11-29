@@ -39,10 +39,25 @@ class StateNameGenerator {
     'login': 'LoggedIn',
     'logout': 'LoggedOut',
     'signin': 'SignedIn',
-    'signIn': 'SignedIn',
     'signup': 'SignedUp',
-    'signUp': 'SignedUp',
     'register': 'Registered',
+    'setup': 'SetupCompleted', // or just 'Setup' depending on preference, idk
+    'checkout': 'CheckedOut',
+    'backup': 'BackedUp',
+  };
+
+  // Known Phrasal Verbs (CamelCase splits these, we want to merge them)
+  static const Set<String> _compoundVerbs = {
+    'signup',
+    'signin',
+    'login',
+    'logout',
+    'setup',
+    'startup',
+    'shutdown',
+    'checkout',
+    'backup',
+    'restore',
   };
 
   /// Generates the success state class name.
@@ -60,9 +75,23 @@ class StateNameGenerator {
   }) {
     // 1. Tokenize (CamelCase Split)
     // e.g., 'getFeaturedProducts' -> ['get', 'Featured', 'Products']
-    final tokens = _splitCamelCase(methodName);
+    var tokens = _splitCamelCase(methodName);
     // Ultimate fallback
     if (tokens.isEmpty) return '${featureName}Success';
+
+    // ---------------------------------------------------------
+    // STEP 1.5: PHRASAL VERB MERGE (The Fix for "UpSigned")
+    // ---------------------------------------------------------
+    if (tokens.length >= 2) {
+      final potentialCompound = '${tokens[0]}${tokens[1]}'.toLowerCase();
+
+      if (_compoundVerbs.contains(potentialCompound)) {
+        // Merge the first two tokens:
+        // ['sign', 'Up', 'User'] -> ['signup', 'User']
+        final remaining = tokens.length > 2 ? tokens.sublist(2) : <String>[];
+        tokens = [potentialCompound, ...remaining];
+      }
+    }
 
     final verb = tokens.first.toLowerCase();
 
@@ -109,11 +138,8 @@ class StateNameGenerator {
     // If the subject is just the FeatureName (e.g. 'User') but
     // return type is List, make it 'Users'
     if (returnType != null && returnType.toLowerCase().startsWith('list')) {
-      if (!subject.endsWith('s')) {
-        // Simple pluralization.
-        // We could use a morphology engine for plurals too,
-        // but 's' covers 95% of generic models.
-        subject = '${subject}s';
+      if (!subject.toLowerCase().endsWith('s')) {
+        subject = EnglishMorphology.pluralize(subject);
       }
     }
 
