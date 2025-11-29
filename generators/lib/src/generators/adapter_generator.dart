@@ -582,9 +582,15 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     if (returnType.toLowerCase().trim() == 'void') {
       buffer.writeln('  const $stateName();');
     } else {
-      final paramName = returnType.toLowerCase().startsWith('list')
-          ? 'data'
-          : returnType.camelCase;
+      var paramName = 'data';
+      if (returnType.isCustomType) {
+        if (returnType.toLowerCase().startsWith('list<')) {
+          paramName = '${returnType.innerType.camelCase}List';
+        } else {
+          paramName = returnType.innerType.camelCase;
+        }
+      }
+
       buffer
         ..writeln('  const $stateName(this.$paramName);')
         ..writeln()
