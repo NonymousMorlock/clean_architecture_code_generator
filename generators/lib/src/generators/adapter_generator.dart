@@ -187,17 +187,19 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     required FeatureFileWriter writer,
   }) {
     final className = visitor.className;
-    final featureName = className
+    final baseName = className
         .replaceAll('CubitTBG', '')
         .replaceAll('Cubit', '')
         .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '');
+        .replaceAll('Adapter', '')
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
 
     buffer
       ..writeln(
         '// **************************************************************************',
       )
-      ..writeln('// AdapterGenerator - $featureName Adapter')
+      ..writeln('// AdapterGenerator - $baseName Adapter')
       ..writeln(
         '// **************************************************************************',
       )
@@ -211,7 +213,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       buffer: buffer,
       visitor: visitor,
       isMultiMode: isMultiMode,
-      featureName: featureName,
+      featureName: baseName,
       writer: writer,
     );
 
@@ -245,13 +247,15 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
   void _generateAdapterBody(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
-    final featureName = className
+    final baseName = className
         .replaceAll('CubitTBG', '')
         .replaceAll('Cubit', '')
         .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '');
-    final adapterName = '${featureName}Adapter';
-    final stateName = '${featureName}State';
+        .replaceAll('Adapter', '')
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
+    final adapterName = '${baseName}Adapter';
+    final stateName = '${baseName}State';
 
     buffer
       ..writeln('class $adapterName extends Cubit<$stateName> {')
@@ -275,7 +279,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     }
 
     buffer
-      ..writeln('       super(const ${featureName}Initial());')
+      ..writeln('       super(const ${baseName}Initial());')
       ..writeln();
 
     // Add private fields
@@ -289,7 +293,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
     // Generate methods for each use case
     for (final method in visitor.methods) {
-      _generateAdapterMethod(buffer, method, featureName);
+      _generateAdapterMethod(buffer, method, baseName);
     }
 
     buffer
@@ -451,17 +455,19 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     required bool isMultiMode,
   }) {
     final className = visitor.className;
-    final featureName = className
+    final baseName = className
         .replaceAll('CubitTBG', '')
         .replaceAll('Cubit', '')
         .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '');
+        .replaceAll('Adapter', '')
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
 
     buffer
       ..writeln(
         '// **************************************************************************',
       )
-      ..writeln('// StateGenerator - $featureName States')
+      ..writeln('// StateGenerator - $baseName States')
       ..writeln(
         '// **************************************************************************',
       )
@@ -470,7 +476,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     _generateStatesImport(
       buffer: buffer,
       isMultiMode: isMultiMode,
-      featureName: featureName,
+      featureName: baseName,
     );
     _generateStatesBody(buffer, visitor);
   }
@@ -489,12 +495,14 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
   void _generateStatesBody(StringBuffer buffer, RepoVisitor visitor) {
     final className = visitor.className;
-    final featureName = className
+    final baseName = className
         .replaceAll('CubitTBG', '')
         .replaceAll('Cubit', '')
         .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '');
-    final stateName = '${featureName}State';
+        .replaceAll('Adapter', '')
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
+    final stateName = '${baseName}State';
 
     buffer
       ..writeln('sealed class $stateName extends Equatable {')
@@ -505,31 +513,13 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       ..writeln('}')
       ..writeln()
       // Initial state
-      ..writeln('final class ${featureName}Initial extends $stateName {')
-      ..writeln('  const ${featureName}Initial();')
+      ..writeln('final class ${baseName}Initial extends $stateName {')
+      ..writeln('  const ${baseName}Initial();')
       ..writeln('}')
       ..writeln()
       // Loading states
-      ..writeln('final class ${featureName}Loading extends $stateName {')
-      ..writeln('  const ${featureName}Loading();')
-      ..writeln('}')
-      ..writeln()
-      ..writeln(
-        'final class FirstPageLoading extends ${featureName}Loading {',
-      )
-      ..writeln('  const FirstPageLoading();')
-      ..writeln('}')
-      ..writeln()
-      ..writeln(
-        'final class Fetching$featureName extends ${featureName}Loading {',
-      )
-      ..writeln('  const Fetching$featureName();')
-      ..writeln('}')
-      ..writeln()
-      ..writeln(
-        'final class Updating$featureName extends ${featureName}Loading {',
-      )
-      ..writeln('  const Updating$featureName();')
+      ..writeln('final class ${baseName}Loading extends $stateName {')
+      ..writeln('  const ${baseName}Loading();')
       ..writeln('}')
       ..writeln();
 
@@ -552,13 +542,13 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
     // Error state
     buffer
-      ..writeln('final class ${featureName}Error extends $stateName {')
+      ..writeln('final class ${baseName}Error extends $stateName {')
       ..writeln(
-        '  const ${featureName}Error({required this.message, '
+        '  const ${baseName}Error({required this.message, '
         'required this.title});',
       )
       ..writeln()
-      ..writeln('  ${featureName}Error.fromFailure(Failure failure)')
+      ..writeln('  ${baseName}Error.fromFailure(Failure failure)')
       ..writeln(
         "    : this(message: failure.message, title: 'Error "
         r"${failure.statusCode}');",
