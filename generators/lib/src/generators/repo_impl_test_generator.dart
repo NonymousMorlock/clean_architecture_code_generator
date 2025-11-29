@@ -56,8 +56,7 @@ class RepoImplTestGenerator
       return buffer.toString();
     }
 
-    final baseName = writer.extractBaseName(visitor.className);
-    final testPath = writer.getRepoImplTestPath(featureName, baseName);
+    final testPath = writer.getRepoImplTestPath(featureName);
 
     // Generate test code
     final buffer = StringBuffer();
