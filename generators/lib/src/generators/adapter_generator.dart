@@ -102,21 +102,11 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       return buffer.toString();
     }
 
-    final className = visitor.className;
-    final baseName = className
-        .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '')
-        .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '')
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-
     // Generate adapter file
     final adapterBuffer = StringBuffer();
     _generateAdapterBody(adapterBuffer, visitor);
 
-    final adapterPath =
-        '${writer.getFeatureRoot(featureName)}/presentation/adapter/${baseName.snakeCase}_adapter.dart';
+    final adapterPath = writer.getInterfaceAdapterPath(featureName);
 
     final importsBuffer = StringBuffer();
     _generateAdapterImports(
@@ -147,8 +137,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     stateBuffer.writeln();
     _generateStatesBody(stateBuffer, visitor);
 
-    final statePath =
-        '${writer.getFeatureRoot(featureName)}/presentation/adapter/${baseName.snakeCase}_state.dart';
+    final statePath = writer.getInterfaceAdapterPath(featureName);
 
     final completeState = writer.generateCompleteFile(
       generatedCode: stateBuffer.toString(),
@@ -160,19 +149,15 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       ..writeln('[AdapterGenerator] Writing state to: $statePath');
 
     try {
-      File(adapterPath)
-        ..createSync(recursive: true)
-        ..writeAsStringSync(completeAdapter);
-
-      File(statePath)
-        ..createSync(recursive: true)
-        ..writeAsStringSync(completeState);
+      writer
+        ..writeToFile(adapterPath, completeAdapter)
+        ..writeToFile(statePath, completeState);
 
       stdout.writeln('[AdapterGenerator] Successfully wrote files');
-    } on Exception catch (e) {
+    } on Exception catch (e, s) {
       stderr
         ..writeln('[AdapterGenerator] ERROR: Could not write adapter files: $e')
-        ..writeln('[AdapterGenerator] Stack trace: ${StackTrace.current}');
+        ..writeln('[AdapterGenerator] Stack trace: $s');
     }
 
     // Return minimal marker for .g.dart file
