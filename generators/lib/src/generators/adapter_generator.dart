@@ -570,25 +570,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       ..writeln('  @override')
       ..writeln('  List<String> get props => [message, title];')
       ..writeln('}')
-      ..writeln()
-      // Specialized error states
-      ..writeln(
-        'final class Paginated${featureName}sFetchError extends '
-        '${featureName}Error {',
-      )
-      ..writeln('  const Paginated${featureName}sFetchError({')
-      ..writeln('    required super.message,')
-      ..writeln('    required super.title,')
-      ..writeln('  });')
-      ..writeln()
-      ..writeln(
-        '  Paginated${featureName}sFetchError.fromFailure(Failure failure)',
-      )
-      ..writeln(
-        "    : this(message: failure.message, title: 'Error "
-        r"${failure.statusCode}');",
-      )
-      ..writeln('}');
+      ..writeln();
   }
 
   void _generateSuccessStateClass(
