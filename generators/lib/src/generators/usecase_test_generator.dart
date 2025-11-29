@@ -71,7 +71,15 @@ class UsecaseTestGenerator
       final usecaseBuffer = StringBuffer()
         ..writeln("import '${className.snakeCase}.mock.dart';");
 
-      _generateMethodTest(
+      final candidates = Utils.discoverMethodEntities(method);
+      writer
+          .getSmartEntityImports(
+            entities: candidates,
+            currentFeature: featureName,
+          )
+          .forEach(usecaseBuffer.writeln);
+
+      _generateUsecaseTestFromMethod(
         buffer: usecaseBuffer,
         className: className,
         method: method,
@@ -150,7 +158,7 @@ class UsecaseTestGenerator
       );
 
     for (final method in visitor.methods) {
-      _generateMethodTest(
+      _generateUsecaseTestFromMethod(
         buffer: buffer,
         className: className,
         method: method,
@@ -159,7 +167,7 @@ class UsecaseTestGenerator
     }
   }
 
-  void _generateMethodTest({
+  void _generateUsecaseTestFromMethod({
     required StringBuffer buffer,
     required String className,
     required IFunction method,
