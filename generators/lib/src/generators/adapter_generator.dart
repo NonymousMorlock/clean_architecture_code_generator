@@ -10,6 +10,7 @@ import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
+import 'package:generators/src/generators/state_name_generator.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
@@ -399,10 +400,10 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       );
 
     // Generate success state based on method name and return type
-    final successState = _generateSuccessState(
-      methodName,
-      returnType,
-      featureName,
+    final successState = StateNameGenerator.generate(
+      methodName: methodName,
+      featureName: featureName,
+      returnType: returnType,
     );
     if (returnType.toLowerCase().trim() == 'void') {
       buffer.writeln('      (_) => emit(const $successState()),');
@@ -417,44 +418,6 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       ..writeln('    );')
       ..writeln('  }')
       ..writeln();
-  }
-
-  String _generateSuccessState(
-    String methodName,
-    String returnType,
-    String featureName,
-  ) {
-    final method = methodName.toLowerCase();
-
-    if (method.contains('create')) {
-      return '${featureName}Created';
-    } else if (method.contains('delete')) {
-      return '${featureName}Deleted';
-    } else if (method.contains('update')) {
-      return '${featureName}Updated';
-    } else if (method.contains('restore')) {
-      return '${featureName}Restored';
-    } else if (method.contains('feature')) {
-      return '${featureName}Featured';
-    } else if (method.contains('unfeature')) {
-      return '${featureName}Unfeatured';
-    } else if (method.contains('replace')) {
-      return '${featureName}Replaced';
-    } else if (method.contains('add') && method.contains('image')) {
-      return 'ImagesAddedToGallery';
-    } else if (method.contains('remove') && method.contains('image')) {
-      return 'ImagesRemovedFromGallery';
-    } else if (method.contains('reorder') && method.contains('image')) {
-      return 'ImagesReorderedInGallery';
-    } else if (method.contains('count')) {
-      return '${featureName}CountsLoaded';
-    } else if (method.contains('recent')) {
-      return 'RecentlyUpdated${featureName}sLoaded';
-    } else if (returnType.toLowerCase().startsWith('list')) {
-      return '${featureName}sLoaded';
-    } else {
-      return '${featureName}Loaded';
-    }
   }
 
   void _generateStates({
@@ -536,10 +499,10 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
-      final successState = _generateSuccessState(
-        method.name,
-        returnType,
-        featureName,
+      final successState = StateNameGenerator.generate(
+        methodName: method.name,
+        featureName: baseName,
+        returnType: returnType,
       );
 
       if (!generatedStates.contains(successState)) {
