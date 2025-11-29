@@ -119,14 +119,44 @@ class FeatureFileWriter {
 
   /// Get the test file path for repository implementation
   /// e.g., test/features/auth/data/repositories/auth_repository_impl_test.dart
-  String getRepoImplTestPath(String featureName, String baseName) {
+  String getRepoImplTestPath(String featureName) {
     return path.join(
       'test',
       config.featureScaffolding.rootName,
       featureName,
       'data',
       'repositories',
-      '${baseName}_repository_impl_test.dart',
+      '${featureName}_repository_impl_test.dart',
+    );
+  }
+
+  /// Get the interface adapter directory path
+  /// e.g., lib/features/auth/presentation/adapters/
+  String getInterfaceAdapterDirPath(String featureName) {
+    return path.join(
+      getFeatureRoot(featureName),
+      'presentation',
+      'adapters',
+    );
+  }
+
+  /// Get the interface adapter file path
+  ///
+  /// e.g., lib/features/auth/presentation/adapters/auth_adapter.dart
+  String getInterfaceAdapterPath(String featureName) {
+    return path.join(
+      getInterfaceAdapterDirPath(featureName),
+      '${featureName}_adapter.dart',
+    );
+  }
+
+  /// Get the interface adapter state file path
+  ///
+  /// e.g., lib/features/auth/presentation/adapters/auth_state.dart
+  String getInterfaceAdapterStatePath(String featureName) {
+    return path.join(
+      getInterfaceAdapterDirPath(featureName),
+      '${featureName}_state.dart',
     );
   }
 
@@ -160,6 +190,21 @@ class FeatureFileWriter {
       'domain',
       'usecases',
       '${methodName.snakeCase}_test.dart',
+    );
+  }
+
+  /// Get the entity file path
+  ///
+  /// e.g., lib/features/auth/domain/entities/user.dart
+  String getEntityPath({
+    required String featureName,
+    required String entityName,
+  }) {
+    return path.join(
+      getFeatureRoot(featureName),
+      'domain',
+      'entities',
+      '${entityName.snakeCase}.dart',
     );
   }
 
@@ -388,6 +433,16 @@ class FeatureFileWriter {
       }
 
       if (!found) {
+        final featureConfig =
+            config.featureScaffolding.features[currentFeature.snakeCase];
+        if (featureConfig != null &&
+            featureConfig.entities.contains(entity.snakeCase)) {
+          final relativePath =
+              '$rootName/$currentFeatureSnake/$layer/$entitySnake.dart';
+          imports.add("import 'package:${config.appName}/$relativePath';");
+
+          continue;
+        }
         // Fallback: If we identified it as a candidate but couldn't find
         // the file,
         // it might be in a weird location. We comment it out so the
