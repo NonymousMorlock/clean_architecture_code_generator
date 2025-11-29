@@ -106,15 +106,17 @@ feature_scaffolding:
   root_name: features          # Root folder for features. e.g., 'features' or 'modules' or 'src'
   enabled: false                  # Pre-generate files when running 'create -t feature'
   features:                       # Define features and their methods for scaffolding
-#    auth:
-#      methods:
-#        - register
-#        - login
-#        - logout
-#        - verify_token
+    auth:
+      methods:
+        - register
+        - login
+        - logout
+        - verify_token
+      entities:
+        - user
 #      data_file_name: auth        # Optional: override default file naming
-#    user:
-#      methods:
-#        - get_profile
-#        - update_profile
-#        - delete_account
+    user:
+      methods:
+        - get_profile
+        - update_profile
+        - delete_account

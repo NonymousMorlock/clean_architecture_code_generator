@@ -688,20 +688,27 @@ class FeatureDefinition {
   /// Creates a [FeatureDefinition] with the given methods and data file name.
   const FeatureDefinition({
     this.methods = const [],
+    this.entities = const [],
     this.dataFileName,
   });
 
   /// Creates a [FeatureDefinition] from a map of configuration values.
   factory FeatureDefinition.fromMap(Map<dynamic, dynamic> map) {
     final methodsList = map['methods'] as List<dynamic>? ?? [];
+    final entitiesList = map['entities'] as List<dynamic>? ?? [];
+
     return FeatureDefinition(
       methods: methodsList.map((e) => e.toString()).toList(),
+      entities: entitiesList.map((e) => e.toString()).toList(),
       dataFileName: map['data_file_name'] as String?,
     );
   }
 
   /// List of method names for this feature.
   final List<String> methods;
+
+  /// List of entity names for this feature.
+  final List<String> entities;
 
   /// Optional custom data file name.
   final String? dataFileName;
@@ -710,7 +717,17 @@ class FeatureDefinition {
   Map<String, dynamic> toMap() {
     return {
       'methods': methods,
+      'entities': entities,
       if (dataFileName != null) 'data_file_name': dataFileName,
     };
+  }
+
+  @override
+  String toString() {
+    return 'FeatureDefinition{'
+        'methods: $methods, '
+        'entities: $entities, '
+        'dataFileName: $dataFileName'
+        '}';
   }
 }
