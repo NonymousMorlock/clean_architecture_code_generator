@@ -34,14 +34,14 @@ class ModelVisitor extends SimpleElementVisitor<void> {
       fields[param.name] = typeStr;
       final isRequired = param.isRequiredNamed || param.isRequiredPositional;
 
-      fieldProperties[param.name.camelCase] = Field.fromMap({
-        'name': param.name.camelCase,
-        'required': isRequired,
+      fieldProperties[param.name.camelCase] = Field(
+        name: param.name.camelCase,
+        isRequired: isRequired,
         // For parameters, "initialized" usually implies having a default value
-        'initialized': param.hasDefaultValue,
+        isInitialized: param.hasDefaultValue,
         // Use the parameter's location, or fall back to the library source
-        'filePath': '${element.library.source.fullName};'.trim(),
-      });
+        filePath: '${element.library.source.fullName};'.trim(),
+      );
     }
   }
 }
