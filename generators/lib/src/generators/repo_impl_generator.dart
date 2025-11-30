@@ -76,12 +76,13 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     // Write to the repository implementation file
     try {
       writer.writeToFile(repoImplPath, completeFile);
+      // Return a minimal marker for the .g.dart file
+      return '// Repository implementation written to: $repoImplPath\n';
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $repoImplPath: $e');
+      return '// Error: Could not write repository implementation to file.\n:'
+          ' $e\n';
     }
-
-    // Return a minimal marker for the .g.dart file
-    return '// Repository implementation written to: $repoImplPath\n';
   }
 
   /// Generates the repository implementation class.

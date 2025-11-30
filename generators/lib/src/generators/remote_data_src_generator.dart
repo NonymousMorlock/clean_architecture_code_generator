@@ -74,12 +74,12 @@ class RemoteDataSrcGenerator
     // Write to the data source file
     try {
       writer.writeToFile(dataSourcePath, completeFile);
+      // Return a minimal marker for the .g.dart file
+      return '// Remote data source written to: $dataSourcePath\n';
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $dataSourcePath: $e');
+      return '// Error: Could not write to $dataSourcePath: $e\n';
     }
-
-    // Return a minimal marker for the .g.dart file
-    return '// Remote data source written to: $dataSourcePath\n';
   }
 
   /// Generates the remote data source interface and implementation.

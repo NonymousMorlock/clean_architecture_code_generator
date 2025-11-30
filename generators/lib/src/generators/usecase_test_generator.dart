@@ -67,6 +67,9 @@ class UsecaseTestGenerator
       featureName: featureName,
       baseName: baseName,
     );
+
+    final results = <String>[];
+
     for (final method in visitor.methods) {
       final usecaseBuffer = StringBuffer()
         ..writeln("import '${className.snakeCase}.mock.dart';");
@@ -92,11 +95,15 @@ class UsecaseTestGenerator
       );
       try {
         writer.writeToFile(usecaseFilePath, usecaseBuffer.toString());
+        results.add(
+          '// Usecase test ${method.name} written to: $usecaseFilePath',
+        );
       } on Exception catch (e) {
         stderr.writeln('Warning: Could not write to $usecaseFilePath: $e');
+        results.add('// Error writing usecase test ${method.name}: $e\n');
       }
     }
-    return '';
+    return '${results.join('\n')}\n';
   }
 
   void _writeMockFile({

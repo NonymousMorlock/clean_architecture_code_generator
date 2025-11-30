@@ -68,12 +68,12 @@ class RepoImplTestGenerator
     // Write to the test file
     try {
       writer.writeToFile(testPath, buffer.toString());
+      // Return a minimal marker for the .g.dart file
+      return '// Repository implementation test written to: $testPath\n';
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $testPath: $e');
+      return '// Error: Could not write to $testPath\n: $e\n';
     }
-
-    // Return a minimal marker for the .g.dart file
-    return '// Repository implementation test written to: $testPath\n';
   }
 
   void _generateRepoImplTest({

@@ -154,17 +154,17 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         ..writeToFile(statePath, completeState);
 
       stdout.writeln('[AdapterGenerator] Successfully wrote files');
+      // Return minimal marker for .g.dart file
+      return '''
+// Adapter written to: $adapterPath
+// State written to: $statePath
+''';
     } on Exception catch (e, s) {
       stderr
         ..writeln('[AdapterGenerator] ERROR: Could not write adapter files: $e')
         ..writeln('[AdapterGenerator] Stack trace: $s');
+      return '// ERROR: Could not write adapter files: $e';
     }
-
-    // Return minimal marker for .g.dart file
-    return '''
-// Adapter written to: $adapterPath
-// State written to: $statePath
-''';
   }
 
   void _generateAdapter({

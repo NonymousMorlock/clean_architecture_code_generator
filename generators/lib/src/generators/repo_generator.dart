@@ -76,12 +76,12 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     // Write to the actual repository file
     try {
       writer.writeToFile(repoPath, completeFile);
+      // Return a minimal marker for the .g.dart file
+      return '// Repository interface written to: $repoPath\n';
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $repoPath: $e');
+      return '// Error: Could not write to $repoPath: $e\n';
     }
-
-    // Return a minimal marker for the .g.dart file
-    return '// Repository interface written to: $repoPath\n';
   }
 
   /// Generates the repository interface.
