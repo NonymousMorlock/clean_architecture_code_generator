@@ -7,6 +7,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/model_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
@@ -94,7 +95,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
         visitor: visitor,
         writer: writer,
         normalisedName: normalisedName,
-        associatedFeatureName: associatedFeatureName,
+        associatedFeatureName: associatedFeatureName!,
       );
     }
 
@@ -110,12 +111,21 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     required ModelVisitor visitor,
     required FeatureFileWriter writer,
     required String normalisedName,
-    required String? associatedFeatureName,
+    required String associatedFeatureName,
   }) {
     final buffer = StringBuffer()
       ..writeln(
         "import 'package:equatable/equatable.dart';",
       );
+
+    // For compositions in the entity, we need to import all custom entities
+    writer
+        .getSmartEntityImports(
+          entities: visitor.discoverRequiredEntities(),
+          currentFeature: associatedFeatureName,
+        )
+        .forEach(buffer.writeln);
+
     _generateEntityClass(
       buffer: buffer,
       visitor: visitor,
@@ -123,7 +133,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     );
 
     final entityPath = writer.getEntityPath(
-      featureName: associatedFeatureName!,
+      featureName: associatedFeatureName,
       entityName: normalisedName,
     );
 
@@ -135,7 +145,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     } on Exception catch (e, s) {
       stderr
         ..writeln(
-          '[EntityGenerator] ERROR: Could not write adapter files: $e',
+          '[EntityGenerator] ERROR: Could not write entity files: $e',
         )
         ..writeln('[EntityGenerator] Stack trace: $s');
       return '// Error: Could not write entity class to file: $e\n';
