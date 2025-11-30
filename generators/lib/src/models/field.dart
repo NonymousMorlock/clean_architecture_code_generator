@@ -5,7 +5,8 @@ import 'package:generators/src/visitors/model_visitor.dart';
 /// Contains information about the field's name, initialization state,
 /// requirement status, and source file path.
 class Field {
-  const Field._({
+  /// Creates a [Field] with the given properties.
+  const Field({
     required this.name,
     required this.isInitialized,
     required this.isRequired,
@@ -19,7 +20,7 @@ class Field {
   /// - `initialized`: Whether the field is initialized (bool)
   /// - `required`: Whether the field is required (bool)
   /// - `filePath`: The source file path (String)
-  factory Field.fromMap(DataMap map) => Field._(
+  factory Field.fromMap(DataMap map) => Field(
     name: map['name'] as String,
     isInitialized: map['initialized'] as bool,
     isRequired: map['required'] as bool,
