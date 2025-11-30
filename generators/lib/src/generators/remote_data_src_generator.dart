@@ -31,7 +31,7 @@ class RemoteDataSrcGenerator
     final writer = FeatureFileWriter(config, buildStep);
 
     if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer, buildStep, config);
+      return _generateMultiFile(visitor, writer, config);
     }
 
     // Default behavior: generate to .g.dart
@@ -43,7 +43,6 @@ class RemoteDataSrcGenerator
   String _generateMultiFile(
     RepoVisitor visitor,
     FeatureFileWriter writer,
-    BuildStep buildStep,
     GeneratorConfig config,
   ) {
     final featureName = writer.extractFeatureName(repoName: visitor.className);

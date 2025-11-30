@@ -33,7 +33,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
     final writer = FeatureFileWriter(config, buildStep);
 
     if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer, buildStep);
+      return _generateMultiFile(visitor, writer);
     }
 
     // Default behavior: generate all usecases to .g.dart
@@ -47,7 +47,6 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
   String _generateMultiFile(
     RepoVisitor visitor,
     FeatureFileWriter writer,
-    BuildStep buildStep,
   ) {
     final featureName = writer.extractFeatureName(repoName: visitor.className);
     if (featureName == null) {

@@ -34,7 +34,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
     final writer = FeatureFileWriter(config, buildStep);
 
     if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer, buildStep);
+      return _generateMultiFile(visitor, writer);
     }
 
     // Default behavior: generate to .g.dart
@@ -46,7 +46,6 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
   String _generateMultiFile(
     RepoVisitor visitor,
     FeatureFileWriter writer,
-    BuildStep buildStep,
   ) {
     final featureName = writer.extractFeatureName(repoName: visitor.className);
     if (featureName == null) {
