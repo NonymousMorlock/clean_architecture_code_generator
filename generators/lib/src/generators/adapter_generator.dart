@@ -137,7 +137,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     stateBuffer.writeln();
     _generateStatesBody(stateBuffer, visitor);
 
-    final statePath = writer.getInterfaceAdapterPath(featureName);
+    final statePath = writer.getInterfaceAdapterStatePath(featureName);
 
     final completeState = writer.generateCompleteFile(
       generatedCode: stateBuffer.toString(),
