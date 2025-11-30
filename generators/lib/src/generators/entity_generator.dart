@@ -63,14 +63,14 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     String? associatedFeatureName;
 
     // Normalize the class name: UserTBG -> User -> user
-    final normalizedName = visitor.className
+    final normalisedName = visitor.className
         .replaceAll('TBG', '')
         .replaceAll('Model', '');
 
     for (final featureEntry in config.featureScaffolding.features.entries) {
       final featureName = featureEntry.key;
       final definition = featureEntry.value;
-      if (definition.entities.contains(normalizedName.toLowerCase())) {
+      if (definition.entities.contains(normalisedName.toLowerCase())) {
         associatedFeatureName = featureName;
         break;
       }
@@ -79,7 +79,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     if (associatedFeatureName == null) {
       stderr.writeln(
         '[EntityGenerator] Warning: No associated feature found for entity '
-        '$normalizedName. Generated entity will not be placed in a '
+        '$normalisedName. Generated entity will not be placed in a '
         'feature-specific directory.',
       );
       ignoreMultiFileCheck = true;
@@ -93,7 +93,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       return _generateMultiFile(
         visitor: visitor,
         writer: writer,
-        normalizedName: normalizedName,
+        normalisedName: normalisedName,
         associatedFeatureName: associatedFeatureName,
       );
     }
@@ -101,7 +101,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     _generateEntityClass(
       buffer: buffer,
       visitor: visitor,
-      className: normalizedName,
+      className: normalisedName,
     );
     return buffer.toString();
   }
@@ -109,7 +109,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
   String _generateMultiFile({
     required ModelVisitor visitor,
     required FeatureFileWriter writer,
-    required String normalizedName,
+    required String normalisedName,
     required String? associatedFeatureName,
   }) {
     final buffer = StringBuffer()
@@ -119,12 +119,12 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     _generateEntityClass(
       buffer: buffer,
       visitor: visitor,
-      className: normalizedName,
+      className: normalisedName,
     );
 
     final entityPath = writer.getEntityPath(
       featureName: associatedFeatureName!,
-      entityName: normalizedName,
+      entityName: normalisedName,
     );
 
     try {
