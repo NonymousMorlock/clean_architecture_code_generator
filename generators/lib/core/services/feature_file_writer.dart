@@ -208,6 +208,21 @@ class FeatureFileWriter {
     );
   }
 
+  /// Get the model file path
+  ///
+  /// e.g., lib/features/auth/data/models/user_model.dart
+  String getModelPath({
+    required String featureName,
+    required String entityName,
+  }) {
+    return path.join(
+      getFeatureRoot(featureName),
+      'data',
+      'models',
+      '${entityName.snakeCase}_model.dart',
+    );
+  }
+
   /// Check if a file exists
   bool fileExists(String filePath) {
     return File(filePath).existsSync();
@@ -416,11 +431,11 @@ class FeatureFileWriter {
         // 2. Self-named Feature (e.g. features/user/domain/entities/user.dart)
         '$rootName/$entitySnake/$layer/$entitySnake.dart',
         // 3. Core (Shared entities)
-        'core/entities/$entitySnake.dart',
+        'core/${isModel ? 'models' : 'entities'}/$entitySnake.dart',
         // 4. Common (Shared entities)
-        'common/entities/$entitySnake.dart',
+        'common/${isModel ? 'models' : 'entities'}/$entitySnake.dart',
         // 4. Common (Shared entities)
-        'core/common/entities/$entitySnake.dart',
+        'core/common/${isModel ? 'models' : 'entities'}/$entitySnake.dart',
       ];
 
       for (final relativePath in pathsToCheck) {
@@ -435,6 +450,13 @@ class FeatureFileWriter {
       if (!found) {
         final featureConfig =
             config.featureScaffolding.features[currentFeature.snakeCase];
+        // this works even for models because the `entities` list is coming
+        // from the ModelVisitor, which scans the annotated class, and the
+        // annotated class is always an entity, therefore, its composite
+        // entities are also going to be pure entities, never models.
+        //
+        // For this reason, I do not have to worry about a "model" suffix in
+        // the condition that uses "entity.snakeCase".
         if (featureConfig != null &&
             featureConfig.entities.contains(entity.snakeCase)) {
           final relativePath =

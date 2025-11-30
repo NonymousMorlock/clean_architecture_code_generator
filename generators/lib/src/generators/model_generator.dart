@@ -1,10 +1,15 @@
 // We need to import from build package internals to access BuildStep
 // ignore_for_file: implementation_imports
 
+import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/src/builder/build_step.dart';
+import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/model_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
+import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -38,28 +43,158 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
+    if (element is! ClassElement) {
+      throw InvalidGenerationSourceError(
+        'Generator cannot target non-classes.',
+      );
+    }
+
     final visitor = ModelVisitor();
-    element.visitChildren(visitor);
+
+    final constructor = element.unnamedConstructor;
+
+    if (constructor != null) {
+      visitor.visitConstructorElement(constructor);
+    } else {
+      stderr.writeln(
+        '[ModelGenerator] Error: No default constructor found for '
+        '${element.name}',
+      );
+      return '// Error: No default constructor found for ${element.name}';
+    }
+
+    final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
+
+    var ignoreMultiFileCheck = false;
+
+    if (config.multiFileOutput.enabled && !config.featureScaffolding.enabled) {
+      // throw InvalidGenerationSourceError(
+      //   'Multi-file output requires feature scaffolding to '
+      //   'be enabled in the configuration, if you are going to be '
+      //   'generating models and entities',
+      // );
+      stderr.writeln(
+        '[ModelGenerator] Multi-file output requires feature scaffolding to '
+        'be enabled in the configuration. Ignoring multi-file setting.',
+      );
+      ignoreMultiFileCheck = true;
+    }
+
+    String? associatedFeatureName;
+
+    // Normalize the class name: UserTBG -> User -> user
+    final normalisedName = visitor.className
+        .replaceAll('TBG', '')
+        .replaceAll('Model', '');
+
+    for (final featureEntry in config.featureScaffolding.features.entries) {
+      final featureName = featureEntry.key;
+      final definition = featureEntry.value;
+      if (definition.entities.contains(normalisedName.toLowerCase())) {
+        associatedFeatureName = featureName;
+        break;
+      }
+    }
+
+    if (associatedFeatureName == null) {
+      stderr.writeln(
+        '[ModelGenerator] Warning: No associated feature found for entity '
+        '$normalisedName. Generated entity will not be placed in a '
+        'feature-specific directory.',
+      );
+      ignoreMultiFileCheck = true;
+    }
+
+    final writer = FeatureFileWriter(config, buildStep);
 
     final buffer = StringBuffer();
-    constructor(buffer, visitor);
+
+    if (writer.isMultiFileEnabled && !ignoreMultiFileCheck) {
+      return _generateMultiFile(
+        visitor: visitor,
+        config: config,
+        writer: writer,
+        normalisedName: normalisedName,
+        associatedFeatureName: associatedFeatureName!,
+      );
+    }
+
+    _generateModel(
+      buffer: buffer,
+      visitor: visitor,
+      normalisedName: normalisedName,
+    );
     return buffer.toString();
   }
 
-  /// Generates the model class constructor and all its methods.
+  String _generateMultiFile({
+    required ModelVisitor visitor,
+    required GeneratorConfig config,
+    required FeatureFileWriter writer,
+    required String normalisedName,
+    required String associatedFeatureName,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln("import 'package:${config.appName}/core/typedefs.dart';")
+      ..writeln("import 'dart:convert';");
+
+    // Import the entity this model is based on
+    writer
+        .getSmartEntityImports(
+          entities: {normalisedName},
+          currentFeature: associatedFeatureName,
+        )
+        .forEach(buffer.writeln);
+
+    writer
+        .getSmartEntityImports(
+          isModel: true,
+          entities: visitor.discoverRequiredEntities(),
+          currentFeature: associatedFeatureName,
+        )
+        .forEach(buffer.writeln);
+
+    _generateModel(
+      buffer: buffer,
+      visitor: visitor,
+      normalisedName: normalisedName,
+    );
+
+    final modelPath = writer.getModelPath(
+      featureName: associatedFeatureName,
+      entityName: normalisedName,
+    );
+
+    try {
+      writer.writeToFile(modelPath, buffer.toString());
+
+      stdout.writeln('[ModelGenerator] Successfully wrote files');
+      return '// Model class written to: $modelPath\n';
+    } on Exception catch (e, s) {
+      stderr
+        ..writeln(
+          '[ModelGenerator] ERROR: Could not write model files: $e',
+        )
+        ..writeln('[ModelGenerator] Stack trace: $s');
+      return '// Error: Could not write model class to file: $e\n';
+    }
+  }
+
+  /// Generates the model class and all its methods.
   ///
   /// Creates the main constructor, empty constructor, and all
   /// serialization/deserialization methods.
-  void constructor(StringBuffer buffer, ModelVisitor visitor) {
-    final className = '${visitor.className}Model';
+  void _generateModel({
+    required StringBuffer buffer,
+    required ModelVisitor visitor,
+    required String normalisedName,
+  }) {
+    final modelClassName = '${normalisedName}Model';
     final length = visitor.fields.length;
 
     buffer
-      ..writeln('// import typedefs')
-      ..writeln('// import entity')
-      ..writeln()
-      ..writeln('class $className extends ${visitor.className} {')
-      ..writeln('const $className({');
+      ..writeln('class $modelClassName extends $normalisedName {')
+      ..writeln('const $modelClassName({');
     for (var i = 0; i < length; i++) {
       final name = visitor.fields.keys.elementAt(i).camelCase;
       final field = visitor.fieldProperties[name]!;
@@ -68,7 +203,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
     buffer
       ..writeln('});')
       ..writeln()
-      ..writeln('$className.empty()')
+      ..writeln('$modelClassName.empty()')
       ..writeln(':')
       ..writeln('this(');
     for (var i = 0; i < length; i++) {
@@ -89,11 +224,11 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       );
     }
     buffer.writeln();
-    fromJson(buffer, visitor);
+    fromJson(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
     buffer.writeln();
-    fromMap(buffer, visitor);
+    fromMap(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
     buffer.writeln();
-    copyWith(buffer, visitor);
+    copyWith(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
     buffer.writeln();
     toMap(buffer, visitor);
     buffer.writeln();
@@ -110,21 +245,40 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
   ///
   /// Creates a factory that deserializes a model from a Map,
   /// handling various data types including DateTime and numeric conversions.
-  void fromMap(StringBuffer buffer, ModelVisitor visitor) {
-    final className = '${visitor.className}Model';
+  void fromMap({
+    required StringBuffer buffer,
+    required ModelVisitor visitor,
+    required String normalisedName,
+  }) {
+    final modelClassName = '${normalisedName}Model';
     buffer
-      ..writeln('$className.fromMap(DataMap map)')
+      ..writeln('$modelClassName.fromMap(DataMap map)')
       ..writeln(': this(');
     for (var i = 0; i < visitor.fields.length; i++) {
       final type = visitor.fields.values.elementAt(i);
       final name = visitor.fields.keys.elementAt(i);
       final field = visitor.fieldProperties[name.camelCase]!;
-      if (type.toLowerCase().startsWith('list')) {
+
+      if (type.isCustomType) {
+        if (type.toLowerCase().startsWith('list')) {
+          var value =
+              "List<DataMap>.from(map['$name'] as List<dynamic>).map("
+              '${type.innerType}Model.fromMap).toList()';
+          if (!field.isRequired) {
+            value = "map['$name'] != null ? $value : null";
+          }
+          buffer.writeln('${name.camelCase}: $value,');
+        } else {
+          var value = "${type}Model.fromMap(map['$name'] as DataMap)";
+          if (!field.isRequired) {
+            value = "map['$name'] != null ? $value : null";
+          }
+          buffer.writeln('${name.camelCase}: $value,');
+        }
+      } else if (type.toLowerCase().startsWith('list')) {
         var value = "$type.from(map['$name'] as List<dynamic>)";
         if (!field.isRequired) {
-          value =
-              "map['$name'] != null ? $type.from(map['$name'] "
-              'as List<dynamic>) : null';
+          value = "map['$name'] != null ? $value : null";
         }
         buffer.writeln('${name.camelCase}: $value,');
       } else if (type.toLowerCase().startsWith('int')) {
@@ -162,11 +316,15 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
   /// Generates the fromJson factory constructor.
   ///
   /// Creates a factory that deserializes a model from a JSON string.
-  void fromJson(StringBuffer buffer, ModelVisitor visitor) {
-    final className = '${visitor.className}Model';
+  void fromJson({
+    required StringBuffer buffer,
+    required ModelVisitor visitor,
+    required String normalisedName,
+  }) {
+    final modelClassName = '${normalisedName}Model';
     buffer
-      ..writeln('factory $className.fromJson(String source) =>')
-      ..writeln('$className.fromMap(jsonDecode(source) as DataMap);');
+      ..writeln('factory $modelClassName.fromJson(String source) =>')
+      ..writeln('$modelClassName.fromMap(jsonDecode(source) as DataMap);');
   }
 
   /// Generates the toMap method.
@@ -181,7 +339,20 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       final name = visitor.fields.keys.elementAt(i);
       final type = visitor.fields.values.elementAt(i);
       final field = visitor.fieldProperties[name.camelCase]!;
-      if (type.toLowerCase().startsWith('datetime')) {
+
+      if (type.isCustomType) {
+        final initialDeclaration =
+            "'$name': ${name.camelCase}${field.isRequired ? '' : '?'}";
+        if (type.toLowerCase().startsWith('list')) {
+          buffer.writeln(
+            '$initialDeclaration.map((e) => e.toMap()).toList(),',
+          );
+        } else {
+          buffer.writeln(
+            '$initialDeclaration.toMap(),',
+          );
+        }
+      } else if (type.toLowerCase().startsWith('datetime')) {
         buffer.writeln(
           "'$name': "
           "${name.camelCase}${field.isRequired ? '' : '?'}.toIso8601String(),",
@@ -206,18 +377,25 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
   ///
   /// Creates a method that returns a new instance with updated values,
   /// following the immutable pattern.
-  void copyWith(StringBuffer buffer, ModelVisitor visitor) {
-    final className = '${visitor.className}Model';
+  void copyWith({
+    required StringBuffer buffer,
+    required ModelVisitor visitor,
+    required String normalisedName,
+  }) {
+    final modelClassName = '${normalisedName}Model';
 
-    buffer.writeln('$className copyWith({');
+    buffer.writeln('$modelClassName copyWith({');
     for (var i = 0; i < visitor.fields.length; i++) {
-      final type = visitor.fields.values.elementAt(i);
+      var type = visitor.fields.values.elementAt(i);
       final name = visitor.fields.keys.elementAt(i).camelCase;
+      final isCustomType = type.isCustomType;
+      if (isCustomType) type = type.modelizeType;
+
       buffer.writeln('$type? $name,');
     }
     buffer
       ..writeln('}) {')
-      ..writeln('return $className(');
+      ..writeln('return $modelClassName(');
     for (var i = 0; i < visitor.fields.length; i++) {
       final name = visitor.fields.keys.elementAt(i).camelCase;
       buffer.writeln('$name: $name ?? this.$name,');
