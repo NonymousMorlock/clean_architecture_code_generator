@@ -223,6 +223,34 @@ class FeatureFileWriter {
     );
   }
 
+  /// Get the model test file path
+  ///
+  /// e.g., test/features/auth/data/models/user_model_test.dart
+  String getModelTestPath({
+    required String featureName,
+    required String entityName,
+  }) {
+    return path.join(
+      'test',
+      config.featureScaffolding.rootName,
+      featureName,
+      'data',
+      'models',
+      '${entityName.snakeCase}_model_test.dart',
+    );
+  }
+
+  /// Get the fixture file path
+  ///
+  /// e.g., test/fixtures/user.json
+  String getModelFixturePath({required String entityName}) {
+    return path.join(
+      'test',
+      'fixtures',
+      '${entityName.snakeCase}.json',
+    );
+  }
+
   /// Check if a file exists
   bool fileExists(String filePath) {
     return File(filePath).existsSync();
