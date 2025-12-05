@@ -419,4 +419,25 @@ extension StringExt on String {
     };
     return !primitives.contains(type.toLowerCase());
   }
+
+  /// Helper to filter out primitives
+  ///
+  /// Make sure you use this ONLY when passing defaults
+  /// (like in a `.empty` constructor. Not when your initialisations have
+  /// actual values
+  bool get isConstValue {
+    const primitives = {
+      'int',
+      'double',
+      'num',
+      'bool',
+      'string',
+      'null',
+      'symbol',
+      'list',
+      'set',
+      'map',
+    };
+    return primitives.any((type) => type.startsWith(toLowerCase()));
+  }
 }
