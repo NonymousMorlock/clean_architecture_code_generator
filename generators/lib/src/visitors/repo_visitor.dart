@@ -1,4 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:generators/src/models/function.dart';
 
@@ -18,13 +20,18 @@ class RepoVisitor extends SimpleElementVisitor<void> {
     final params = element.parameters;
     final methodParams = <Param>[];
     for (final e in params) {
+      final isNullable = e.type.nullabilitySuffix == NullabilitySuffix.question;
+      final isDynamic = e.type is DynamicType;
+
       methodParams.add(
         Param(
           name: e.name,
           type: e.type.toString(),
+          rawType: e.type,
           isNamed: e.isNamed,
           isOptional: e.isOptional,
           isOptionalNamed: e.isOptionalNamed,
+          isNullable: isNullable || isDynamic,
           isRequired: e.isRequired,
           isRequiredNamed: e.isRequiredNamed,
           isRequiredPositional: e.isRequiredPositional,
@@ -36,6 +43,7 @@ class RepoVisitor extends SimpleElementVisitor<void> {
 
     final method = IFunction(
       name: element.name,
+      rawType: element.returnType,
       returnType: element.returnType.toString().replaceFirst('*', ''),
       params: methodParams.isEmpty ? null : methodParams,
     );
