@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/element/type.dart';
 import 'package:equatable/equatable.dart';
 
 /// Represents a function/method in generated code.
@@ -11,6 +12,7 @@ class IFunction {
   /// [params] has more than one parameter.
   const IFunction({
     required this.name,
+    required this.rawType,
     required this.returnType,
     this.params,
   }) : shouldHaveCustomParams = params != null && params.length > 1;
@@ -28,6 +30,12 @@ class IFunction {
 
   /// The return type of the function.
   final String returnType;
+
+  /// The raw return type of the function
+  final DartType rawType;
+
+  /// Returns true if this function has parameters.
+  bool get hasParams => params?.isNotEmpty ?? false;
 
   @override
   String toString() =>
