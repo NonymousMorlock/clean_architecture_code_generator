@@ -64,6 +64,8 @@ class Param extends Equatable {
     required this.isPositional,
     required this.isOptionalPositional,
     required this.name,
+    required this.rawType,
+    required this.isNullable,
     required this.type,
   });
 
@@ -78,6 +80,8 @@ class Param extends Equatable {
         isRequiredPositional: false,
         isPositional: false,
         isOptionalPositional: false,
+        isNullable: false,
+        rawType: null,
         name: '',
         type: '',
       );
@@ -111,6 +115,12 @@ class Param extends Equatable {
 
   /// Whether this is an optional positional parameter.
   final bool isOptionalPositional;
+
+  /// Whether this is a nullable parameter
+  final bool isNullable;
+
+  /// The raw type of the parameter.
+  final DartType? rawType;
 
   /// Returns the parameter as a formatted string for code generation.
   ///
