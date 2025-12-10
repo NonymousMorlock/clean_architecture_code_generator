@@ -1,6 +1,6 @@
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
-import 'package:generators/src/models/function.dart';
+import 'package:generators/src/models/param.dart';
 
 /// Extension methods for DartType manipulation in code generation.
 extension ParamExtensions on Param {

@@ -1,4 +1,5 @@
 import 'package:generators/src/models/function.dart';
+import 'package:generators/src/models/param.dart';
 
 /// Converts a parameter to its string representation with proper syntax.
 ///

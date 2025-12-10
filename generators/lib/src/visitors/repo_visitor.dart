@@ -3,6 +3,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:generators/src/models/function.dart';
+import 'package:generators/src/models/param.dart';
 
 /// Visitor for extracting repository information from Dart AST elements.
 ///

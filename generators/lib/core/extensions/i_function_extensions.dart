@@ -1,5 +1,6 @@
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/src/models/function.dart';
+import 'package:generators/src/models/param.dart';
 
 /// Extension methods for IFunction manipulation in code generation.
 extension IFunctionExtensions on IFunction {
