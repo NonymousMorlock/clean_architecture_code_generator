@@ -13,7 +13,7 @@ extension ParamExtensions on Param {
   Expression get fallbackValue {
     if (isNullable) return literalNull;
 
-    final targetRawType = rawType!;
+    final targetRawType = rawType;
     final targetType = type.rightType;
     final base = targetType.baseType.toLowerCase().replaceAll('?', '');
 

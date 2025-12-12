@@ -2,6 +2,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:equatable/equatable.dart';
+import 'package:generators/src/models/empty_type.dart';
 
 /// Represents a parameter in a function/method.
 ///
@@ -26,7 +27,7 @@ class Param extends Equatable {
         isNamed: false,
         isRequired: false,
         isNullable: false,
-        rawType: null,
+        rawType: const EmptyType(),
         hasDefaultValue: false,
         name: '',
         type: '',
@@ -69,7 +70,7 @@ class Param extends Equatable {
   final bool isNullable;
 
   /// The raw type of the parameter.
-  final DartType? rawType;
+  final DartType rawType;
 
   /// Whether this parameter has a default value
   final bool hasDefaultValue;
