@@ -105,7 +105,7 @@ class StateNameGenerator {
       // Use Morphology Engine for custom verbs
       // (verify -> Verified, ban -> Banned)
       final pastTense = EnglishMorphology.convertToPastParticiple(verb);
-      stateSuffix = pastTense.capitalize();
+      stateSuffix = pastTense.capitalized;
     }
 
     // 3. Determine Subject (The "Target")
@@ -114,14 +114,14 @@ class StateNameGenerator {
     if (tokens.length > 1) {
       // The subject is explicitly in the method name
       // ['get', 'Featured', 'Products'] -> 'FeaturedProducts'
-      subject = tokens.sublist(1).map((e) => e.capitalize()).join();
+      subject = tokens.sublist(1).map((e) => e.capitalized).join();
     } else {
       // No subject in method name (e.g., 'login', 'submit', 'save')
 
       // Edge Case: If the mapped state is already a
       // full standalone concept (LoggedIn), use it.
       if (_intentMap.containsKey(verb) &&
-          stateSuffix.startsWith(verb.capitalize().substring(0, 2))) {
+          stateSuffix.startsWith(verb.capitalized.substring(0, 2))) {
         // e.g. login -> LoggedIn. We don't want "AuthLoggedIn".
         // Just "LoggedIn".
         // But "get" -> "Loaded". We DO want "AuthLoaded".

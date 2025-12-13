@@ -1,43 +1,108 @@
 /// Extension methods for String manipulation in code generation.
 extension StringExt on String {
-  /// Capitalizes the first letter of the string.
-  String capitalize() {
-    if (trim().isEmpty) return this;
+  /// Capitalizes the first letter of the string and lowercases the rest.
+  /// "WORD" -> "Word", "word" -> "Word"
+  String get capitalized {
+    if (isEmpty) return this;
     return '${this[0].toUpperCase()}${substring(1).toLowerCase()}';
   }
 
-  /// Converts the string to title case (each word capitalized).
+  /// Converts any string format to Title Case.
+  ///
+  /// Examples:
+  /// - `user_name` -> `User Name`
   String get titleCase {
-    if (trim().isEmpty) return this;
-    return split(' ').map<String>((e) => e.capitalize()).toList().join(' ');
+    final words = _groupIntoWords;
+    if (words.isEmpty) return this;
+
+    return words.map((w) => w.capitalized).join(' ');
   }
 
-  /// Converts snake_case string to camelCase.
+  /// Splits the string into independent words based on common boundaries.
+  ///
+  /// Handles:
+  /// - snake_case (user_name)
+  /// - kebab-case (user-name)
+  /// - PascalCase (UserName)
+  /// - camelCase (userName)
+  /// - SCREAMING_SNAKE (USER_NAME)
+  /// - Mixed (User_Name)
+  List<String> get _groupIntoWords {
+    // 1. Handle Empty
+    if (trim().isEmpty) return [];
+
+    // 2. Standardize separators: Replace underscores, hyphens,
+    // and dots with spaces
+    // This turns "user_name" -> "user name"
+    var clean = replaceAll(RegExp(r'[\_\-\.\s]+'), ' ');
+
+    // 3. Insert space before uppercase letters to handle Pascal/camelCase
+    // "UserName" -> "User Name"
+    // "XMLHttp" -> "XML Http"
+    // Look for: (Lower -> Upper) OR (Upper -> Upper + Lower for acronyms)
+    clean = clean.replaceAllMapped(
+      RegExp('([a-z])([A-Z])|([A-Z])([A-Z][a-z])'),
+      (Match m) {
+        if (m.group(1) != null) {
+          // Case 1: camelCase (aB) -> a B
+          return '${m.group(1)} ${m.group(2)}';
+        } else {
+          // Case 2: Acronyms (XMLHttp) -> XML Http
+          return '${m.group(3)} ${m.group(4)}';
+        }
+      },
+    );
+
+    // 4. Split by space and remove empty entries
+    return clean.split(' ').where((s) => s.isNotEmpty).toList();
+  }
+
+  /// Converts any string format to camelCase.
+  ///
+  /// Examples:
+  /// - `User_Name` -> `userName`
+  /// - `user_name` -> `userName`
+  /// - `UserName`  -> `userName`
+  /// - `USER_NAME` -> `userName`
   String get camelCase {
-    final splitString = split('_');
-    final buffer = StringBuffer(splitString[0]);
-    for (var i = 1; i < splitString.length; i++) {
-      buffer.write(splitString[i].titleCase);
+    final words = _groupIntoWords;
+    if (words.isEmpty) return this;
+
+    final buffer = StringBuffer()
+      // 1. First word is always lowercase
+      ..write(words.first.toLowerCase());
+
+    // 2. Subsequent words are Capitalized
+    for (var i = 1; i < words.length; i++) {
+      buffer.write(words[i].capitalized);
     }
+
     return buffer.toString();
   }
 
-  /// Converts camelCase or PascalCase string to snake_case.
+  /// Converts any string format to snake_case.
+  ///
+  /// Examples:
+  /// - `userName` -> `user_name`
+  /// - `UserName` -> `user_name`
+  /// - `USER_NAME`-> `user_name`
   String get snakeCase {
-    return replaceAllMapped(
-      RegExp('([A-Z])'),
-      (match) => '_${match.group(0)!.toLowerCase()}',
-    ).replaceAll(RegExp('^_'), '');
+    final words = _groupIntoWords;
+    if (words.isEmpty) return this;
+
+    return words.map((w) => w.toLowerCase()).join('_');
   }
 
-  /// Converts the first character to uppercase (PascalCase).
-  String get upperCamelCase {
-    return '${this[0].toUpperCase()}${substring(1)}';
-  }
+  /// Converts any string format to PascalCase (UpperCamelCase).
+  ///
+  /// Examples:
+  /// - `user_name` -> `UserName`
+  /// - `userName` -> `UserName`
+  String get pascalCase {
+    final words = _groupIntoWords;
+    if (words.isEmpty) return this;
 
-  /// Converts the first character to lowercase (camelCase).
-  String get lowerCamelCase {
-    return '${this[0].toLowerCase()}${substring(1)}';
+    return words.map((w) => w.capitalized).join();
   }
 
   /// Strips the outer type wrapper and returns the inner generic type.
@@ -303,39 +368,6 @@ extension StringExt on String {
     }
 
     return types;
-  }
-
-  /// Checks if a type is likely a clean architecture Entity.
-  /// Filters out primitives, collections, and core types like Failure/Either.
-  bool get isPotentialEntity {
-    final lower = toLowerCase();
-    const ignored = {
-      // Primitives
-      'int',
-      'double',
-      'num',
-      'bool',
-      'string',
-      'void',
-      'dynamic',
-      'object',
-      'datetime',
-      // Collections
-      'list',
-      'map',
-      'set',
-      'iterable',
-      'future',
-      'stream',
-      // Core Architecture
-      'either',
-      'failure',
-      'serverfailure',
-      'cachefailure',
-      'nointernetfailure',
-    };
-
-    return !ignored.contains(lower);
   }
 
   /// Recursively digs for the "Success" entity type based on
