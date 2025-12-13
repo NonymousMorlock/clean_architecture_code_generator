@@ -140,7 +140,7 @@ class InjectionGenerator
 
     // Register Use Cases (lazy singletons)
     for (final method in visitor.methods) {
-      final usecaseName = method.name.upperCamelCase;
+      final usecaseName = method.name.pascalCase;
       buffer.writeln('    ..registerLazySingleton(() => $usecaseName(sl()))');
     }
 
