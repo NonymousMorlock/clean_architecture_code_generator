@@ -45,4 +45,23 @@ sealed class Utils {
     }
     return candidates;
   }
+
+  /// Determines if a lambda body should be used for a method.
+  ///
+  /// A lambda body is preferred for methods without parameters,
+  /// or with a single named parameter, or with only a few positional parameters.
+  /// Returns `true` if a lambda body is suitable, otherwise `false`.
+  static bool shouldUseLambdaBody({
+    required bool methodHasParams,
+    required int namedArgumentsLength,
+    required int positionalWhenArgumentsLength,
+  }) {
+    final hasSingleNamedParam =
+        namedArgumentsLength == 1 && positionalWhenArgumentsLength == 0;
+
+    final hasOnlyFewPositional =
+        namedArgumentsLength == 0 && positionalWhenArgumentsLength <= 2;
+
+    return !methodHasParams || hasSingleNamedParam || hasOnlyFewPositional;
+  }
 }
