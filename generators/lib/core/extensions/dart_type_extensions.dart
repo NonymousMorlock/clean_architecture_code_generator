@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:code_builder/code_builder.dart';
@@ -42,6 +43,31 @@ extension DartTypeExtensions on DartType {
     return current;
   }
 
+  /// Converts the DartType to a model class name string.
+  String get modelize {
+    // 1. Primitives: return as-is
+    if (!isCustomType) return toString();
+
+    final type = this;
+
+    // 2. Generics (Recursion)
+    if (type is InterfaceType && type.typeArguments.isNotEmpty) {
+      final name = element?.name ?? '';
+      final args = type.typeArguments.map((t) => t.modelize).join(', ');
+      return '$name<$args>';
+    }
+
+    // 3. Custom Types
+    // Check if it's strictly a custom class
+    final name = element?.name ?? '';
+    // Apply your naming logic
+    if (!name.endsWith('Model')) {
+      return '${name}Model';
+    }
+
+    return name;
+  }
+
   /// Unwraps Future or Stream once to get the inner type.
   DartType get innerType {
     var current = this;
@@ -77,11 +103,32 @@ extension DartTypeExtensions on DartType {
   }
 
   /// Gets a display string without legacy Dart 2.x syntax.
-  String get displayString {
+  String displayString({bool withNullability = true}) {
     // getDisplayString(withNullability: true)
     // ensures we get 'User?' or 'User' correctly.
     // then we sanitize legacy Dart 2.x syntax ('*') if present
-    return getDisplayString(withNullability: true).replaceAll('*', '');
+    return getDisplayString(
+      withNullability: withNullability,
+    ).replaceAll('*', '');
+  }
+
+  /// Checks if the type is DateTime.
+  bool get isDateTime {
+    if (element == null) return false;
+    return element!.name == 'DateTime' &&
+        // This ensures we don't accidentally pick up a 'DateTime' class
+        // from a 3rd party package.
+        (element!.library?.isDartCore ?? false);
+  }
+
+  /// Checks if the type is a custom user-defined type.
+  bool get isCustomType {
+    return displayString(withNullability: false).isCustomType;
+  }
+
+  /// Checks if the type is an enum.
+  bool get isEnum {
+    return element is EnumElement;
   }
 
   /// Returns a fallback value based on the type.
@@ -98,8 +145,6 @@ extension DartTypeExtensions on DartType {
     if (isNullable && skipIfNullable) return literalNull;
 
     final targetRawType = this;
-    final targetType = targetRawType.rightType.displayString;
-    final base = targetType.baseType.toLowerCase().replaceAll('?', '');
 
     // Helper: Extracts the type argument as a Reference
     // (e.g., List<String> -> refer('String'))
@@ -107,7 +152,7 @@ extension DartTypeExtensions on DartType {
       if (targetRawType is InterfaceType &&
           targetRawType.typeArguments.length > index) {
         final arg = targetRawType.typeArguments[index];
-        return refer(arg.displayString);
+        return refer(arg.displayString());
       }
       return null;
     }
@@ -141,20 +186,20 @@ extension DartTypeExtensions on DartType {
     if (targetRawType.isDartCoreBool) {
       return literalTrue;
     }
-    if (base.contains('datetime')) {
+    if (targetRawType.isDateTime) {
       return const Reference('DateTime').newInstanceNamed('now', []);
     }
     if (targetRawType.isDartCoreRecord) {
       return literalConstRecord([], {});
     }
-    if (base.isCustomType) {
+    if (targetRawType.isCustomType) {
       final modelClassName = useModelForCustomType
-          ? '${targetType.replaceAll('?', '')}Model'
-          : targetType.replaceAll('?', '');
+          ? '${displayString(withNullability: false)}Model'
+          : displayString(withNullability: false);
       return Reference(modelClassName).newInstanceNamed('empty', []);
     }
     if (targetRawType.isDartCoreType) {
-      return Reference(targetType.replaceAll('?', '')).newInstance([]);
+      return Reference(displayString(withNullability: false)).newInstance([]);
     }
 
     return literalNull;
