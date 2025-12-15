@@ -4,49 +4,56 @@ import 'package:generators/src/models/param.dart';
 
 /// Extension methods for IFunction manipulation in code generation.
 extension IFunctionExtensions on IFunction {
-  /// Extracts parameters that should be passed positionally.
-  /// Returns: [param1, param2]
-  List<Expression> get positionalValues {
-    return params
-            ?.where((param) => !param.isNamed)
-            .map((param) => refer(param.name))
-            .toList() ??
-        [];
-  }
-
-  /// Extracts positional parameters and applies a transformation.
+  /// Extracts both positional and named arguments in a single pass.
   ///
-  /// [transformer] - A function to transform each parameter's name.
-  /// Returns a list of transformed expressions for positional parameters.
-  List<Expression> positionalValuesWithTransform(
-    String Function(Param) transformer,
-  ) {
-    return params
-            ?.where((param) => !param.isNamed)
-            .map((param) => refer(transformer(param)))
-            .toList() ??
-        [];
-  }
-
-  /// Extracts parameters that should be passed by name.
-  /// Returns: { 'id': id, 'name': name }
-  Map<String, Expression> get namedValues {
-    return {
-      for (final param in params?.where((param) => param.isNamed) ?? <Param>[])
-        param.name: refer(param.name),
-    };
-  }
-
-  /// Extracts named parameters and applies a transformation to their values.
+  /// [transformer]: Optional function to transform parameter values.
+  /// - If it returns a [String], it will be wrapped in `refer()`.
+  /// - If it returns an [Expression], it will be used directly.
   ///
-  /// [transformer] - A function to transform each parameter's name.
-  /// Returns a map of parameter names to transformed expressions.
-  Map<String, Expression> namedValuesWithTransform(
-    String Function(Param) transformer,
-  ) {
-    return {
-      for (final param in params?.where((param) => param.isNamed) ?? <Param>[])
-        param.name: refer(transformer(param)),
-    };
+  /// Returns a record with `positional` list and `named` map.
+  ({List<Expression> positional, Map<String, Expression> named}) extractArgs({
+    Object Function(Param)? transformer,
+  }) {
+    final positional = <Expression>[];
+    final named = <String, Expression>{};
+
+    final parameters = params;
+    if (parameters == null || parameters.isEmpty) {
+      return (positional: positional, named: named);
+    }
+
+    for (final param in parameters) {
+      Expression value;
+
+      // 1. Determine the value (Transformed or Default)
+      if (transformer != null) {
+        final result = transformer(param);
+
+        if (result is String) {
+          // Wrap string results: "tName" -> refer("tName")
+          value = refer(result);
+        } else if (result is Expression) {
+          // Pass expressions through: literal(1) -> literal(1)
+          value = result;
+        } else {
+          throw ArgumentError(
+            'Transformer must return a String or Expression, '
+            'but returned ${result.runtimeType} for param ${param.name}',
+          );
+        }
+      } else {
+        // Default: just refer to the parameter name
+        value = refer(param.name);
+      }
+
+      // 2. Sort into the correct bucket
+      if (param.isNamed) {
+        named[param.name] = value;
+      } else {
+        positional.add(value);
+      }
+    }
+
+    return (positional: positional, named: named);
   }
 }
