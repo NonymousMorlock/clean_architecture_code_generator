@@ -6,9 +6,9 @@ extension ModelVisitorExtensions on ModelVisitor {
   Set<String> discoverRequiredEntities() {
     final candidates = <String>{};
 
-    for (final fieldType in fields.values) {
+    for (final param in params) {
       // Assuming entity types start with an uppercase letter
-      candidates.addAll(fieldType.entityCandidates);
+      candidates.addAll(param.type.entityCandidates);
     }
 
     return candidates;

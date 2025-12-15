@@ -1,7 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
-import 'package:generators/core/extensions/string_extensions.dart';
-import 'package:generators/src/models/field.dart';
+import 'package:generators/src/models/param.dart';
 
 /// Type alias for a map containing dynamic data.
 typedef DataMap = Map<String, dynamic>;
@@ -14,34 +13,14 @@ class ModelVisitor extends SimpleElementVisitor<void> {
   /// The name of the class being visited.
   String className = '';
 
-  /// Map of field names to their types.
-  Map<String, String> fields = {};
-
-  /// Map of field names to their [Field] properties.
-  Map<String, Field> fieldProperties = {};
+  /// Map of fields found in the class.
+  List<Param> params = [];
 
   @override
   void visitConstructorElement(ConstructorElement element) {
     final returnType = element.returnType.toString();
     className = returnType.replaceFirst('*', '').replaceAll('TBG', '');
 
-    for (final param in element.parameters) {
-      final typeStr = param.type
-          .toString()
-          .replaceFirst('*', '')
-          .replaceFirst('?', '');
-
-      fields[param.name] = typeStr;
-      final isRequired = param.isRequiredNamed || param.isRequiredPositional;
-
-      fieldProperties[param.name.camelCase] = Field(
-        name: param.name.camelCase,
-        isRequired: isRequired,
-        // For parameters, "initialized" usually implies having a default value
-        isInitialized: param.hasDefaultValue,
-        // Use the parameter's location, or fall back to the library source
-        filePath: '${element.library.source.fullName};'.trim(),
-      );
-    }
+    params = element.parameters.map(Param.fromElement).toList();
   }
 }
