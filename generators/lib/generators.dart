@@ -37,7 +37,6 @@ export 'src/generators/repo_impl_test_generator.dart';
 export 'src/generators/usecase_generator.dart';
 export 'src/generators/usecase_test_generator.dart';
 // Model exports
-export 'src/models/field.dart';
 export 'src/models/function.dart';
 // Visitor exports
 export 'src/visitors/model_visitor.dart';

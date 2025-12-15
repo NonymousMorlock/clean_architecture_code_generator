@@ -27,7 +27,6 @@ void main() {
 
     test('exports model classes', () {
       // Verify model exports are accessible
-      expect(Field, isNotNull);
       expect(Function, isNotNull);
     });
 
