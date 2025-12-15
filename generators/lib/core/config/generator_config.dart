@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:yaml/yaml.dart';
 
 /// Configuration for the code generators.
@@ -316,13 +317,22 @@ class ModelTestConfig {
   /// Gets the field type for a specific model field.
   ///
   /// Checks model-specific configuration first, then falls back to defaults.
-  String getFieldType(String modelName, String fieldName, String dartType) {
+  String getFieldType({
+    required String modelName,
+    required String fieldName,
+    required String dartType,
+  }) {
     // Check model-specific configuration first
     final modelConfig = modelConfigs[modelName.toLowerCase()];
     if (modelConfig != null) {
       final fieldType = modelConfig.fieldTypes[fieldName];
       if (fieldType != null) {
         return fieldType;
+      } else {
+        final fieldType = modelConfig.fieldTypes[fieldName.camelCase];
+        if (fieldType != null) {
+          return fieldType;
+        }
       }
     }
 
@@ -530,44 +540,58 @@ class RemoteDataSourceConfig {
   }
 
   /// Gets the list of constructor dependencies based on the configuration.
-  List<String> get constructorDependencies {
-    final dependencies = <String>[];
+  List<Dependency> get constructorDependencies {
+    final dependencies = <Dependency>[];
 
     switch (httpClient) {
       case HttpClientType.dio:
-        dependencies.add('Dio dio');
+        dependencies.add(const Dependency(type: 'Dio', name: 'dio'));
       case HttpClientType.http:
-        dependencies.add('http.Client client');
+        dependencies.add(const Dependency(type: 'http.Client', name: 'client'));
       case HttpClientType.chopper:
-        dependencies.add('ChopperClient client');
+        dependencies.add(
+          const Dependency(type: 'ChopperClient', name: 'client'),
+        );
       case HttpClientType.retrofit:
-        dependencies.add('RestClient client');
+        dependencies.add(const Dependency(type: 'RestClient', name: 'client'));
       case HttpClientType.custom:
-        dependencies.add('HttpClient client');
+        dependencies.add(const Dependency(type: 'HttpClient', name: 'client'));
     }
 
     if (useFirebaseAuth) {
-      dependencies.add('FirebaseAuth firebaseAuth');
+      dependencies.add(
+        const Dependency(type: 'FirebaseAuth', name: 'firebaseAuth'),
+      );
     }
 
     if (useFirebaseFirestore) {
-      dependencies.add('FirebaseFirestore firestore');
+      dependencies.add(
+        const Dependency(type: 'FirebaseFirestore', name: 'firestore'),
+      );
     }
 
     if (useFirebaseStorage) {
-      dependencies.add('FirebaseStorage storage');
+      dependencies.add(
+        const Dependency(type: 'FirebaseStorage', name: 'storage'),
+      );
     }
 
     if (useGraphQL) {
-      dependencies.add('GraphQLClient graphQLClient');
+      dependencies.add(
+        const Dependency(type: 'GraphQLClient', name: 'graphQLClient'),
+      );
     }
 
     if (useWebSockets) {
-      dependencies.add('WebSocketChannel webSocketChannel');
+      dependencies.add(
+        const Dependency(type: 'WebSocketChannel', name: 'webSocketChannel'),
+      );
     }
 
     if (useSupabase) {
-      dependencies.add('SupabaseClient supabaseClient');
+      dependencies.add(
+        const Dependency(type: 'SupabaseClient', name: 'supabaseClient'),
+      );
     }
 
     return dependencies;
@@ -730,4 +754,21 @@ class FeatureDefinition {
         'dataFileName: $dataFileName'
         '}';
   }
+}
+
+/// Represents a dependency with a type and a name.
+///
+/// Used for defining dependencies in the configuration.
+class Dependency {
+  /// Creates a [Dependency] with the given type and name.
+  const Dependency({required this.type, required this.name});
+
+  /// The type of the dependency.
+  final String type;
+
+  /// The name of the dependency.
+  final String name;
+
+  /// The private name of the dependency.
+  String get privatisedName => '_$name';
 }
