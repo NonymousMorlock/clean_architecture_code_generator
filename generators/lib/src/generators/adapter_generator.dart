@@ -1,12 +1,13 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/class_builder_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
@@ -32,7 +33,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
     // Load config to check if multi-file output is enabled
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
     // Debug: Write to log file
     try {
@@ -46,119 +47,133 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       // Ignore
     }
 
-    if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer, buildStep);
+    final className = visitor.className;
+
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
+
+    if (writer.isMultiFileEnabled && featureName != null) {
+      return _generateMultiFile(
+        visitor: visitor,
+        writer: writer,
+        featureName: featureName.pascalCase,
+      );
     }
 
-    // Default behavior: generate to .g.dart
-    final buffer = StringBuffer();
-
-    // Generate Adapter
-    _generateAdapter(
-      buffer: buffer,
-      visitor: visitor,
-      isMultiMode: writer.isMultiFileEnabled,
-      writer: writer,
-    );
-
-    // Generate States
-    _generateStates(
-      buffer: buffer,
-      visitor: visitor,
-      isMultiMode: writer.isMultiFileEnabled,
-    );
-
-    return buffer.toString();
-  }
-
-  String _generateMultiFile(
-    RepoVisitor visitor,
-    FeatureFileWriter writer,
-    BuildStep buildStep,
-  ) {
-    final featureName = writer.extractFeatureName(repoName: visitor.className);
-    stdout
-      ..writeln('[AdapterGenerator] Input path: ${buildStep.inputId.path}')
-      ..writeln('[AdapterGenerator] Extracted feature name: $featureName');
-
-    if (featureName == null) {
+    if (writer.isMultiFileEnabled && featureName == null) {
       stdout.writeln(
         '[AdapterGenerator] Feature name is null, falling back to '
         'default generation',
       );
-      // Fallback to default if feature name can't be extracted
-      final buffer = StringBuffer();
-      _generateAdapter(
-        buffer: buffer,
-        visitor: visitor,
-        isMultiMode: writer.isMultiFileEnabled,
-        writer: writer,
-      );
-      _generateStates(
-        buffer: buffer,
-        visitor: visitor,
-        isMultiMode: writer.isMultiFileEnabled,
-      );
-      return buffer.toString();
     }
 
-    // Generate adapter file
-    final adapterBuffer = StringBuffer();
-    _generateAdapterBody(adapterBuffer, visitor);
+    // Default behavior: generate to .g.dart
 
-    final adapterPath = writer.getInterfaceAdapterPath(featureName);
+    final fallBackFeatureName = className
+        .replaceAll('CubitTBG', '')
+        .replaceAll('Cubit', '')
+        .replaceAll('AdapterTBG', '')
+        .replaceAll('Adapter', '')
+        .replaceAll('RepoTBG', '')
+        .replaceAll('Repo', '');
 
-    final importsBuffer = StringBuffer();
-    _generateAdapterImports(
-      buffer: importsBuffer,
+    final feature = featureName?.camelCase ?? fallBackFeatureName;
+
+    // Generate Adapter
+    final adapterClass = _interfaceAdapter(
       visitor: visitor,
-      isMultiMode: writer.isMultiFileEnabled,
+      featureName: feature,
+    );
+
+    // Generate States
+    final adapterStateClass = _interfaceAdapterState(
+      visitor: visitor,
+      featureName: feature,
+    );
+
+    return writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..comments.addAll([
+            '// **************************************************************************',
+            '// AdapterGenerator - $feature Adapter',
+            '// **************************************************************************',
+          ])
+          ..body.addAll([
+            adapterClass,
+            Library((stateLibrary) {
+              stateLibrary
+                ..comments.addAll([
+                  '// **************************************************************************',
+                  '// StateGenerator - $feature States',
+                  '// **************************************************************************',
+                ])
+                ..body.addAll(adapterStateClass);
+            }),
+          ]);
+      }),
+    );
+  }
+
+  String _generateMultiFile({
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+    required String featureName,
+  }) {
+    // Generate adapter file
+    final adapter = _interfaceAdapter(
+      visitor: visitor,
       featureName: featureName,
-      writer: writer,
-    );
-    final adapterImports = [
-      "import 'package:bloc/bloc.dart';",
-      "import 'package:equatable/equatable.dart';",
-      "import 'package:${writer.config.appName}/core/errors/failures.dart';",
-      ...importsBuffer.toString().split('\n'),
-    ];
-    final completeAdapter = writer.generateCompleteFile(
-      imports: adapterImports,
-      generatedCode: adapterBuffer.toString(),
     );
 
-    // Generate state file
-    final stateBuffer = StringBuffer();
-    _generateStatesImport(
-      buffer: stateBuffer,
-      isMultiMode: writer.isMultiFileEnabled,
+    final adapterState = _interfaceAdapterState(
+      visitor: visitor,
       featureName: featureName,
     );
-    stateBuffer.writeln();
-    _generateStatesBody(stateBuffer, visitor);
 
-    final statePath = writer.getInterfaceAdapterStatePath(featureName);
+    final adapterPath = writer.getInterfaceAdapterPath(featureName.snakeCase);
+    final statePath = writer.getInterfaceAdapterStatePath(
+      featureName.snakeCase,
+    );
 
-    final completeState = writer.generateCompleteFile(
-      generatedCode: stateBuffer.toString(),
+    // Generate complete file with imports
+    final (:imports, :importComments) = writer
+        .generateSmartInterfaceAdapterImports(
+          candidates: visitor.discoverRequiredEntities(),
+          methods: visitor.methods,
+          featureName: featureName,
+        );
+
+    final completeAdapterFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.add(adapter)
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import))
+          ..directives.add(
+            Directive.part('${featureName.snakeCase}_state.dart'),
+          );
+      }),
+    );
+
+    final completeStateFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.addAll(adapterState)
+          ..directives.add(
+            Directive.partOf('${featureName.snakeCase}_adapter.dart'),
+          );
+      }),
     );
 
     // Write to actual files
-    stdout
-      ..writeln('[AdapterGenerator] Writing adapter to: $adapterPath')
-      ..writeln('[AdapterGenerator] Writing state to: $statePath');
-
     try {
       writer
-        ..writeToFile(adapterPath, completeAdapter)
-        ..writeToFile(statePath, completeState);
+        ..writeToFile(adapterPath, completeAdapterFile)
+        ..writeToFile(statePath, completeStateFile);
 
-      stdout.writeln('[AdapterGenerator] Successfully wrote files');
       // Return minimal marker for .g.dart file
-      return '''
-// Adapter written to: $adapterPath
-// State written to: $statePath
-''';
+      return '// Adapter written to: $adapterPath\n// State written to: '
+          '$statePath';
     } on Exception catch (e, s) {
       stderr
         ..writeln('[AdapterGenerator] ERROR: Could not write adapter files: $e')
@@ -167,393 +182,518 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     }
   }
 
-  void _generateAdapter({
-    required StringBuffer buffer,
+  Class _interfaceAdapter({
     required RepoVisitor visitor,
-    required bool isMultiMode,
-    required FeatureFileWriter writer,
-  }) {
-    final className = visitor.className;
-    final baseName = className
-        .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '')
-        .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '')
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-
-    buffer
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln('// AdapterGenerator - $baseName Adapter')
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln()
-      ..writeln("import 'package:bloc/bloc.dart';")
-      ..writeln(
-        "import 'package:equatable/equatable.dart';",
-      );
-
-    _generateAdapterImports(
-      buffer: buffer,
-      visitor: visitor,
-      isMultiMode: isMultiMode,
-      featureName: baseName,
-      writer: writer,
-    );
-
-    _generateAdapterBody(buffer, visitor);
-  }
-
-  void _generateAdapterImports({
-    required StringBuffer buffer,
-    required RepoVisitor visitor,
-    required bool isMultiMode,
     required String featureName,
-    required FeatureFileWriter writer,
   }) {
-    // Import use cases
-    for (final method in visitor.methods) {
-      final usecaseFile = method.name.snakeCase;
-      final packagePath = writer.getFeaturePackagePath(featureName);
-      buffer.writeln(
-        "import '$packagePath/domain/usecases/$usecaseFile.dart';",
-      );
-    }
+    final adapterName = '${featureName}Adapter';
+    final stateName = '${featureName}State';
 
-    writer
-        .getSmartEntityImports(
-          entities: visitor.discoverRequiredEntities(),
-          currentFeature: featureName.snakeCase,
+    return Class((classBuilder) {
+      final streamMethods = <IFunction>[];
+      classBuilder
+        ..name = adapterName
+        ..extend = TypeReference((ref) {
+          ref
+            ..symbol = 'Cubit'
+            ..types.add(Reference(stateName));
+        })
+        ..constructors.add(
+          Constructor((constructor) {
+            constructor
+              ..optionalParameters.addAll(
+                visitor.methods.map((method) {
+                  final usecaseName = method.name.pascalCase;
+                  final paramName = method.name.camelCase;
+                  return Parameter((param) {
+                    param
+                      ..name = paramName
+                      ..type = Reference(usecaseName)
+                      ..named = true
+                      ..required = true;
+                  });
+                }),
+              )
+              ..initializers.addAll([
+                ...visitor.methods.map((method) {
+                  final paramName = method.name.camelCase;
+                  return refer('_$paramName').assign(Reference(paramName)).code;
+                }),
+                refer(
+                  'super',
+                ).call([refer('${featureName}Initial').constInstance([])]).code,
+              ]);
+          }),
         )
-        .forEach(buffer.writeln);
-
-    final optionalPartComment = isMultiMode ? '' : '// ';
-
-    buffer
-      ..writeln()
-      ..writeln(
-        "${optionalPartComment}part '${featureName.snakeCase}_state.dart';",
-      );
+        ..fields.addAll(
+          visitor.methods.map((method) {
+            final usecaseName = method.name.pascalCase;
+            final paramName = method.name.camelCase;
+            if (method.rawType.isDartAsyncStream) streamMethods.add(method);
+            return Field((field) {
+              field
+                ..name = '_$paramName'
+                ..type = Reference(usecaseName)
+                ..modifier = FieldModifier.final$;
+            });
+          }),
+        )
+        ..fields.addAll(
+          streamMethods.map((method) {
+            return Field((field) {
+              field
+                ..name = '_${method.name.camelCase}Subscription'
+                ..type = TypeReference((ref) {
+                  ref
+                    ..symbol = 'StreamSubscription'
+                    ..types.add(Reference(method.returnType.innerType))
+                    ..isNullable = true;
+                });
+            });
+          }),
+        )
+        ..methods.addAll(
+          visitor.methods.map((method) {
+            return _generateAdapterMethod(
+              method: method,
+              featureName: featureName,
+            );
+          }),
+        )
+        ..methods.addAll([
+          Method((methodBuilder) {
+            methodBuilder
+              ..name = 'emit'
+              ..returns = const Reference('void')
+              ..annotations.add(const Reference('override'))
+              ..requiredParameters.add(
+                Parameter((param) {
+                  param
+                    ..name = 'state'
+                    ..type = Reference(stateName);
+                }),
+              )
+              ..body = Block((block) {
+                block
+                  ..statements.add(const Code('if (isClosed) return;'))
+                  ..addExpression(
+                    refer(
+                      'super',
+                    ).property('emit').call([const Reference('state')]),
+                  );
+              });
+          }),
+          if (streamMethods.isNotEmpty)
+            Method((methodBuilder) {
+              methodBuilder
+                ..name = 'close'
+                ..returns = TypeReference((ref) {
+                  ref
+                    ..symbol = 'Future'
+                    ..types.add(const Reference('void'));
+                })
+                ..annotations.add(const Reference('override'))
+                ..modifier = MethodModifier.async
+                ..body = Block((block) {
+                  for (final method in streamMethods) {
+                    block.addExpression(
+                      refer(
+                        '_${method.name.camelCase}Subscription',
+                      ).nullSafeProperty('cancel').call([]).awaited,
+                    );
+                  }
+                  block.addExpression(
+                    refer('super').property('close').call([]).returned,
+                  );
+                });
+            }),
+        ]);
+    });
   }
 
-  void _generateAdapterBody(StringBuffer buffer, RepoVisitor visitor) {
-    final className = visitor.className;
-    final baseName = className
-        .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '')
-        .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '')
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-    final adapterName = '${baseName}Adapter';
-    final stateName = '${baseName}State';
-
-    buffer
-      ..writeln('class $adapterName extends Cubit<$stateName> {')
-      ..writeln('  $adapterName({');
-
-    // Add use cases as constructor parameters
-    for (final method in visitor.methods) {
-      final usecaseName = method.name.upperCamelCase;
-      final paramName = method.name.camelCase;
-      buffer.writeln('    required $usecaseName $paramName,');
-    }
-
-    buffer.writeln('  }) : ');
-
-    // Initialize private fields
-    for (var i = 0; i < visitor.methods.length; i++) {
-      final method = visitor.methods[i];
-      final paramName = method.name.camelCase;
-      final isLast = i == visitor.methods.length - 1;
-      buffer.writeln('       _$paramName = $paramName${isLast ? ',' : ','}');
-    }
-
-    buffer
-      ..writeln('       super(const ${baseName}Initial());')
-      ..writeln();
-
-    // Add private fields
-    for (final method in visitor.methods) {
-      final usecaseName = method.name.upperCamelCase;
-      final paramName = method.name.camelCase;
-      buffer.writeln('  final $usecaseName _$paramName;');
-    }
-
-    buffer.writeln();
-
-    // Generate methods for each use case
-    for (final method in visitor.methods) {
-      _generateAdapterMethod(buffer, method, baseName);
-    }
-
-    buffer
-      ..writeln('}')
-      ..writeln();
-  }
-
-  void _generateAdapterMethod(
-    StringBuffer buffer,
-    IFunction method,
-    String featureName,
-  ) {
+  Method _generateAdapterMethod({
+    required IFunction method,
+    required String featureName,
+  }) {
     final methodName = method.name;
     final usecasePrivateName = '_${methodName.camelCase}';
     final returnType = method.returnType.rightType;
-    final isStream = method.returnType.startsWith('Stream');
-
-    // Generate method signature
-    if (method.params != null && method.params!.isNotEmpty) {
-      // Method with parameters
-      if (method.params!.length == 1) {
-        final param = method.params![0];
-        buffer.writeln(
-          '  Future<void> $methodName(${param.type} ${param.name}) async {',
-        );
-      } else {
-        // Multiple parameters - use params class
-        final paramsClassName = '${methodName.upperCamelCase}Params';
-        buffer.writeln(
-          '  Future<void> $methodName($paramsClassName params) async {',
-        );
-      }
-    } else {
-      // Method without parameters
-      buffer.writeln('  Future<void> $methodName() async {');
+    final isStream = method.rawType.isDartAsyncStream;
+    var streamName = methodName;
+    if (!streamName.toLowerCase().trim().endsWith('stream')) {
+      streamName += 'Stream';
     }
-
-    // Emit loading state
-    if (isStream) {
-      buffer
-        ..writeln(
-          '    // Note: Stream methods might need different handling',
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = isStream ? streamName : method.name
+        ..returns = TypeReference((ref) {
+          ref.symbol = isStream ? 'void' : 'Future';
+          if (!isStream) {
+            ref.types.add(const Reference('void'));
+          }
+        })
+        ..modifier = isStream ? null : MethodModifier.async
+        ..optionalParameters.addAll(
+          method.params?.map((param) {
+                return Parameter((paramBuilder) {
+                  paramBuilder
+                    ..name = param.name
+                    ..type = TypeReference((ref) {
+                      ref
+                        ..symbol = param.type.trim().replaceAll('?', '')
+                        ..isNullable = param.isNullable;
+                    })
+                    ..named = true
+                    ..required = !param.isNullable;
+                });
+              }) ??
+              [],
         )
-        ..writeln(
-          '    // Consider using StreamSubscription for proper state management',
-        );
-    }
+        ..body = Block((body) {
+          final paramsClassName = '${methodName.pascalCase}Params';
+          final needsCustomParams =
+              method.params != null && method.params!.length > 1;
+          var resultAssignment = refer(usecasePrivateName).call(
+            [
+              if (!needsCustomParams && method.hasParams)
+                refer(method.params!.first.name)
+              else if (needsCustomParams)
+                refer(paramsClassName).newInstance(
+                  [],
+                  {
+                    for (final param in method.params!)
+                      param.name: refer(param.name),
+                  },
+                ),
+            ],
+          );
 
-    // Special loading states for specific operations
-    if (methodName.toLowerCase().contains('get') &&
-        (methodName.toLowerCase().contains('page') ||
-            methodName.toLowerCase().contains('first'))) {
-      buffer
-        ..writeln('    if (page == null || page == 1) {')
-        ..writeln('      emit(const FirstPageLoading());')
-        ..writeln('    } else {')
-        ..writeln('      emit(const ${featureName}Loading());')
-        ..writeln('    }');
-    } else if (methodName.toLowerCase().contains('fetch') ||
-        methodName.toLowerCase().contains('get')) {
-      if (methodName.toLowerCase().contains('id') ||
-          methodName.toLowerCase().contains('single')) {
-        buffer.writeln('    emit(const Fetching$featureName());');
-      } else {
-        buffer.writeln('    emit(const ${featureName}Loading());');
-      }
-    } else if (methodName.toLowerCase().contains('updat')) {
-      buffer.writeln('    emit(const Updating$featureName());');
-    } else {
-      buffer.writeln('    emit(const ${featureName}Loading());');
-    }
-
-    buffer.writeln();
-
-    // Call use case
-    if (method.params != null && method.params!.isNotEmpty) {
-      if (method.params!.length == 1) {
-        final param = method.params![0];
-        buffer.writeln(
-          '    final result = await $usecasePrivateName(${param.name});',
-        );
-      } else {
-        buffer.writeln('    final result = await $usecasePrivateName(params);');
-      }
-    } else {
-      buffer.writeln('    final result = await $usecasePrivateName();');
-    }
-
-    buffer
-      ..writeln()
-      // Handle result
-      ..writeln('    result.fold(')
-      ..writeln(
-        '      (failure) => emit(${featureName}Error.fromFailure(failure)),',
-      );
-
-    // Generate success state based on method name and return type
-    final successState = StateNameGenerator.generate(
-      methodName: methodName,
-      featureName: featureName,
-      returnType: returnType,
-    );
-    if (returnType.toLowerCase().trim() == 'void') {
-      buffer.writeln('      (_) => emit(const $successState()),');
-    } else {
-      final paramName = returnType.toLowerCase().startsWith('list')
-          ? 'data'
-          : returnType.camelCase;
-      buffer.writeln('      ($paramName) => emit($successState($paramName)),');
-    }
-
-    buffer
-      ..writeln('    );')
-      ..writeln('  }')
-      ..writeln();
+          final errorClassName = '${featureName}Error';
+          if (!isStream) {
+            resultAssignment = resultAssignment.awaited;
+            body
+              ..addExpression(
+                refer(
+                  'emit',
+                ).call([refer('${featureName}Loading').constInstance([])]),
+              )
+              ..addExpression(declareFinal('result').assign(resultAssignment))
+              ..addExpression(
+                _foldResult(
+                  errorClassName: errorClassName,
+                  methodName: methodName,
+                  featureName: featureName,
+                  returnType: returnType,
+                ),
+              );
+          } else {
+            final streamSubscriptionName = '${usecasePrivateName}Subscription';
+            body
+              ..addExpression(
+                refer(
+                  streamSubscriptionName,
+                ).nullSafeProperty('cancel').call([]),
+              )
+              ..addExpression(declareFinal('stream').assign(resultAssignment))
+              ..addExpression(
+                refer(streamSubscriptionName).assign(
+                  refer('stream')
+                      .property('listen')
+                      .call(
+                        [
+                          Method((onDataMethod) {
+                            onDataMethod
+                              ..requiredParameters.add(
+                                Parameter((param) => param.name = 'result'),
+                              )
+                              ..body = _foldResult(
+                                errorClassName: errorClassName,
+                                methodName: methodName,
+                                featureName: featureName,
+                                returnType: returnType,
+                              ).statement;
+                          }).closure,
+                        ],
+                        {
+                          'onError': Method((onErrorMethod) {
+                            onErrorMethod
+                              ..requiredParameters.addAll([
+                                Parameter((param) {
+                                  param
+                                    ..name = 'error'
+                                    ..type = const Reference('Object');
+                                }),
+                                Parameter((param) {
+                                  param
+                                    ..name = 'stackTrace'
+                                    ..type = const Reference('StackTrace');
+                                }),
+                              ])
+                              ..body = refer('emit').call([
+                                refer(errorClassName).constInstance([
+                                  literalString('Something went wrong'),
+                                ]),
+                              ]).statement;
+                          }).closure,
+                          'cancelOnError': literalFalse,
+                        },
+                      ),
+                ),
+              );
+          }
+        });
+    });
   }
 
-  void _generateStates({
-    required StringBuffer buffer,
-    required RepoVisitor visitor,
-    required bool isMultiMode,
+  Expression _foldResult({
+    required String errorClassName,
+    required String methodName,
+    required String featureName,
+    required String returnType,
   }) {
-    final className = visitor.className;
-    final baseName = className
-        .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '')
-        .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '')
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-
-    buffer
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln('// StateGenerator - $baseName States')
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln();
-
-    _generateStatesImport(
-      buffer: buffer,
-      isMultiMode: isMultiMode,
-      featureName: baseName,
-    );
-    _generateStatesBody(buffer, visitor);
+    return refer('result').property('fold').call([
+      Method((failureMethod) {
+        failureMethod
+          ..requiredParameters.add(
+            Parameter((param) => param.name = 'failure'),
+          )
+          ..lambda = true
+          ..body = refer('emit').call([
+            refer(
+              errorClassName,
+            ).newInstanceNamed('fromFailure', [refer('failure')]),
+          ]).code;
+      }).closure,
+      Method((failureMethod) {
+        // Generate success state based on method name and return type
+        final successState = StateNameGenerator.generate(
+          methodName: methodName,
+          featureName: featureName,
+          returnType: returnType,
+        );
+        final isVoid = returnType.toLowerCase() == 'void';
+        final successStateRef = refer(successState);
+        failureMethod
+          ..requiredParameters.add(
+            Parameter(
+              (param) => param.name = isVoid ? '_' : 'data',
+            ),
+          )
+          ..lambda = true
+          ..body = refer('emit').call([
+            if (isVoid)
+              successStateRef.constInstance([])
+            else
+              successStateRef.newInstance([refer('data')]),
+          ]).code;
+      }).closure,
+    ]);
   }
 
-  void _generateStatesImport({
-    required StringBuffer buffer,
-    required bool isMultiMode,
+  List<Class> _interfaceAdapterState({
+    required RepoVisitor visitor,
     required String featureName,
   }) {
-    final optionalPartComment = isMultiMode ? '' : '// ';
+    final stateName = '${featureName}State';
 
-    buffer.writeln(
-      "${optionalPartComment}part of '${featureName.snakeCase}_adapter.dart';",
-    );
-  }
-
-  void _generateStatesBody(StringBuffer buffer, RepoVisitor visitor) {
-    final className = visitor.className;
-    final baseName = className
-        .replaceAll('CubitTBG', '')
-        .replaceAll('Cubit', '')
-        .replaceAll('AdapterTBG', '')
-        .replaceAll('Adapter', '')
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '');
-    final stateName = '${baseName}State';
-
-    buffer
-      ..writeln('sealed class $stateName extends Equatable {')
-      ..writeln('  const $stateName();')
-      ..writeln()
-      ..writeln('  @override')
-      ..writeln('  List<Object> get props => [];')
-      ..writeln('}')
-      ..writeln()
-      // Initial state
-      ..writeln('final class ${baseName}Initial extends $stateName {')
-      ..writeln('  const ${baseName}Initial();')
-      ..writeln('}')
-      ..writeln()
-      // Loading states
-      ..writeln('final class ${baseName}Loading extends $stateName {')
-      ..writeln('  const ${baseName}Loading();')
-      ..writeln('}')
-      ..writeln();
+    final stateClasses = [
+      _generateBaseState(stateName: stateName),
+      _generateChildState(
+        stateName: '${featureName}Initial',
+        parentClassName: stateName,
+      ),
+      _generateChildState(
+        stateName: '${featureName}Loading',
+        parentClassName: stateName,
+      ),
+    ];
 
     // Generate success states based on methods
-    final generatedStates = <String>{};
+    final successStates = <String>{};
 
     for (final method in visitor.methods) {
       final returnType = method.returnType.rightType;
       final successState = StateNameGenerator.generate(
         methodName: method.name,
-        featureName: baseName,
+        featureName: featureName,
         returnType: returnType,
       );
 
-      if (!generatedStates.contains(successState)) {
-        generatedStates.add(successState);
-        _generateSuccessStateClass(buffer, successState, returnType, stateName);
+      if (!successStates.contains(successState)) {
+        successStates.add(successState);
+        stateClasses.add(
+          _generateSuccessStateClass(
+            successStateName: successState,
+            returnTypeString: returnType,
+            rawReturnType: method.rawType,
+            baseStateName: stateName,
+          ),
+        );
       }
     }
 
-    // Error state
-    buffer
-      ..writeln('final class ${baseName}Error extends $stateName {')
-      ..writeln(
-        '  const ${baseName}Error({required this.message, '
-        'required this.title});',
-      )
-      ..writeln()
-      ..writeln('  ${baseName}Error.fromFailure(Failure failure)')
-      ..writeln(
-        "    : this(message: failure.message, title: 'Error "
-        r"${failure.statusCode}');",
-      )
-      ..writeln()
-      ..writeln('  final String message;')
-      ..writeln('  final String title;')
-      ..writeln()
-      ..writeln('  @override')
-      ..writeln('  List<String> get props => [message, title];')
-      ..writeln('}')
-      ..writeln();
+    stateClasses.add(
+      Class((classBuilder) {
+        classBuilder
+          ..name = '${featureName}Error'
+          ..extend = Reference(stateName)
+          ..modifier = ClassModifier.final$
+          ..constructors.addAll([
+            Constructor((constructor) {
+              constructor
+                ..constant = true
+                ..optionalParameters.addAll(
+                  List.generate(2, (index) {
+                    return Parameter((param) {
+                      param
+                        ..name = switch (index) {
+                          0 => 'message',
+                          _ => 'title',
+                        }
+                        ..toThis = true
+                        ..named = true
+                        ..required = true;
+                    });
+                  }),
+                );
+            }),
+            Constructor((constructor) {
+              constructor
+                ..name = 'fromFailure'
+                ..requiredParameters.add(
+                  Parameter((param) {
+                    param
+                      ..name = 'failure'
+                      ..type = const Reference('Failure');
+                  }),
+                )
+                ..initializers.add(
+                  refer('this').call([], {
+                    'message': literal('failure.message'),
+                    'title': literalString(r'Error ${failure.statusCode}'),
+                  }).code,
+                );
+            }),
+          ])
+          ..fields.addAll(
+            List.generate(2, (index) {
+              return Field((field) {
+                field
+                  ..modifier = FieldModifier.final$
+                  ..type = TypeReference((ref) {
+                    ref
+                      ..symbol = 'String'
+                      ..isNullable = index == 1;
+                  })
+                  ..name = switch (index) {
+                    0 => 'message',
+                    _ => 'title',
+                  };
+              });
+            }),
+          )
+          ..addEquatableProps(
+            body: literalList([refer('message'), refer('title')]).code,
+          );
+      }),
+    );
+    return stateClasses;
   }
 
-  void _generateSuccessStateClass(
-    StringBuffer buffer,
-    String stateName,
-    String returnType,
-    String baseStateName,
-  ) {
-    buffer.writeln('final class $stateName extends $baseStateName {');
+  Class _generateChildState({
+    required String stateName,
+    required String parentClassName,
+  }) {
+    return Class((classBuilder) {
+      classBuilder
+        ..name = stateName
+        ..extend = Reference(parentClassName)
+        ..modifier = ClassModifier.final$
+        ..constructors.add(
+          Constructor((constructor) => constructor.constant = true),
+        );
+    });
+  }
 
-    if (returnType.toLowerCase().trim() == 'void') {
-      buffer.writeln('  const $stateName();');
-    } else {
-      var paramName = 'data';
-      if (returnType.isCustomType) {
-        if (returnType.toLowerCase().startsWith('list<')) {
-          paramName = '${returnType.innerType.lowerCamelCase}List';
-        } else {
-          paramName = returnType.innerType.lowerCamelCase;
+  Class _generateBaseState({required String stateName}) {
+    return Class((classBuilder) {
+      classBuilder
+        ..name = stateName
+        ..extend = const Reference('Equatable')
+        ..sealed = true
+        ..constructors.add(
+          Constructor((constructor) => constructor.constant = true),
+        )
+        ..addEquatableProps(params: []);
+    });
+  }
+
+  Class _generateSuccessStateClass({
+    required String successStateName,
+    required String returnTypeString,
+    required DartType rawReturnType,
+    required String baseStateName,
+  }) {
+    return Class((classBuilder) {
+      final hasParams = returnTypeString.toLowerCase().trim() != 'void';
+      String? paramName;
+      if (hasParams) {
+        paramName = 'data';
+        if (returnTypeString.isCustomType) {
+          if (returnTypeString.toLowerCase().startsWith('list<')) {
+            paramName = '${returnTypeString.innerType.camelCase}List';
+          } else {
+            paramName = returnTypeString.innerType.camelCase;
+          }
         }
       }
+      classBuilder
+        ..name = successStateName
+        ..extend = Reference(baseStateName)
+        ..modifier = ClassModifier.final$
+        ..constructors.add(
+          Constructor((constructor) {
+            if (hasParams) {
+              constructor.optionalParameters.add(
+                Parameter((param) {
+                  param
+                    ..name = paramName!
+                    ..toThis = true
+                    ..named = true
+                    ..required =
+                        rawReturnType.nullabilitySuffix ==
+                        NullabilitySuffix.none;
+                }),
+              );
+            }
 
-      buffer
-        ..writeln('  const $stateName(this.$paramName);')
-        ..writeln()
-        ..writeln('  final $returnType $paramName;')
-        ..writeln()
-        ..writeln('  @override');
-      if (returnType.toLowerCase().startsWith('list')) {
-        buffer.writeln('  List<Object> get props => $paramName;');
-      } else {
-        buffer.writeln('  List<Object> get props => [$paramName];');
+            constructor.constant = true;
+          }),
+        );
+      if (hasParams) {
+        final isListProperty = returnTypeString.toLowerCase().startsWith(
+          'list',
+        );
+        final body = isListProperty
+            ? refer(paramName!)
+            : literalList([refer(paramName!)]);
+        classBuilder
+          ..fields.add(
+            Field((field) {
+              field
+                ..name = paramName
+                ..type = TypeReference((ref) {
+                  ref
+                    ..symbol = returnTypeString
+                    ..isNullable =
+                        rawReturnType.nullabilitySuffix ==
+                        NullabilitySuffix.question;
+                })
+                ..modifier = FieldModifier.final$;
+            }),
+          )
+          ..addEquatableProps(body: body.code);
       }
-    }
-
-    buffer
-      ..writeln('}')
-      ..writeln();
+    });
   }
 }
