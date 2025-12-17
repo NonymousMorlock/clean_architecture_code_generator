@@ -1,13 +1,13 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/class_builder_extensions.dart';
 import 'package:generators/core/extensions/model_visitor_extensions.dart';
+import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
@@ -86,9 +86,7 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       ignoreMultiFileCheck = true;
     }
 
-    final writer = FeatureFileWriter(config, buildStep);
-
-    final buffer = StringBuffer();
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
     if (writer.isMultiFileEnabled && !ignoreMultiFileCheck) {
       return _generateMultiFile(
@@ -99,12 +97,13 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       );
     }
 
-    _generateEntityClass(
-      buffer: buffer,
+    final entityClass = _generateEntityClass(
       visitor: visitor,
       className: normalisedName,
     );
-    return buffer.toString();
+    return writer.resolveGeneratedCode(
+      library: Library((library) => library.body.add(entityClass)),
+    );
   }
 
   String _generateMultiFile({
@@ -113,21 +112,13 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     required String normalisedName,
     required String associatedFeatureName,
   }) {
-    final buffer = StringBuffer()
-      ..writeln(
-        "import 'package:equatable/equatable.dart';",
-      );
-
     // For compositions in the entity, we need to import all custom entities
-    writer
-        .getSmartEntityImports(
-          entities: visitor.discoverRequiredEntities(),
-          currentFeature: associatedFeatureName,
-        )
-        .forEach(buffer.writeln);
+    final (:imports, :importComments) = writer.generateSmartDomainEntityImports(
+      candidates: visitor.discoverRequiredEntities(),
+      featureName: associatedFeatureName,
+    );
 
-    _generateEntityClass(
-      buffer: buffer,
+    final entityClass = _generateEntityClass(
       visitor: visitor,
       className: normalisedName,
     );
@@ -137,10 +128,18 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       entityName: normalisedName,
     );
 
-    try {
-      writer.writeToFile(entityPath, buffer.toString());
+    final completeFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.add(entityClass)
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import));
+      }),
+    );
 
-      stdout.writeln('[EntityGenerator] Successfully wrote files');
+    try {
+      writer.writeToFile(entityPath, completeFile);
+
       return '// Entity class written to: $entityPath\n';
     } on Exception catch (e, s) {
       stderr
@@ -152,61 +151,67 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
     }
   }
 
-  void _generateEntityClass({
-    required StringBuffer buffer,
+  Class _generateEntityClass({
     required ModelVisitor visitor,
     required String className,
   }) {
-    final length = visitor.fields.length;
-    buffer
-      ..writeln('class $className extends Equatable {')
-      ..writeln('const $className({');
-    for (var i = 0; i < length; i++) {
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      final field = visitor.fieldProperties[name]!;
-      buffer.writeln('${field.isRequired ? 'required ' : ''}this.$name,');
-    }
-    buffer
-      ..writeln('});')
-      ..writeln()
-      ..writeln('$className.empty()')
-      ..writeln(':');
-    for (var i = 0; i < length; i++) {
-      final type = visitor.fields.values.elementAt(i);
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      // final field = visitor.fieldProperties[name]!;
-      final defaultValue = type.fallbackValue;
-      final emptyConstructor = '$type.empty()';
-      final optionalQuote =
-          defaultValue is String && defaultValue.toLowerCase() == 'test string'
-          ? '"'
-          : '';
-      buffer.writeln(
-        '$name = $optionalQuote'
-        '${defaultValue ?? emptyConstructor}'
-        '$optionalQuote${i == length - 1 ? ';' : ','}',
-      );
-    }
-    buffer.writeln();
-    for (var i = 0; i < length; i++) {
-      final type = visitor.fields.values.elementAt(i);
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      final field = visitor.fieldProperties[name]!;
-      buffer.writeln('final $type${field.isRequired ? '' : '?'} $name;');
-    }
-    buffer
-      ..writeln()
-      ..writeln('@override')
-      ..writeln('List<dynamic> get props => [');
-    for (var i = 0; i < length; i++) {
-      final type = visitor.fields.values.elementAt(i);
-      if (type.toLowerCase().startsWith('list')) continue;
-      final name = visitor.fields.keys.elementAt(i).camelCase;
+    return Class((classBuilder) {
+      classBuilder
+        ..name = className
+        ..extend = const Reference('Equatable')
+        ..constructors.addAll(_generateConstructors(visitor: visitor))
+        ..fields.addAll(
+          visitor.params.map((param) {
+            return Field((field) {
+              field
+                ..name = param.name.camelCase
+                ..type = TypeReference((ref) {
+                  ref
+                    ..symbol = param.type
+                    ..isNullable = param.isNullable;
+                })
+                ..modifier = FieldModifier.final$;
+            });
+          }),
+        )
+        ..addEquatableProps(params: visitor.params);
+    });
+  }
 
-      buffer.writeln('$name,');
-    }
-    buffer
-      ..writeln('];')
-      ..writeln('}');
+  List<Constructor> _generateConstructors({required ModelVisitor visitor}) {
+    return [
+      Constructor((constructor) {
+        constructor
+          ..constant = true
+          ..optionalParameters.addAll(
+            visitor.params.map((param) {
+              return Parameter((paramBuilder) {
+                paramBuilder
+                  ..name = param.name.camelCase
+                  ..named = true
+                  ..required = !param.isNullable && !param.hasDefaultValue
+                  ..defaultTo = param.hasDefaultValue
+                      ? Code(param.defaultValueCode!)
+                      : null
+                  ..toThis = true;
+              });
+            }),
+          );
+      }),
+      Constructor((constructor) {
+        constructor
+          ..name = 'empty'
+          ..constant = visitor.params.every((param) => param.type.isConstValue)
+          ..initializers.add(
+            refer('this').call(
+              [],
+              {
+                for (final param in visitor.params)
+                  param.name.camelCase: param.fallbackValue(),
+              },
+            ).code,
+          );
+      }),
+    ];
   }
 }
