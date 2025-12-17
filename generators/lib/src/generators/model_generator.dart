@@ -1,13 +1,13 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/model_visitor_extensions.dart';
+import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
@@ -18,25 +18,30 @@ import 'package:source_gen/source_gen.dart';
 /// Processes classes annotated with `@ModelGenAnnotation` and generates
 /// corresponding model classes in the data layer with JSON serialization.
 class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
-  // DIDN'T SOLVE MY ISSUE, HAD TO CHANGE BUILD.YAML CONFIG
-  // static const _checker = TypeChecker.fromRuntime(ModelGenAnnotation);
-  // unfortunately, after dart 3 update, the generateForAnnotatedElement
-  // override was no longer enough to generate the model class, so we had to
-  // override generate as well.
-  // @override
-  // Future<String> generate(LibraryReader library, BuildStep buildStep) async {
-  //   final buffer = StringBuffer();
-  //   for (var element in library.allElements) {
-  //     if (element is ClassElement && _checker
-  //     .hasAnnotationOfExact(element)) {
-  //       final visitor = ModelVisitor();
-  //       element.visitChildren(visitor);
-  //       constructor(buffer, visitor);
-  //     }
-  //   }
-  //   return buffer.toString();
-  // }
-
+  // When handling the `toMap` and `fromMap`, you'll notice I've used the
+  // configs for `DateTime` in the `toMap` but not using in the `fromMap`.
+  //
+  // The reason for this is "Postel's Law" (The Robustness Principle).
+  //
+  // "Be conservative in what you do, be liberal in what you accept
+  // from others."
+  //
+  // So, based on this rule:
+  //
+  // `toMap` (Writing/Sending): I MUST obey the config.
+  // The backend expects a specific format (e.g., specific timestamp format),
+  // so our generator must be strict here.
+  //
+  // `fromMap` (Reading/Receiving): I should IGNORE the config and use the
+  // Helper.
+  //
+  // Why? Even if the user thinks the API sends `timestamp_ms`,
+  // the API might change to ISO strings tomorrow, or send an int
+  // for one record and a double for another.
+  //
+  // Our helper `_parseDateTime` handles all of these cases automatically. It
+  // is strictly superior to a rigid config-based parser because
+  // it auto-adapts at runtime.
   @override
   String generateForAnnotatedElement(
     Element element,
@@ -105,9 +110,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       ignoreMultiFileCheck = true;
     }
 
-    final writer = FeatureFileWriter(config, buildStep);
-
-    final buffer = StringBuffer();
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
     if (writer.isMultiFileEnabled && !ignoreMultiFileCheck) {
       return _generateMultiFile(
@@ -119,45 +122,34 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       );
     }
 
-    _generateModel(
-      buffer: buffer,
+    final modelClass = _generateModelClass(
       visitor: visitor,
-      normalisedName: normalisedName,
+      entityName: normalisedName,
+      config: config,
     );
-    return buffer.toString();
+
+    return writer.resolveGeneratedCode(
+      library: Library((library) => library.body.add(modelClass)),
+    );
   }
 
   String _generateMultiFile({
     required ModelVisitor visitor,
-    required GeneratorConfig config,
     required FeatureFileWriter writer,
+    required GeneratorConfig config,
     required String normalisedName,
     required String associatedFeatureName,
   }) {
-    final buffer = StringBuffer()
-      ..writeln("import 'package:${config.appName}/core/typedefs.dart';")
-      ..writeln("import 'dart:convert';");
+    final (:imports, :importComments) = writer.generateSmartModelImports(
+      candidates: visitor.discoverRequiredEntities(),
+      featureName: associatedFeatureName,
+      parentEntityName: normalisedName,
+    );
 
-    // Import the entity this model is based on
-    writer
-        .getSmartEntityImports(
-          entities: {normalisedName},
-          currentFeature: associatedFeatureName,
-        )
-        .forEach(buffer.writeln);
-
-    writer
-        .getSmartEntityImports(
-          isModel: true,
-          entities: visitor.discoverRequiredEntities(),
-          currentFeature: associatedFeatureName,
-        )
-        .forEach(buffer.writeln);
-
-    _generateModel(
-      buffer: buffer,
+    final modelClass = _generateModelClass(
       visitor: visitor,
-      normalisedName: normalisedName,
+      entityName: normalisedName,
+      config: config,
     );
 
     final modelPath = writer.getModelPath(
@@ -165,10 +157,18 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       entityName: normalisedName,
     );
 
-    try {
-      writer.writeToFile(modelPath, buffer.toString());
+    final completeFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.add(modelClass)
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import));
+      }),
+    );
 
-      stdout.writeln('[ModelGenerator] Successfully wrote files');
+    try {
+      writer.writeToFile(modelPath, completeFile);
+
       return '// Model class written to: $modelPath\n';
     } on Exception catch (e, s) {
       stderr
@@ -184,251 +184,549 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
   ///
   /// Creates the main constructor, empty constructor, and all
   /// serialization/deserialization methods.
-  void _generateModel({
-    required StringBuffer buffer,
+  Class _generateModelClass({
+    required GeneratorConfig config,
     required ModelVisitor visitor,
-    required String normalisedName,
+    required String entityName,
   }) {
-    final modelClassName = '${normalisedName}Model';
-    final length = visitor.fields.length;
+    final modelClassName = '${entityName}Model';
 
-    buffer
-      ..writeln('class $modelClassName extends $normalisedName {')
-      ..writeln('const $modelClassName({');
-    for (var i = 0; i < length; i++) {
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      final field = visitor.fieldProperties[name]!;
-      buffer.writeln('${field.isRequired ? 'required ' : ''}super.$name,');
-    }
-    buffer
-      ..writeln('});')
-      ..writeln()
-      ..writeln('$modelClassName.empty()')
-      ..writeln(':')
-      ..writeln('this(');
-    for (var i = 0; i < length; i++) {
-      final type = visitor.fields.values.elementAt(i);
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      // final field = visitor.fieldProperties[name]!;
-      final defaultValue = type.fallbackValue;
-      final emptyConstructor = '$type.empty()';
-      final optionalQuote =
-          defaultValue is String && defaultValue.toLowerCase() == 'test string'
-          ? '"'
-          : '';
-      buffer.writeln(
-        '$name: '
-        '$optionalQuote'
-        '${defaultValue ?? emptyConstructor}'
-        '$optionalQuote${i == length - 1 ? ',);' : ','}',
-      );
-    }
-    buffer.writeln();
-    fromJson(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
-    buffer.writeln();
-    fromMap(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
-    buffer.writeln();
-    copyWith(buffer: buffer, visitor: visitor, normalisedName: normalisedName);
-    buffer.writeln();
-    toMap(buffer, visitor);
-    buffer.writeln();
-    toJson(buffer);
-    buffer.writeln();
-
-    // Add DateTime parsing helper method
-    _generateDateTimeParsingHelper(buffer);
-
-    buffer.writeln('}');
+    return Class((classBuilder) {
+      classBuilder
+        ..name = modelClassName
+        ..extend = refer(entityName)
+        ..constructors.addAll([
+          Constructor((constructor) {
+            constructor
+              ..constant = true
+              ..optionalParameters.addAll(
+                visitor.params.map((param) {
+                  return Parameter((paramBuilder) {
+                    paramBuilder
+                      ..name = param.name.camelCase
+                      ..named = true
+                      ..required = !param.isNullable && !param.hasDefaultValue
+                      ..defaultTo = param.hasDefaultValue
+                          ? Code(param.defaultValueCode!)
+                          : null
+                      ..toSuper = true;
+                  });
+                }),
+              );
+          }),
+          Constructor((constructor) {
+            constructor
+              ..name = 'empty'
+              ..constant = visitor.params.every(
+                (param) => param.type.isConstValue,
+              )
+              ..initializers.add(
+                refer('this').call(
+                  [],
+                  {
+                    for (final param in visitor.params)
+                      param.name.camelCase: param.fallbackValue(
+                        useModelForCustomType: true,
+                      ),
+                  },
+                ).code,
+              );
+          }),
+          fromJson(className: modelClassName),
+          fromMap(visitor: visitor),
+        ])
+        ..methods.addAll([
+          copyWith(visitor: visitor, className: modelClassName),
+          toMap(visitor: visitor, config: config, entityName: entityName),
+          toJson(),
+          if (visitor.params.any((param) => param.rawType.isDateTime))
+            _generateDateTimeParsingHelper(),
+          if (visitor.params.any((param) => param.rawType.isDartCoreInt))
+            _generateIntParsingHelper(),
+          if (visitor.params.any((param) => param.rawType.isDartCoreDouble))
+            _generateDoubleParsingHelper(),
+        ]);
+    });
   }
 
   /// Generates the fromMap factory constructor.
   ///
   /// Creates a factory that deserializes a model from a Map,
   /// handling various data types including DateTime and numeric conversions.
-  void fromMap({
-    required StringBuffer buffer,
+  Constructor fromMap({
     required ModelVisitor visitor,
-    required String normalisedName,
   }) {
-    final modelClassName = '${normalisedName}Model';
-    buffer
-      ..writeln('$modelClassName.fromMap(DataMap map)')
-      ..writeln(': this(');
-    for (var i = 0; i < visitor.fields.length; i++) {
-      final type = visitor.fields.values.elementAt(i);
-      final name = visitor.fields.keys.elementAt(i);
-      final field = visitor.fieldProperties[name.camelCase]!;
+    return Constructor((constructor) {
+      // TODO(Documentation): Add this note somewhere for the user to see.
+      // I'm using the param.name as it is. So, if the user's API is
+      // returning snake case keys, they have to declare the properties using
+      // snake case in the annotated class
+      final entries = <String, Expression>{};
+      final dynamicListTypeRef = TypeReference((ref) {
+        ref
+          ..symbol = 'List'
+          ..types.add(const Reference('dynamic'));
+      });
+      for (final param in visitor.params) {
+        final type = param.type;
+        final argumentName = param.name.camelCase;
+        final valueReference = refer('map').index(literalString(param.name));
 
-      if (type.isCustomType) {
-        if (type.toLowerCase().startsWith('list')) {
-          var value =
-              "List<DataMap>.from(map['$name'] as List<dynamic>).map("
-              '${type.innerType}Model.fromMap).toList()';
-          if (!field.isRequired) {
-            value = "map['$name'] != null ? $value : null";
+        Expression value;
+
+        if (type.isCustomType) {
+          final customTypeReference = refer('${type.innerType}Model');
+          if (param.rawType.isDartCoreList) {
+            value =
+                TypeReference((ref) {
+                      ref
+                        ..symbol = 'List'
+                        ..types.add(const Reference('DataMap'));
+                    })
+                    .newInstanceNamed('from', [
+                      valueReference.asA(dynamicListTypeRef),
+                    ])
+                    .property('map')
+                    .call([customTypeReference.property('fromMap')])
+                    .property('toList')
+                    .call([]);
+            if (param.isNullable) {
+              value = valueReference
+                  .notEqualTo(literalNull)
+                  .conditional(value, literalNull);
+            }
+          } else {
+            value = customTypeReference.newInstanceNamed('fromMap', [
+              valueReference.asA(const Reference('DataMap')),
+            ]);
+            if (param.isNullable) {
+              value = valueReference
+                  .notEqualTo(literalNull)
+                  .conditional(value, literalNull);
+            }
           }
-          buffer.writeln('${name.camelCase}: $value,');
+        } else if (param.rawType.isDartCoreList) {
+          value = refer(
+            type,
+          ).newInstanceNamed('from', [valueReference.asA(dynamicListTypeRef)]);
+
+          if (param.isNullable) {
+            value = valueReference
+                .notEqualTo(literalNull)
+                .conditional(value, literalNull);
+          }
+        } else if (param.rawType.isDartCoreInt) {
+          value = refer('_parseInt').call([valueReference]);
+
+          if (param.isNullable) {
+            value = valueReference
+                .notEqualTo(literalNull)
+                .conditional(value, literalNull);
+          }
+        } else if (param.rawType.isDartCoreDouble) {
+          value = refer('_parseDouble').call([valueReference]);
+
+          if (param.isNullable) {
+            value = valueReference
+                .notEqualTo(literalNull)
+                .conditional(value, literalNull);
+          }
+        } else if (type.toLowerCase().startsWith('datetime')) {
+          value = refer('_parseDateTime').call([valueReference]);
+          if (param.isNullable) {
+            value = valueReference
+                .notEqualTo(literalNull)
+                .conditional(value, literalNull);
+          }
         } else {
-          var value = "${type}Model.fromMap(map['$name'] as DataMap)";
-          if (!field.isRequired) {
-            value = "map['$name'] != null ? $value : null";
-          }
-          buffer.writeln('${name.camelCase}: $value,');
-        }
-      } else if (type.toLowerCase().startsWith('list')) {
-        var value = "$type.from(map['$name'] as List<dynamic>)";
-        if (!field.isRequired) {
-          value = "map['$name'] != null ? $value : null";
-        }
-        buffer.writeln('${name.camelCase}: $value,');
-      } else if (type.toLowerCase().startsWith('int')) {
-        var value = "(map['$name'] as num).toInt()";
-        if (!field.isRequired) {
-          value = "(map['$name'] as num?)?.toInt()";
-        }
-        buffer.writeln('${name.camelCase}: $value,');
-      } else if (type.toLowerCase().startsWith('double')) {
-        var value = "(map['$name'] as num).toDouble()";
-        if (!field.isRequired) {
-          value = "(map['$name'] as num?)?.toDouble()";
-        }
-        buffer.writeln('${name.camelCase}: $value,');
-      } else if (type.toLowerCase().startsWith('datetime')) {
-        // Enhanced DateTime parsing to handle multiple API formats
-        if (!field.isRequired) {
-          buffer.writeln(
-            "${name.camelCase}: map['$name'] == null ? null :"
-            " _parseDateTime(map['$name']),",
+          value = valueReference.asA(
+            TypeReference((ref) {
+              ref
+                ..symbol = type
+                ..isNullable = param.isNullable;
+            }),
           );
-        } else {
-          buffer.writeln("${name.camelCase}: _parseDateTime(map['$name']),");
         }
-      } else {
-        buffer.writeln(
-          "${name.camelCase}: map['$name'] "
-          "as $type${field.isRequired ? '' : '?'},",
-        );
+        entries[argumentName] = value;
       }
-    }
-    buffer.writeln(');');
+      constructor
+        ..name = 'fromMap'
+        ..requiredParameters.add(
+          Parameter((param) {
+            param
+              ..name = 'map'
+              ..type = const Reference('DataMap');
+          }),
+        )
+        ..initializers.add(refer('this').call([], entries).code);
+    });
   }
 
   /// Generates the fromJson factory constructor.
   ///
   /// Creates a factory that deserializes a model from a JSON string.
-  void fromJson({
-    required StringBuffer buffer,
-    required ModelVisitor visitor,
-    required String normalisedName,
-  }) {
-    final modelClassName = '${normalisedName}Model';
-    buffer
-      ..writeln('factory $modelClassName.fromJson(String source) =>')
-      ..writeln('$modelClassName.fromMap(jsonDecode(source) as DataMap);');
+  Constructor fromJson({required String className}) {
+    return Constructor((constructor) {
+      constructor
+        ..factory = true
+        ..name = 'fromJson'
+        ..requiredParameters.add(
+          Parameter(
+            (param) {
+              param
+                ..name = 'source'
+                ..type = refer('String');
+            },
+          ),
+        )
+        ..lambda = true
+        ..body = refer(className).newInstanceNamed('fromMap', [
+          refer('jsonDecode').call([refer('source')]).asA(refer('DataMap')),
+        ]).code;
+    });
   }
 
   /// Generates the toMap method.
   ///
   /// Creates a method that serializes the model to a Map,
   /// properly handling DateTime conversion to ISO 8601 strings.
-  void toMap(StringBuffer buffer, ModelVisitor visitor) {
-    buffer
-      ..writeln('DataMap toMap() {')
-      ..writeln('return <String, dynamic>{');
-    for (var i = 0; i < visitor.fields.length; i++) {
-      final name = visitor.fields.keys.elementAt(i);
-      final type = visitor.fields.values.elementAt(i);
-      final field = visitor.fieldProperties[name.camelCase]!;
+  Method toMap({
+    required ModelVisitor visitor,
+    required GeneratorConfig config,
+    required String entityName,
+  }) {
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'toMap'
+        ..returns = const Reference('DataMap')
+        ..body = Block((body) {
+          final entries = <String, Expression>{};
+          for (final param in visitor.params) {
+            final key = param.name;
+            Expression valueReference = refer(param.name.camelCase);
 
-      if (type.isCustomType) {
-        final initialDeclaration =
-            "'$name': ${name.camelCase}${field.isRequired ? '' : '?'}";
-        if (type.toLowerCase().startsWith('list')) {
-          buffer.writeln(
-            '$initialDeclaration.map((e) => e.toMap()).toList(),',
+            if (param.type.isCustomType) {
+              if (param.rawType.isDartCoreList) {
+                valueReference = param.isNullable
+                    ? valueReference.nullSafeProperty('map')
+                    : valueReference.property('map');
+
+                valueReference = valueReference
+                    .call([
+                      Method((methodBuilder) {
+                        methodBuilder
+                          ..lambda = true
+                          ..requiredParameters.add(
+                            Parameter((param) => param.name = 'e'),
+                          )
+                          ..body = refer('e').property('toMap').call([]).code;
+                      }).closure,
+                    ])
+                    .property('toList')
+                    .call([]);
+              } else {
+                valueReference = param.isNullable
+                    ? valueReference.nullSafeProperty('toMap')
+                    : valueReference.property('toMap');
+                valueReference = valueReference.call([]);
+              }
+            } else if (param.type.toLowerCase().startsWith('datetime')) {
+              // 1. Resolve the Config Format
+
+              // Lookup logic: Specific Model -> Default
+              final format = _resolveDateFormat(
+                config: config,
+                entityName: entityName.snakeCase,
+                fieldName: param.name.snakeCase,
+              );
+
+              // 2. Generate Expression based on Format
+              switch (format) {
+                case 'timestamp_ms':
+                  // Generates: created_at: value?.millisecondsSinceEpoch
+                  valueReference = param.isNullable
+                      ? valueReference.nullSafeProperty(
+                          'millisecondsSinceEpoch',
+                        )
+                      : valueReference.property('millisecondsSinceEpoch');
+
+                case 'timestamp_s':
+                  // Generates: created_at: value == null ? null : value.millisecondsSinceEpoch ~/ 1000
+                  final msAccess = valueReference.property(
+                    'millisecondsSinceEpoch',
+                  );
+                  final division = msAccess.operatorIntDivide(literalNum(1000));
+
+                  if (param.isNullable) {
+                    // We cannot divide null, so we must use a conditional check
+                    valueReference = valueReference
+                        .equalTo(literalNull)
+                        .conditional(literalNull, division);
+                  } else {
+                    valueReference = division;
+                  }
+
+                case 'iso_string':
+                default:
+                  // Generates: created_at: value?.toIso8601String()
+                  valueReference = param.isNullable
+                      ? valueReference.nullSafeProperty('toIso8601String')
+                      : valueReference.property('toIso8601String');
+
+                  valueReference = valueReference.call([]);
+              }
+            }
+
+            entries[key] = valueReference;
+          }
+          body.addExpression(
+            literalMap(entries, refer('String'), refer('dynamic')).returned,
           );
-        } else {
-          buffer.writeln(
-            '$initialDeclaration.toMap(),',
-          );
-        }
-      } else if (type.toLowerCase().startsWith('datetime')) {
-        buffer.writeln(
-          "'$name': "
-          "${name.camelCase}${field.isRequired ? '' : '?'}.toIso8601String(),",
-        );
-      } else {
-        buffer.writeln("'$name': ${name.camelCase},");
-      }
-    }
-    buffer
-      ..writeln('};')
-      ..writeln('}');
+        });
+    });
   }
 
   /// Generates the toJson method.
   ///
   /// Creates a method that serializes the model to a JSON string.
-  void toJson(StringBuffer buffer) {
-    buffer.writeln('String toJson() => jsonEncode(toMap());');
+  Method toJson() {
+    return Method((method) {
+      method
+        ..name = 'toJson'
+        ..returns = const Reference('String')
+        ..lambda = true
+        ..body = refer('jsonEncode').call([refer('toMap').call([])]).code;
+    });
   }
 
   /// Generates the copyWith method.
   ///
   /// Creates a method that returns a new instance with updated values,
   /// following the immutable pattern.
-  void copyWith({
-    required StringBuffer buffer,
+  Method copyWith({
     required ModelVisitor visitor,
-    required String normalisedName,
+    required String className,
   }) {
-    final modelClassName = '${normalisedName}Model';
-
-    buffer.writeln('$modelClassName copyWith({');
-    for (var i = 0; i < visitor.fields.length; i++) {
-      var type = visitor.fields.values.elementAt(i);
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      final isCustomType = type.isCustomType;
-      if (isCustomType) type = type.modelizeType;
-
-      buffer.writeln('$type? $name,');
-    }
-    buffer
-      ..writeln('}) {')
-      ..writeln('return $modelClassName(');
-    for (var i = 0; i < visitor.fields.length; i++) {
-      final name = visitor.fields.keys.elementAt(i).camelCase;
-      buffer.writeln('$name: $name ?? this.$name,');
-    }
-    buffer
-      ..writeln(');')
-      ..writeln('}');
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'copyWith'
+        ..returns = refer(className)
+        ..optionalParameters.addAll(
+          visitor.params.map((param) {
+            return Parameter((paramBuilder) {
+              paramBuilder
+                ..name = param.name.camelCase
+                ..type = TypeReference((ref) {
+                  ref
+                    ..symbol = param.type.isCustomType
+                        ? param.type.modelizeType
+                        : param.type
+                    ..isNullable = true;
+                });
+            });
+          }),
+        )
+        ..body = Block((body) {
+          body.addExpression(
+            refer(
+              className,
+            ).newInstance([], {
+              for (final param in visitor.params)
+                param.name.camelCase: refer(
+                  param.name.camelCase,
+                ).ifNullThen(refer('this').property(param.name.camelCase)),
+            }).returned,
+          );
+        });
+    });
   }
 
-  void _generateDateTimeParsingHelper(StringBuffer buffer) {
-    buffer
-      ..writeln(
-        '  // Helper method to parse DateTime from various API formats',
-      )
-      ..writeln('  static DateTime _parseDateTime(dynamic value) {')
-      ..writeln('    if (value is String) {')
-      ..writeln('      return DateTime.parse(value);')
-      ..writeln('    } else if (value is int) {')
-      ..writeln('      // Handle timestamp (milliseconds or seconds)')
-      ..writeln('      return value > 1000000000000')
-      ..writeln('          ? DateTime.fromMillisecondsSinceEpoch(value)')
-      ..writeln(
-        '          : DateTime.fromMillisecondsSinceEpoch(value * 1000);',
-      )
-      ..writeln('    } else if (value is double) {')
-      ..writeln(
-        '      return DateTime.fromMillisecondsSinceEpoch(value.toInt());',
-      )
-      ..writeln('    } else {')
-      ..writeln(
-        r"      throw FormatException('Invalid DateTime format: $value');",
-      )
-      ..writeln('    }')
-      ..writeln('  }');
+  String _resolveDateFormat({
+    required GeneratorConfig config,
+    required String entityName,
+    required String fieldName,
+  }) {
+    // We normalize names to match the YAML structure (snake_case)
+    final modelKey = entityName.snakeCase;
+    final fieldKey = fieldName.snakeCase;
+
+    return config
+            .modelTestConfig
+            .modelConfigs[modelKey]
+            ?.fieldTypes[fieldKey] ??
+        config.modelTestConfig.defaults.datetimeFormat;
+  }
+
+  // While "Don't Repeat Yourself" (DRY) is a golden rule for human-written
+  // code, I'll still put this helper in the model files themselves.
+  // WHY?
+  // If I generate a user_model.dart, I want it to "just work." If I move
+  // the logic to a shared core/utils/date_parser.dart, then I create a hard
+  // dependency.
+  //
+  // Scenario: A user deletes the core folder to regenerate it,
+  // or moves the Model file to another package.
+  //
+  // Result: The Model breaks because it can't find the utility.
+  //
+  //
+  // Also, by embedding the helper, the file is portable. It doesn't rely on
+  // the user having run the `Core` generator successfully.
+  //
+  //
+  // I also do not have to worry about bloat. The Dart compiler is smart. If
+  // you have 50 private _parseDateTime methods in 50 files, the compiler
+  // will inline/optimize them efficiently.
+  // The file size increase is negligible compared to the stability benefits.
+  Method _generateDateTimeParsingHelper() {
+    return Method((method) {
+      method
+        ..docs.add(
+          '/// Helper method to parse DateTime from various API '
+          'formats',
+        )
+        ..name = '_parseDateTime'
+        ..requiredParameters.add(
+          Parameter((param) {
+            param
+              ..name = 'value'
+              ..type = refer('dynamic');
+          }),
+        )
+        ..returns = refer('DateTime')
+        ..static = true
+        ..body = Block((body) {
+          body
+            // String
+            ..statements.add(const Code('if (value is String) {'))
+            ..addExpression(
+              refer(
+                'DateTime',
+              ).property('parse').call([refer('value')]).returned,
+            )
+            // Int
+            ..statements.add(const Code('} else if (value is int) {'))
+            ..statements.add(
+              const Code('// Handle timestamp (milliseconds or seconds)'),
+            )
+            ..addExpression(
+              refer(
+                    'value',
+                  )
+                  .greaterThan(literalNum(1000000000000))
+                  .conditional(
+                    refer('DateTime').newInstanceNamed(
+                      'fromMillisecondsSinceEpoch',
+                      [refer('value')],
+                    ),
+                    refer(
+                      'DateTime',
+                    ).newInstanceNamed('fromMillisecondsSinceEpoch', [
+                      refer('value').operatorMultiply(literalNum(1000)),
+                    ]),
+                  )
+                  .returned,
+            )
+            // double
+            ..statements.add(const Code('} else if (value is double) {'))
+            ..addExpression(
+              refer('DateTime').newInstanceNamed('fromMillisecondsSinceEpoch', [
+                refer('value').property('toInt').call([]),
+              ]).returned,
+            )
+            ..statements.add(const Code('} else {'))
+            ..addExpression(
+              refer('FormatException').newInstance([
+                const CodeExpression(
+                  Code(r"'Invalid DateTime format: $value'"),
+                ),
+              ]).thrown,
+            )
+            ..statements.add(const Code('}'));
+        });
+    });
+  }
+
+  Method _generateIntParsingHelper() {
+    return Method((method) {
+      method
+        ..docs.add('/// Helper method to parse int from various API formats')
+        ..name = '_parseInt'
+        ..requiredParameters.add(
+          Parameter(
+            (param) => param
+              ..name = 'value'
+              ..type = refer('dynamic'),
+          ),
+        )
+        ..returns = refer('int')
+        ..static = true
+        ..body = Block((body) {
+          body
+            ..statements.add(const Code('if (value is int) {'))
+            ..addExpression(refer('value').returned)
+            ..statements.add(const Code('} else if (value is double) {'))
+            ..addExpression(refer('value').property('toInt').call([]).returned)
+            ..statements.add(const Code('} else if (value is String) {'))
+            ..addExpression(
+              refer('int')
+                  .property('tryParse')
+                  .call([refer('value')])
+                  .nullSafeProperty('toInt') // Ensures result is int
+                  .call([])
+                  .ifNullThen(
+                    refer('Exception').newInstance([
+                      literalString('Could not parse int from string'),
+                    ]),
+                  )
+                  .returned,
+            )
+            ..statements.add(const Code('} else {'))
+            ..addExpression(
+              refer('Exception').newInstance([
+                literalString('Invalid type for int field'),
+              ]).thrown,
+            )
+            ..statements.add(const Code('}'));
+        });
+    });
+  }
+
+  Method _generateDoubleParsingHelper() {
+    return Method((method) {
+      method
+        ..docs.add('/// Helper method to parse double from various API formats')
+        ..name = '_parseDouble'
+        ..requiredParameters.add(
+          Parameter(
+            (param) => param
+              ..name = 'value'
+              ..type = refer('dynamic'),
+          ),
+        )
+        ..returns = refer('double')
+        ..static = true
+        ..body = Block((body) {
+          body
+            ..statements.add(const Code('if (value is double) {'))
+            ..addExpression(refer('value').returned)
+            ..statements.add(const Code('} else if (value is int) {'))
+            ..addExpression(
+              refer('value').property('toDouble').call([]).returned,
+            )
+            ..statements.add(const Code('} else if (value is String) {'))
+            // Handles "1.5" and "1" (via double.parse)
+            ..addExpression(
+              refer('double').property('parse').call([refer('value')]).returned,
+            )
+            ..statements.add(const Code('} else {'))
+            ..addExpression(
+              refer('Exception').newInstance([
+                literalString('Invalid type for double field'),
+              ]).thrown,
+            )
+            ..statements.add(const Code('}'));
+        });
+    });
   }
 }
