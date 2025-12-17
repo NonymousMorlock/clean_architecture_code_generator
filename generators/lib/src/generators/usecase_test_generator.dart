@@ -1,13 +1,14 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
-import 'package:generators/core/extensions/repo_visitor_extensions.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
+import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/generators.dart';
+import 'package:generators/src/models/param.dart';
 import 'package:source_gen/source_gen.dart';
 
 /// Generator for creating test files for use case classes.
@@ -26,464 +27,406 @@ class UsecaseTestGenerator
     element.visitChildren(visitor);
 
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
+    final className = visitor.className;
+    final featureName = writer.extractFeatureName(repoName: className);
 
-    if (writer.isMultiFileEnabled) {
+    if (writer.isMultiFileEnabled && featureName != null) {
       return _generateMultiFile(
         visitor: visitor,
         writer: writer,
-        buildStep: buildStep,
+        featureName: featureName,
+        className: className,
       );
     }
-    final buffer = StringBuffer();
 
-    _generateUsecaseTests(buffer: buffer, visitor: visitor, writer: writer);
-    return buffer.toString();
+    // Default behavior: generate all usecase tests to .g.dart
+    return writer.resolveGeneratedCode(
+      library: _generateLibraryForSingleFileOutput(
+        visitor: visitor,
+        className: className,
+      ),
+    );
   }
 
   String _generateMultiFile({
     required RepoVisitor visitor,
     required FeatureFileWriter writer,
-    required BuildStep buildStep,
+    required String featureName,
+    required String className,
   }) {
-    final className = visitor.className;
-    final featureName = writer.extractFeatureName(repoName: className);
-    final baseName = writer.extractBaseName(className);
-
-    if (featureName == null) {
-      final buffer = StringBuffer();
-      _generateUsecaseTests(buffer: buffer, visitor: visitor, writer: writer);
-      return buffer.toString();
-    }
-
-    final mockFilePath = writer.getUsecasesRepoMockPath(featureName);
-    final mockBuffer = StringBuffer();
-    // write to the .mock file
-    _writeMockFile(
-      filePath: mockFilePath,
-      buffer: mockBuffer,
-      writer: writer,
-      className: className,
-      featureName: featureName,
-      baseName: baseName,
-    );
-
     final results = <String>[];
 
+    final mockFilePath = writer.getUsecasesRepoMockPath(featureName);
+
+    final mockRepoClass = _generateMockRepoClass(className: className);
+
+    final completeMockFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..directives.addAll([
+            Directive.import('package:mocktail/mocktail.dart'),
+            Directive.import(
+              writer.getRepositoryImportStatement(featureName: featureName),
+            ),
+          ])
+          ..body.add(mockRepoClass);
+      }),
+    );
+
+    try {
+      writer.writeToFile(mockFilePath, completeMockFile);
+      results.add('// Mock$className written to: $mockFilePath');
+    } on Exception catch (e) {
+      stderr.writeln('Warning: Could not write to $mockFilePath: $e');
+      results.add('// Error writing Mock$className: $e');
+    }
+
     for (final method in visitor.methods) {
-      final usecaseBuffer = StringBuffer()
-        ..writeln("import '${className.snakeCase}.mock.dart';");
+      final usecaseTestFilePath = writer.getUsecaseTestPath(
+        featureName: featureName,
+        methodName: method.name,
+      );
 
-      final candidates = Utils.discoverMethodEntities(method);
-      writer
-          .getSmartEntityImports(
-            entities: candidates,
-            currentFeature: featureName,
-          )
-          .forEach(usecaseBuffer.writeln);
-
-      _generateUsecaseTestFromMethod(
-        buffer: usecaseBuffer,
+      final usecaseTestMethod = _generateUsecaseTestFromMethod(
         className: className,
         method: method,
-        writer: writer,
       );
 
-      final usecaseFilePath = writer.getUsecaseTestPath(
-        featureName,
-        method.name,
+      final (:imports, :importComments) = writer
+          .generateSmartUsecaseTestImports(
+            candidates: Utils.discoverMethodEntities(method),
+            featureName: featureName,
+            methodName: method.name,
+            repoName: className,
+          );
+      final completeFile = writer.resolveGeneratedCode(
+        library: Library((library) {
+          library
+            ..body.add(usecaseTestMethod)
+            ..comments.addAll(importComments)
+            ..directives.addAll(imports.map(Directive.import));
+        }),
       );
+
+      // Write to the usecase file
       try {
-        writer.writeToFile(usecaseFilePath, usecaseBuffer.toString());
+        writer.writeToFile(usecaseTestFilePath, completeFile);
         results.add(
-          '// Usecase test ${method.name} written to: $usecaseFilePath',
+          '// Usecase test ${method.name} written to: $usecaseTestFilePath',
         );
       } on Exception catch (e) {
-        stderr.writeln('Warning: Could not write to $usecaseFilePath: $e');
+        stderr.writeln('Warning: Could not write to $usecaseTestFilePath: $e');
         results.add('// Error writing usecase test ${method.name}: $e\n');
       }
     }
+
+    // Return markers for the .g.dart file
     return '${results.join('\n')}\n';
   }
 
-  void _writeMockFile({
-    required String filePath,
-    required StringBuffer buffer,
-    required FeatureFileWriter writer,
+  Class _generateMockRepoClass({
     required String className,
-    required String featureName,
-    required String baseName,
   }) {
-    buffer
-      ..writeln("import 'package:mocktail/mocktail.dart';")
-      ..writeln(
-        writer.getRepositoryImportStatement(
-          baseName: baseName,
-          featureName: featureName,
-        ),
-      )
-      ..writeln()
-      ..writeln('class Mock$className extends Mock implements $className {}');
-    try {
-      writer.writeToFile(filePath, buffer.toString());
-    } on Exception catch (e) {
-      stderr.writeln('Warning: Could not write to $filePath: $e');
-    }
+    return Class((classBuilder) {
+      classBuilder
+        ..name = 'Mock$className'
+        ..extend = const Reference('Mock')
+        ..implements.add(Reference(className));
+    });
   }
 
-  void _generateUsecaseTests({
-    required StringBuffer buffer,
+  Library _generateLibraryForSingleFileOutput({
     required RepoVisitor visitor,
-    required FeatureFileWriter writer,
+    required String className,
   }) {
-    final className = visitor.className;
-
-    final usedEntities = visitor.discoverRequiredEntities();
-
-    writer.getRepoTestImports()
-      ..add("import '${className.snakeCase}.mock.dart';")
-      ..forEach(buffer.writeln);
-
-    final featureName = writer.extractFeatureName()!;
-
-    writer.getSmartEntityImports(
-      entities: usedEntities,
-      currentFeature: featureName,
-    );
-
-    final tag =
-        '''
-// **************************************************************************
-// ${className.snakeCase}.mock.dart
-// **************************************************************************
-''';
-    buffer
-      ..writeln(tag)
-      ..writeln(
-        'class Mock$className extends Mock implements $className '
-        '{}',
-      );
-
-    for (final method in visitor.methods) {
-      _generateUsecaseTestFromMethod(
-        buffer: buffer,
-        className: className,
-        method: method,
-        writer: writer,
-      );
-    }
+    return Library((library) {
+      library
+        ..comments.addAll([
+          '// **************************************************************************',
+          '// ${className.snakeCase}.mock.dart',
+          '// **************************************************************************',
+        ])
+        ..body.addAll([
+          _generateMockRepoClass(className: className),
+          for (final method in visitor.methods)
+            _generateUsecaseTestFromMethod(
+              className: className,
+              method: method,
+            ),
+        ]);
+    });
   }
 
-  void _generateUsecaseTestFromMethod({
-    required StringBuffer buffer,
+  Method _generateUsecaseTestFromMethod({
     required String className,
     required IFunction method,
-    required FeatureFileWriter writer,
   }) {
-    final hasParams = method.params != null;
-    final featureName = writer.extractFeatureName(repoName: className);
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'main'
+        ..returns = const Reference('void')
+        ..body = Block((body) {
+          body
+            ..addExpression(
+              declareVar(
+                'repo',
+                type: refer(className),
+                late: true,
+              ),
+            )
+            ..addExpression(
+              declareVar(
+                'usecase',
+                type: refer(method.name.pascalCase),
+                late: true,
+              ),
+            );
 
-    if (featureName != null) {
-      buffer
-        ..writeln(
-          writer.getUsecaseImportStatement(
-            featureName: featureName,
-            methodName: method.name,
-          ),
-        )
-        ..writeln();
-    }
+          if (method.hasParams) {
+            for (final param in method.params!) {
+              final variableName = 't${param.name.pascalCase}';
+              final variableRef = param.rawType.isConst
+                  ? declareConst(variableName)
+                  : declareFinal(variableName);
+              body.addExpression(
+                variableRef.assign(
+                  param.fallbackValue(
+                    useConstForCollections: false,
+                    skipIfNullable: false,
+                  ),
+                ),
+              );
+            }
+          }
 
-    buffer
-      ..writeln('void main() {')
-      ..writeln('  late Mock$className repo;')
-      ..writeln('  late ${method.name.upperCamelCase} usecase;');
+          final resultType = method.rawType.rightType;
+          if (resultType is! VoidType) {
+            const resultVariableName = 'tResult';
+            final testResultRef = resultType.isConst
+                ? declareConst(resultVariableName)
+                : declareFinal(resultVariableName);
 
-    final testNames = <String>[];
-
-    // 3. PARAMETER GENERATION (Simplified)
-    if (hasParams) {
-      for (final param in method.params!) {
-        buffer.writeln();
-        final testName = 't${param.name.upperCamelCase}';
-        testNames.add(testName);
-
-        // LOGIC: Trust the extension.
-        // fallbackValue returns code string: "User.empty()", "[]", "1", "\"Test\""
-        final value = param.type.fallbackValue;
-
-        // LOGIC: isCustomType on the type string decides const/final
-        final isCustom = param.type.isCustomType;
-
-        // Exception: Lists are always not const if they contain custom types,
-        // but '[]' can be const. For safety in tests, 'final'
-        // is usually fine for lists.
-        final keyword = (isCustom || param.type.toLowerCase().contains('list'))
-            ? 'final'
-            : 'const';
-
-        buffer.writeln('  $keyword $testName = $value;');
-      }
-    }
-
-    // 4. RESULT GENERATION (Simplified)
-    final methodReturnType =
-        method.returnType.rightType; // Handle Future/Either automatically
-    final resultValue = methodReturnType.fallbackValue;
-
-    // Only generate tResult if it's not void
-    if (resultValue != 'null') {
-      final isResultCustom = methodReturnType.isCustomType;
-      final keyword =
-          (isResultCustom || methodReturnType.toLowerCase().contains('list'))
-          ? 'final'
-          : 'const';
-
-      buffer
-        ..writeln()
-        ..writeln('  $keyword tResult = $resultValue;');
-    }
-
-    buffer.writeln();
-    _generateSetUp(buffer, className, method);
-    buffer.writeln();
-    _generateActualTest(buffer, className, method, testNames, resultValue);
-    buffer.writeln('}');
-  }
-
-  void _generateSetUp(StringBuffer buffer, String className, IFunction method) {
-    buffer
-      ..writeln('  setUp(() {')
-      ..writeln('    repo = Mock$className();')
-      ..writeln('    usecase = ${method.name.upperCamelCase}(repo);');
-
-    if (method.params != null) {
-      for (final param in method.params!) {
-        // Only register fallback if it's a custom type that might need it
-        if (param.type.isCustomType) {
-          buffer.writeln(
-            '    registerFallbackValue(t${param.name.upperCamelCase});',
-          );
-        }
-      }
-    }
-    buffer.writeln('  });');
-  }
-
-  void _generateActualTest(
-    StringBuffer buffer,
-    String className,
-    IFunction method,
-    List<String> testNames,
-    dynamic resultValue, // The code string for the result
-  ) {
-    final returnType = method.returnType; // Raw return type
-    final methodName = method.name;
-    final isStream = returnType.startsWith('Stream');
-    final rightType = returnType.rightType; // The success type
-
-    buffer
-      ..writeln('  test(')
-      ..writeln("    'should call the [$className.$methodName]',")
-      ..writeln('    () async {')
-      // WHEN BLOCK
-      ..writeln('      when(() => repo.$methodName(');
-    if (method.params != null) {
-      for (final param in method.params!) {
-        final matcher = param.isNamed
-            ? '${param.name}: any(named: "${param.name}"),'
-            : 'any(),';
-        buffer.writeln('        $matcher');
-      }
-    }
-    buffer.writeln('      )).thenAnswer(');
-
-    // ANSWER BLOCK
-    final responsePayload = resultValue == 'null' ? 'null' : 'tResult';
-    final prefix = isStream ? 'Stream.value(' : '';
-    final suffix = isStream ? ')' : '';
-    var modifier = (resultValue == 'null') ? '' : 'const';
-    // If tResult is used (variable), remove const
-    if (responsePayload == 'tResult') modifier = '';
-
-    // Wrap in Right/Left. clean architecture assumes success path for this basic test.
-    buffer
-      ..writeln(
-        '        (_) async => $prefix$modifier Right($responsePayload)$suffix,',
-      )
-      ..writeln('      );') // Close thenAnswer
-      ..writeln();
-
-    // ACT BLOCK
-    final resultVar = isStream ? 'stream' : 'result';
-    final awaitKey = isStream ? '' : 'await';
-
-    // Handle Params Call
-    var paramsCall = '()';
-    if (testNames.length > 1) {
-      // Assuming you have a Params class for multiple args
-      // (UseCase specific pattern)
-      final paramsClassName = '${method.name.upperCamelCase}Params';
-      // We need to construct the params object
-      final args = testNames
-          .map((t) {
-            final paramName = t.replaceFirst('t', '').lowerCamelCase;
-            return '$paramName: $t';
-          })
-          .join(', ');
-      paramsCall = '($paramsClassName($args))';
-    } else if (testNames.isNotEmpty) {
-      paramsCall = '(${testNames.first})';
-    }
-
-    buffer.writeln('      final $resultVar = $awaitKey usecase$paramsCall;');
-
-    // ASSERT BLOCK
-    final expectMatcher = isStream ? 'emits' : 'equals';
-    buffer
-      ..writeln('      expect(')
-      ..writeln('        $resultVar,')
-      ..writeln(
-        '        $expectMatcher($modifier Right<dynamic, '
-        '$rightType>($responsePayload)),',
-      )
-      ..writeln('      );')
-      // VERIFY BLOCK
-      ..writeln('      verify(() => repo.$methodName(');
-    if (method.params != null) {
-      for (final param in method.params!) {
-        final matcher = param.isNamed
-            ? '${param.name}: any(named: "${param.name}"),'
-            : 'any(),';
-        buffer.writeln('        $matcher');
-      }
-    }
-    buffer
-      ..writeln('      )).called(1);')
-      ..writeln('      verifyNoMoreInteractions(repo);')
-      ..writeln('    },')
-      ..writeln('  );');
+            body.addExpression(
+              testResultRef.assign(
+                resultType.fallbackValue(useConstForCollections: false),
+              ),
+            );
+          }
+          body
+            ..addExpression(
+              _generateSetUp(className: className, method: method),
+            )
+            ..addExpression(
+              _generateActualTest(className: className, method: method),
+            );
+        });
+    });
   }
 
   /// Generates the setUp method for use case tests.
   ///
   /// Initializes mocks and registers fallback values for parameters.
-  void setUp(StringBuffer buffer, String className, IFunction method) {
-    final hasParams = method.params != null;
-    buffer
-      ..writeln('setUp(() {')
-      ..writeln('repo = Mock$className();')
-      ..writeln('usecase = ${method.name.upperCamelCase}(repo);');
-    if (hasParams) {
-      for (final param in method.params!) {
-        buffer.writeln('registerFallbackValue(t${param.name.upperCamelCase});');
-      }
-    }
-    buffer.writeln('});');
+  Expression _generateSetUp({
+    required String className,
+    required IFunction method,
+  }) {
+    return refer('setUp').call([
+      Method((methodBuilder) {
+        methodBuilder.body = Block((body) {
+          body
+            ..addExpression(
+              refer('repo').assign(refer('Mock$className').newInstance([])),
+            )
+            ..addExpression(
+              refer('usecase').assign(
+                refer(method.name.pascalCase).newInstance([refer('repo')]),
+              ),
+            );
+          if (method.hasParams) {
+            for (final param in method.params!) {
+              if (param.type.isCustomType &&
+                  !param.rawType.isDartCoreList &&
+                  !param.rawType.isEnum) {
+                body.addExpression(
+                  refer(
+                    'registerFallbackValue',
+                  ).call([refer('t${param.name.pascalCase}')]),
+                );
+              }
+            }
+          }
+        });
+      }).closure,
+    ]);
   }
 
-  /// Generates a test case for a use case.
-  ///
-  /// Creates a comprehensive test that verifies the use case calls
-  /// the repository correctly and returns the expected result.
-  void test(
-    StringBuffer buffer,
-    String className,
-    IFunction method,
-    List<String> testNames,
-  ) {
-    final returnType = method.returnType.trim();
+  Expression _generateActualTest({
+    required String className,
+    required IFunction method,
+  }) {
     final methodName = method.name;
-    final isStream = returnType.startsWith('Stream');
-    final action = isStream ? 'emit' : 'return';
-    buffer
-      ..writeln('test(')
-      ..writeln(
-        returnType.rightType == 'void'
-            ? "'should call the [$className.${method.name}]',"
-            : "'should $action [${method.returnType.rightType}] "
-                  "from the repo',",
-      )
-      ..writeln('() async {')
-      ..writeln('when(() => repo.$methodName(');
-    if (method.params != null) {
-      for (final param in method.params!) {
-        final fallback = param.isNamed
-            ? '${param.name}: any(named: "${param.name}"),'
-            : 'any(),';
-        buffer.writeln(fallback);
-      }
-    }
-    // var fallback = method.returnType.fallbackValue == method.returnType
-    //     ? '${method.returnType.rightType}()'
-    //     : method.returnType.fallbackValue;
-    final returnTypeFallback = method.returnType.fallbackValue;
-    final fallback =
-        returnTypeFallback is String && returnTypeFallback == 'null'
-        ? null
-        : 'tResult';
-    final hasCustomReturnType =
-        returnTypeFallback is String && returnTypeFallback.isCustomType;
-    // if (fallback is String && fallback.isCustomType) {
-    //   fallback = 'tResult';
-    //   hasCustomReturnType = true;
-    // }
-    buffer
-      ..writeln('),')
-      ..writeln(')')
-      ..writeln('.thenAnswer(');
-    final moreThanOneParam = testNames.length > 1;
-    final modifier = hasCustomReturnType ? '' : 'const';
-    var streamPrefix = '';
-    var streamSuffix = '';
-    if (isStream) {
-      streamPrefix = 'Stream.value(';
-      streamSuffix = ')';
-    }
-    buffer
-      ..writeln(
-        '(_) async '
-        '=> $streamPrefix'
-        '$modifier Right($fallback)$streamSuffix,',
-      )
-      ..writeln(');')
-      ..writeln();
-    final resultText = isStream ? 'stream' : 'result';
-    buffer.writeln(
-      'final $resultText = ${isStream ? '' : 'await'} ${moreThanOneParam
-          ? 'usecase('
-          : testNames.isNotEmpty
-          ? 'usecase(${testNames.first});'
-          : 'usecase();'}',
-    );
-    if (moreThanOneParam) {
-      final className = '${method.name.upperCamelCase}Params';
-      buffer.writeln('const $className(');
-      for (final name in testNames) {
-        buffer.writeln('${name.replaceFirst('t', '').lowerCamelCase}: $name,');
-      }
-      buffer
-        ..writeln('),')
-        ..writeln(');');
-    }
-    buffer
-      ..writeln(
-        'expect($resultText, ${isStream ? 'emits' : 'equals'}($modifier '
-        'Right<dynamic, ${method.returnType.rightType}>($fallback)));',
-      )
-      ..writeln('verify(() => repo.$methodName(');
-    if (method.params != null) {
-      for (final param in method.params!) {
-        final fallback = param.isNamed
-            ? '${param.name}: any(named: "${param.name}"),'
-            : 'any(),';
-        buffer.writeln(fallback);
-      }
-    }
-    buffer
-      ..writeln('),).called(1);')
-      ..writeln('verifyNoMoreInteractions(repo);')
-      ..writeln('},')
-      ..writeln(');');
+    final isStream = method.rawType.isDartAsyncStream;
+
+    return refer('test').call([
+      literalString('should call the [$className.$methodName]'),
+      Method((methodBuilder) {
+        if (!isStream) {
+          methodBuilder.modifier = MethodModifier.async;
+        }
+
+        final positionalArgumentsWithAny = <Expression>[];
+        final namedArgumentsWithAny = <String, Expression>{};
+        final positionalArgumentsWithTest = <Expression>[];
+        final namedArgumentsWithTest = <String, Expression>{};
+        for (final param in method.params ?? <Param>[]) {
+          if (param.isNamed) {
+            namedArgumentsWithAny[param.name] = refer(
+              'any',
+            ).call([], {'named': literalString(param.name)});
+            namedArgumentsWithTest[param.name] = refer(
+              't${param.name.pascalCase}',
+            );
+          } else {
+            positionalArgumentsWithAny.add(refer('any').call([]));
+            positionalArgumentsWithTest.add(refer('t${param.name.pascalCase}'));
+          }
+        }
+        final useLambdas = Utils.shouldUseLambdaBody(
+          methodHasParams: method.hasParams,
+          namedArgumentsLength: namedArgumentsWithAny.length,
+          positionalWhenArgumentsLength: positionalArgumentsWithAny.length,
+        );
+
+        methodBuilder.body = Block((body) {
+          final responsePayload = method.rawType.rightType is VoidType
+              ? literalNull
+              : refer('tResult');
+          // TODO(Test): Test this with various return types to
+          //  make sure it uses a const instance ONLY when appropriate
+          final isConst =
+              responsePayload == literalNull ||
+              method.rawType.rightType.isConst;
+          // Arrange
+          body.addExpression(
+            refer('when')
+                .call([
+                  Method((methodBuilder) {
+                    final body = refer('repo')
+                        .property(methodName)
+                        .call(
+                          positionalArgumentsWithAny,
+                          namedArgumentsWithAny,
+                        );
+                    methodBuilder
+                      ..lambda = useLambdas
+                      ..body = useLambdas
+                          ? body.code
+                          : Block(
+                              (block) => block.addExpression(body.returned),
+                            );
+                  }).closure,
+                ])
+                .property('thenAnswer')
+                .call([
+                  Method((methodBuilder) {
+                    final responseRef = isConst
+                        ? refer('Right').constInstance([responsePayload])
+                        : refer('Right').newInstance([responsePayload]);
+
+                    Expression body;
+
+                    if (!isStream) {
+                      methodBuilder.modifier = MethodModifier.async;
+                      body = responseRef;
+                    } else {
+                      body = refer(
+                        'Stream',
+                      ).property('value').call([responseRef]);
+                    }
+                    methodBuilder
+                      ..requiredParameters.add(
+                        Parameter((param) => param.name = '_'),
+                      )
+                      ..lambda = true
+                      ..body = body.code;
+                  }).closure,
+                ]),
+          );
+
+          // Act
+          final resultName = isStream ? 'stream' : 'result';
+          final paramsClassName = '${methodName.pascalCase}Params';
+          final needsCustomParams =
+              method.params != null && method.params!.length > 1;
+          final resultAssignment = refer('usecase').call(
+            [
+              if (!needsCustomParams && method.hasParams)
+                refer('t${method.params!.first.name.pascalCase}')
+              else if (needsCustomParams)
+                refer(paramsClassName).newInstance(
+                  [],
+                  {
+                    for (final param in method.params!)
+                      param.name: refer('t${param.name.pascalCase}'),
+                  },
+                ),
+            ],
+          );
+          body.addExpression(
+            declareFinal(
+              resultName,
+            ).assign(isStream ? resultAssignment : resultAssignment.awaited),
+          );
+
+          // Assert
+          final expectedRef = TypeReference((ref) {
+            ref
+              ..symbol = 'Right'
+              ..types.addAll([
+                const Reference('dynamic'),
+                refer(method.rawType.rightType.displayString()),
+              ]);
+          });
+          body
+            ..addExpression(
+              refer(
+                'expect',
+              ).call([
+                refer(resultName),
+                refer(isStream ? 'emits' : 'equals').call([
+                  if (isConst)
+                    expectedRef.constInstance([responsePayload])
+                  else
+                    expectedRef.newInstance([responsePayload]),
+                ]),
+              ]),
+            )
+            ..addExpression(
+              refer('verify')
+                  .call([
+                    Method((methodBuilder) {
+                      final body = refer('repo')
+                          .property(methodName)
+                          .call(
+                            positionalArgumentsWithTest,
+                            namedArgumentsWithTest,
+                          );
+                      methodBuilder
+                        ..lambda = useLambdas
+                        ..body = useLambdas
+                            ? body.code
+                            : Block((block) => block.addExpression(body));
+                    }).closure,
+                  ])
+                  .property('called')
+                  .call([literalNum(1)]),
+            )
+            ..addExpression(
+              refer('verifyNoMoreInteractions').call([refer('repo')]),
+            );
+        });
+      }).closure,
+    ]);
   }
 }
