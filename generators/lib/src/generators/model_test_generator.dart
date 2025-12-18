@@ -132,7 +132,18 @@ class ModelTestGenerator
           ])
           ..body.addAll([
             Code('/*\n$completeFixtureFile\n*/\n'),
-            fixtureReader,
+            Library((library) {
+              library
+                ..comments.addAll([
+                  '// **************************************************************************',
+                  '// Fixture Reader',
+                  '// **************************************************************************',
+                  '',
+                  '// Helper function to read fixture files for tests.',
+                  'Create this file at: test/fixtures/fixture_reader.dart',
+                ])
+                ..body.add(fixtureReader);
+            }),
             modelTest,
           ]);
       }),
