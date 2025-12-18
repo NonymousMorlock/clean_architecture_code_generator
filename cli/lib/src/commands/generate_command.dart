@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:clean_arch_cli/src/config_reader.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 /// {@template generate_command}
@@ -120,25 +121,41 @@ class GenerateCommand extends Command<int> {
 
       if (exitCode == 0) {
         try {
-          if (!watch && deleteConflicting) {
-            _logger.info(
-              '🧹 Deleting existing .g.dart files in project $projectPath...',
+          if (!watch) {
+            final isMultiFileEnabled = ConfigReader.isMultiFileEnabled(
+              projectPath,
             );
+
+            _logger.info(
+              '🧹 Cleaning up output files '
+              '(Multi-file mode: $isMultiFileEnabled)...',
+            );
+
             final dir = Directory(projectPath);
-            final gFiles = dir
+            final filesToDelete = dir
                 .listSync(recursive: true)
                 .whereType<File>()
-                .where(
-                  (file) =>
-                      file.path.endsWith('.g.dart') ||
-                      file.path.endsWith('.g.part'),
-                );
-            for (final file in gFiles) {
+                .where((file) {
+                  final path = file.path;
+                  final isGFile = path.endsWith('.g.dart');
+                  final isPartFile =
+                      path.endsWith('.g.part') || path.endsWith('.part');
+
+                  if (isMultiFileEnabled) {
+                    // Delete everything generated in multi-file mode
+                    return isGFile || isPartFile;
+                  } else {
+                    // Keep .g.dart files in single-file mode, only delete parts
+                    return isPartFile;
+                  }
+                });
+
+            for (final file in filesToDelete) {
               file.deleteSync();
             }
           }
         } on Exception catch (e) {
-          _logger.err('❌ Failed to delete .g.dart files: $e');
+          _logger.err('❌ Failed to clean up output files: $e');
         }
 
         // run the dart format command on the directory
