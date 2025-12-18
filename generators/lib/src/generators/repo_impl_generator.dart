@@ -1,16 +1,15 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/code_builder_extensions.dart';
+import 'package:generators/core/extensions/i_function_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
-import 'package:generators/core/services/functions.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
@@ -31,45 +30,49 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
 
     // Load config to check if multi-file output is enabled
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
 
-    if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer);
+    if (writer.isMultiFileEnabled && featureName != null) {
+      return _generateMultiFile(
+        visitor: visitor,
+        writer: writer,
+        featureName: featureName,
+      );
     }
 
     // Default behavior: generate to .g.dart
-    final buffer = StringBuffer();
-    repository(buffer: buffer, visitor: visitor);
-    return buffer.toString();
+    final repoImplClass = repository(visitor: visitor);
+    return writer.resolveGeneratedCode(
+      library: Library((library) => library.body.add(repoImplClass)),
+    );
   }
 
-  String _generateMultiFile(
-    RepoVisitor visitor,
-    FeatureFileWriter writer,
-  ) {
-    final featureName = writer.extractFeatureName(repoName: visitor.className);
-    if (featureName == null) {
-      // Fallback to default
-      final buffer = StringBuffer();
-      repository(buffer: buffer, visitor: visitor);
-      return buffer.toString();
-    }
-
-    final baseName = writer.extractBaseName(visitor.className);
-    final repoImplPath = writer.getRepoImplPath(featureName, baseName);
+  String _generateMultiFile({
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+    required String featureName,
+  }) {
+    final repoImplPath = writer.getRepoImplPath(featureName);
 
     // Generate repository implementation code
-    final buffer = StringBuffer();
-    repository(buffer: buffer, visitor: visitor);
+    final repoImplClass = repository(visitor: visitor);
 
     // Generate complete file with imports
-    final imports = writer.generateSmartRepoImplImports(
+    final (:imports, :importComments) = writer.generateSmartRepoImplImports(
       candidates: visitor.discoverRequiredEntities(),
       featureName: featureName,
+      hasStream: visitor.methods.any(
+        (method) => method.rawType.isDartAsyncStream,
+      ),
     );
-    final completeFile = writer.generateCompleteFile(
-      imports: imports,
-      generatedCode: buffer.toString(),
+    final completeFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.add(repoImplClass)
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import));
+      }),
     );
 
     // Write to the repository implementation file
@@ -88,139 +91,190 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
   ///
   /// Creates a concrete implementation of the repository interface
   /// that delegates to data sources and handles data transformations.
-  void repository({
-    required StringBuffer buffer,
-    required RepoVisitor visitor,
-  }) {
+  Class repository({required RepoVisitor visitor}) {
     final repoName = visitor.className;
     final className = '${repoName}Impl';
-    buffer
-      ..writeln('class $className implements $repoName {')
-      ..writeln('const $className(this._remoteDataSource);')
-      ..writeln()
-      ..writeln(
-        'final '
-        '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc '
-        '_remoteDataSource;',
-      )
-      ..writeln();
-    for (final method in visitor.methods) {
-      final returnType = method.returnType.rightType;
-      final result = returnType.trim() != 'void' ? 'final result = ' : '';
-      final returnResult = returnType.trim() != 'void' ? 'result' : 'null';
-      buffer.writeln('@override');
-      final isStream = method.returnType.startsWith('Stream');
-      final asyncText = isStream ? '' : 'async';
-      final asynchronyType = isStream ? 'Stream' : 'Future';
-      if (method.params != null) {
-        final params = method.params!
-            .map((param) => paramToString(method, param))
-            .join(', ');
-        buffer.writeln(
-          'Result$asynchronyType<$returnType> ${method.name}($params) '
-          '$asyncText {',
+    return Class((builder) {
+      builder
+        ..name = className
+        ..implements.add(Reference(repoName))
+        ..constructors.add(
+          Constructor((builder) {
+            builder
+              ..constant = true
+              ..requiredParameters.add(
+                Parameter((param) {
+                  param
+                    ..name = '_remoteDataSource'
+                    ..toThis = true;
+                }),
+              );
+          }),
+        )
+        ..fields.add(
+          Field(
+            (builder) => builder
+              ..name = '_remoteDataSource'
+              ..modifier = FieldModifier.final$
+              ..type = Reference(
+                '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc',
+              ),
+          ),
+        )
+        ..methods.addAll(
+          visitor.methods.map((method) {
+            final returnType = method.returnType.rightType;
+            final isStream = method.returnType.startsWith('Stream');
+            final asynchronyType = isStream ? 'Stream' : 'Future';
+            return Method((methodBuilder) {
+              methodBuilder
+                ..annotations.add(const Reference('override'))
+                ..name = method.name
+                ..returns = TypeReference((ref) {
+                  ref
+                    ..symbol = 'Result$asynchronyType'
+                    ..types.add(Reference(returnType));
+                })
+                ..modifier = isStream ? null : MethodModifier.async
+                ..addParamsFrom(method);
+              if (!isStream) {
+                methodBuilder.body = _buildAsyncMethodBody(
+                  method: method,
+                  isVoid: returnType.trim() == 'void',
+                );
+              } else {
+                methodBuilder.body = _buildStreamMethodBody(method: method);
+              }
+            });
+          }),
         );
-        if (!isStream) {
-          final commaSeparatedArguments = method.params!
-              .map(_paramToArg)
-              .join(', ');
-          buffer
-            ..writeln('try {')
-            ..writeln(
-              '${result}await '
-              '_remoteDataSource.${method.name}($commaSeparatedArguments);',
-            )
-            ..writeln(
-              'return '
-              "${returnResult == 'null' ? 'const ' : ''}Right($returnResult);",
-            )
-            ..writeln('} on ServerException catch (e) {')
-            ..writeln(
-              'return Left(ServerFailure(message: e.message, '
-              'statusCode: e.statusCode));',
-            )
-            ..writeln('}');
-        } else {
-          final commaSeparatedArguments = method.params!
-              .map(_paramToArg)
-              .join(', ');
-          buffer.writeln(
-            'return _remoteDataSource.${method.name}'
-            '($commaSeparatedArguments).transform(',
-          );
-          _writeTransformer(buffer, method: method);
-          buffer.writeln(');');
-        }
-        buffer.writeln('}');
+    });
+  }
+
+  Block _buildAsyncMethodBody({
+    required IFunction method,
+    required bool isVoid,
+  }) {
+    return Block((bodyBuilder) {
+      bodyBuilder.statements.add(const Code('try {'));
+
+      final (:positional, :named) = method.extractArgs();
+
+      // await _remoteDataSource.methodName(...);
+      final callExpression = refer(
+        '_remoteDataSource',
+      ).property(method.name).call(positional, named).awaited;
+
+      if (isVoid) {
+        bodyBuilder
+          ..addExpression(callExpression)
+          ..addExpression(refer('Right').call([refer('null')]).returned);
       } else {
-        buffer.writeln(
-          'Result$asynchronyType<$returnType> ${method.name}'
-          '() $asyncText {',
-        );
-        if (!isStream) {
-          buffer
-            ..writeln('try {')
-            ..writeln('${result}await _remoteDataSource.${method.name}();')
-            ..writeln(
-              'return '
-              "${returnResult == 'null' ? 'const ' : ''}Right($returnResult);",
-            )
-            ..writeln('} on ServerException catch (e) {')
-            ..writeln(
-              'return Left(ServerFailure(message: e.message, '
-              'statusCode: e.statusCode));',
-            )
-            ..writeln('}');
-        } else {
-          buffer.writeln(
-            'return _remoteDataSource.${method.name}().transform(',
-          );
-          _writeTransformer(buffer, method: method);
-          buffer.writeln(');');
-        }
-        buffer.writeln('}');
+        bodyBuilder
+          ..addExpression(declareFinal('result').assign(callExpression))
+          ..addExpression(refer('Right').call([refer('result')]).returned);
       }
-    }
-    buffer.writeln('}');
+
+      bodyBuilder.statements.add(
+        const Code('} on ServerException catch (e) {'),
+      );
+
+      final serverFailure = refer('ServerFailure').newInstance([], {
+        'message': refer('e').property('message'),
+        'statusCode': refer('e').property('statusCode'),
+      });
+
+      bodyBuilder.addExpression(refer('Left').call([serverFailure]).returned);
+
+      bodyBuilder.statements.add(const Code('}'));
+    });
   }
 
-  String _paramToArg(Param param) {
-    if (param.isNamed) {
-      return '${param.name}: ${param.name}';
-    } else {
-      return param.name;
-    }
-  }
+  Block _buildStreamMethodBody({required IFunction method}) {
+    return Block((bodyBuilder) {
+      // the 'handleData' closure: (data, sink) { ... }
+      final handleData = Method(
+        (method) => method
+          ..requiredParameters.addAll([
+            Parameter((param) => param.name = 'data'),
+            Parameter((param) => param.name = 'sink'),
+          ])
+          ..body = Block((body) {
+            body.addExpression(
+              refer('sink').property('add').call([
+                refer('Right').call([refer('data')]),
+              ]),
+            );
+          }),
+      ).closure;
 
-  void _writeTransformer(StringBuffer buffer, {required IFunction method}) {
-    // left of transformer is the Stream's return type
-    // right side is the return type of the calling function, in this
-    // case, our repoImpl method
-    final modelReturnType = method.returnType.modelizeType;
-    buffer
-      ..writeln(
-        'StreamTransformer<'
-        '$modelReturnType, ${method.returnType}'
-        '>.fromHandlers(',
-      )
-      ..writeln('handleData: (data, sink) {')
-      ..writeln('sink.add(Right(data));')
-      ..writeln('},')
-      ..writeln('handleError: (error, stackTrace, sink) {')
-      ..writeln('if (error is ServerException) {')
-      ..writeln(
-        'sink.add(Left(ServerFailure(message: error.message,'
-        ' statusCode: error.statusCode,),),);',
-      )
-      ..writeln('} else {')
-      ..writeln(
-        'sink.add(Left(ServerFailure(message: '
-        "'Something went wrong'(), statusCode: 500,),),);",
-      )
-      ..writeln('}')
-      ..writeln('},')
-      ..writeln('),');
+      // the 'handleError' closure: (error, stackTrace, sink) { ... }
+      final handleError = Method(
+        (method) => method
+          ..requiredParameters.addAll([
+            Parameter((param) => param.name = 'error'),
+            Parameter((param) => param.name = 'stackTrace'),
+            Parameter((param) => param.name = 'sink'),
+          ])
+          ..body = Block((body) {
+            body.statements.add(const Code('if (error is ServerException) {'));
+
+            final serverFailure = refer('ServerFailure').newInstance([], {
+              'message': refer('error').property('message'),
+              'statusCode': refer('error').property('statusCode'),
+            });
+
+            body.addExpression(
+              refer('sink').property('add').call([
+                refer('Left').call([serverFailure]),
+              ]),
+            );
+
+            body.statements.add(const Code('} else {'));
+
+            final genericFailure = refer('ServerFailure').newInstance([], {
+              'message': literalString('Something went wrong'),
+              'statusCode': literalNum(500),
+            });
+
+            body.addExpression(
+              refer('sink').property('add').call([
+                refer('Left').call([genericFailure]),
+              ]),
+            );
+
+            body.statements.add(const Code('}'));
+          }),
+      ).closure;
+
+      final transformer =
+          TypeReference((refBuilder) {
+            final modelType = Reference(
+              method.returnType.rightType.modelizeType,
+            );
+            final returnType = Reference(method.returnType.innerType);
+            refBuilder
+              ..symbol = 'StreamTransformer'
+              ..types.addAll([modelType, returnType]);
+          }).newInstanceNamed(
+            'fromHandlers',
+            [],
+            {
+              'handleData': handleData,
+              'handleError': handleError,
+            },
+          );
+      final (:positional, :named) = method.extractArgs();
+
+      // return _remoteDataSource.method(args).transform(transformer);
+      bodyBuilder.addExpression(
+        refer('_remoteDataSource')
+            .property(method.name)
+            .call(positional, named)
+            .property('transform')
+            .call([transformer])
+            .returned,
+      );
+    });
   }
 }
-
-// ResultFuture<${method.returnType.rightType}>
