@@ -131,7 +131,7 @@ class ModelTestGenerator
             '// Content generated based on YAML configuration:',
           ])
           ..body.addAll([
-            Code(completeFixtureFile),
+            Code('/*\n$completeFixtureFile\n*/\n'),
             fixtureReader,
             modelTest,
           ]);
