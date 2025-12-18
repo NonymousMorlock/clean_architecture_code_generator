@@ -1,14 +1,17 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
+import 'package:generators/core/extensions/iterable_extensions.dart';
+import 'package:generators/core/extensions/model_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
+import 'package:generators/src/models/param.dart';
 import 'package:generators/src/visitors/model_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -24,8 +27,25 @@ class ModelTestGenerator
     ConstantReader annotation,
     BuildStep buildStep,
   ) {
+    if (element is! ClassElement) {
+      throw InvalidGenerationSourceError(
+        'Generator cannot target non-classes.',
+      );
+    }
+
     final visitor = ModelVisitor();
-    element.visitChildren(visitor);
+
+    final constructor = element.unnamedConstructor;
+
+    if (constructor != null) {
+      visitor.visitConstructorElement(constructor);
+    } else {
+      stderr.writeln(
+        '[ModelGenerator] Error: No default constructor found for '
+        '${element.name}',
+      );
+      return '// Error: No default constructor found for ${element.name}';
+    }
 
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
 
@@ -69,7 +89,7 @@ class ModelTestGenerator
       );
       ignoreMultiFileCheck = true;
     }
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
     if (writer.isMultiFileEnabled && !ignoreMultiFileCheck) {
       return _generateMultiFile(
@@ -80,24 +100,43 @@ class ModelTestGenerator
         featureName: associatedFeatureName!,
       );
     }
-
-    final buffer = StringBuffer();
-    _generateModelTest(
+    final fixture = _generateFixtureFile(
       config: config,
-      buffer: buffer,
-      visitor: visitor,
-      className: normalisedName,
-    );
-
-    // Generate fixture file
-    _generateFixtureFile(
-      config: config,
-      buffer: buffer,
       className: normalisedName,
       visitor: visitor,
     );
 
-    return buffer.toString();
+    final completeFixtureFile = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(fixture);
+
+    final fixtureReader = _generateFixtureReader();
+
+    final modelTest = _generateModelTest(
+      config: config,
+      visitor: visitor,
+      className: normalisedName,
+    );
+
+    return writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..comments.addAll([
+            '// **************************************************************************',
+            '// Fixture Generator - $normalisedName Fixture',
+            '// **************************************************************************',
+            '',
+            '// GENERATED FIXTURE FILE (YAML Config-Aware)',
+            '// Create this file at: test/fixtures/${normalisedName.snakeCase}.json',
+            '// Content generated based on YAML configuration:',
+          ])
+          ..body.addAll([
+            Code(completeFixtureFile),
+            fixtureReader,
+            modelTest,
+          ]);
+      }),
+    );
   }
 
   String _generateMultiFile({
@@ -107,751 +146,764 @@ class ModelTestGenerator
     required FeatureFileWriter writer,
     required String featureName,
   }) {
-    final testBuffer = StringBuffer();
-    final modelTestPath = writer.getModelTestPath(
-      featureName: featureName,
-      entityName: normalisedName,
-    );
-    _generateModelTest(
-      config: config,
-      visitor: visitor,
-      buffer: testBuffer,
-      className: normalisedName,
-    );
-
-    final fixtureBuffer = StringBuffer();
+    final results = <String>[];
     final fixturePath = writer.getModelFixturePath(entityName: normalisedName);
     // Generate fixture file
-    _generateFixtureFile(
+    final fixture = _generateFixtureFile(
       config: config,
       className: normalisedName,
-      buffer: fixtureBuffer,
       visitor: visitor,
     );
 
-    final results = <String>[];
+    final completeFixtureFile = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(fixture);
 
     try {
-      writer.writeToFile(modelTestPath, testBuffer.toString());
-
-      stdout.writeln('[ModelTestGenerator] Successfully wrote files');
-      results.add(
-        '// ${normalisedName}Model test written to: $modelTestPath\n',
-      );
-
-      writer.writeToFile(fixturePath, fixtureBuffer.toString());
-      stdout.writeln('[ModelTestGenerator] Successfully wrote files');
+      writer.writeToFile(fixturePath, completeFixtureFile);
       results.add('// $normalisedName fixture written to: $fixturePath\n');
     } on Exception catch (e, s) {
       stderr
         ..writeln(
-          '[ModelTestGenerator] ERROR: Could not write model files: $e',
+          '[ModelTestGenerator] ERROR: Could not write fixture file: $e',
         )
         ..writeln('[ModelTestGenerator] Stack trace: $s');
-      results.add('// Error: Could not write model class to file: $e\n');
+      results.add('// Error: Could not write fixture file: $e\n');
+    }
+
+    if (!writer.fixtureReaderExists()) {
+      final fixtureReaderPath = writer.getFixtureReaderPath();
+      final fixtureReader = _generateFixtureReader();
+
+      final completeFixtureReaderFile = writer.resolveGeneratedCode(
+        library: Library((library) {
+          library
+            ..directives.add(Directive.import('dart:io'))
+            ..body.add(fixtureReader);
+        }),
+      );
+
+      try {
+        writer.writeToFile(fixtureReaderPath, completeFixtureReaderFile);
+        results.add(
+          '// Fixture reader written to: $fixtureReaderPath\n',
+        );
+      } on Exception catch (e, s) {
+        stderr
+          ..writeln(
+            '[ModelTestGenerator] ERROR: Could not write '
+            'fixture reader file: $e',
+          )
+          ..writeln('[ModelTestGenerator] Stack trace: $s');
+        results.add('// Error: Could not write fixture reader file: $e\n');
+      }
+    }
+
+    final modelTestPath = writer.getModelTestPath(
+      featureName: featureName,
+      entityName: normalisedName,
+    );
+
+    final (:imports, :importComments) = writer.generateSmartModelTestImports(
+      candidates: visitor.discoverRequiredEntities(),
+      featureName: featureName,
+      entityName: normalisedName,
+    );
+
+    final modelTest = _generateModelTest(
+      config: config,
+      visitor: visitor,
+      className: normalisedName,
+    );
+
+    final completeTestFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..directives.addAll(imports.map(Directive.import))
+          ..comments.addAll(importComments)
+          ..body.add(modelTest);
+      }),
+    );
+
+    try {
+      writer.writeToFile(modelTestPath, completeTestFile);
+
+      results.add(
+        '// ${normalisedName}Model test written to: $modelTestPath\n',
+      );
+    } on Exception catch (e, s) {
+      stderr
+        ..writeln(
+          '[ModelTestGenerator] ERROR: Could not write model test file: $e',
+        )
+        ..writeln('[ModelTestGenerator] Stack trace: $s');
+      results.add('// Error: Could not write model test to file: $e\n');
     }
 
     // Return markers for the .g.dart file
     return '${results.join('\n')}\n';
   }
 
-  void _generateModelTest({
+  Method _generateModelTest({
     required GeneratorConfig config,
     required String className,
-    required StringBuffer buffer,
     required ModelVisitor visitor,
   }) {
     final modelClassName = '${className}Model';
-    final entityClassName = className;
 
-    // Configuration is loaded in individual methods as needed
-
-    // Generate imports
-    _generateImports(config: config, buffer: buffer, className: className);
-
-    // Generate main test function
-    buffer.writeln('void main() {');
-
-    // Generate test model using fixture-based approach
-    _generateTestModel(
-      config: config,
-      buffer: buffer,
-      className: className,
-      modelClassName: modelClassName,
-      entityClassName: entityClassName,
-      visitor: visitor,
-    );
-
-    // Generate tests
-    _generateEntitySubclassTest(buffer, modelClassName, entityClassName);
-    _generateFromMapTest(buffer, modelClassName);
-    _generateToMapTest(buffer, modelClassName);
-    _generateCopyWithTest(buffer, modelClassName, visitor);
-    _generateFromJsonTest(buffer, modelClassName);
-    _generateToJsonTest(buffer, modelClassName);
-
-    buffer.writeln('}');
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'main'
+        ..returns = const Reference('void')
+        ..body = Block((block) {
+          _generateTestSetup(
+            className: className,
+            modelClassName: modelClassName,
+            visitor: visitor,
+            config: config,
+          ).forEach(block.addExpression);
+          block
+            ..addExpression(
+              _generateEntitySubclassTest(
+                modelClassName: modelClassName,
+                entityClassName: className,
+              ),
+            )
+            ..addExpression(_generateFromMapTest(modelClassName))
+            ..addExpression(_generateToMapTest(modelClassName))
+            ..addExpression(
+              _generateCopyWithTest(
+                modelClassName: modelClassName,
+                visitor: visitor,
+              ),
+            )
+            ..addExpression(
+              _generateFromJsonTest(modelClassName: modelClassName),
+            )
+            ..addExpression(
+              _generateToJsonTest(modelClassName: modelClassName),
+            );
+        });
+    });
   }
 
-  void _generateImports({
-    required StringBuffer buffer,
-    required String className,
-    required GeneratorConfig config,
-  }) {
-    final classSnakeCase = className.snakeCase;
-
-    // Load configuration to get app name
-    final appName = config.appName;
-    final rootName = config.featureScaffolding.rootName;
-
-    buffer
-      ..writeln("import 'dart:convert';")
-      ..writeln()
-      ..writeln("import 'package:flutter_test/flutter_test.dart';")
-      ..writeln()
-      ..writeln("import 'package:$appName/core/typedefs.dart';")
-      ..writeln(
-        "import 'package:$appName/$rootName/$classSnakeCase/data/models/${classSnakeCase}_model.dart';",
-      )
-      ..writeln(
-        "import 'package:$appName/$rootName/$classSnakeCase/domain/entities/$classSnakeCase.dart';",
-      )
-      ..writeln()
-      ..writeln("import '../../../fixtures/fixture_reader.dart';")
-      ..writeln();
-  }
-
-  void _generateTestModel({
-    required GeneratorConfig config,
-    required StringBuffer buffer,
+  List<Expression> _generateTestSetup({
     required String className,
     required String modelClassName,
-    required String entityClassName,
     required ModelVisitor visitor,
-  }) {
-    buffer
-      ..writeln(
-        '  // Test model created from fixture to ensure consistency',
-      )
-      ..writeln('  late $modelClassName t$modelClassName;')
-      ..writeln('  late DataMap tMap;')
-      ..writeln()
-      ..writeln('  setUpAll(() {')
-      ..writeln('    // Load fixture and create model from it')
-      ..writeln(
-        "    final fixtureString = fixture('${className.snakeCase}.json');",
-      )
-      ..writeln('    tMap = jsonDecode(fixtureString) as DataMap;')
-      ..writeln();
-
-    // Handle special field transformations for fixtures
-    _generateFixtureTransformations(
-      config: config,
-      buffer: buffer,
-      visitor: visitor,
-    );
-
-    buffer
-      ..writeln('    // Create test model from fixture data')
-      ..writeln('    t$modelClassName = $modelClassName.fromMap(tMap);')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateFixtureTransformations({
     required GeneratorConfig config,
-    required StringBuffer buffer,
-    required ModelVisitor visitor,
   }) {
-    buffer.writeln(
-      '    // Transform fixture data to match expected types',
-    );
+    final fixtureFileName = '${className.snakeCase}.json';
+    final testModelName = 't$modelClassName';
 
-    for (final field in visitor.fields.entries) {
-      final fieldName = field.key;
-      final fieldType = field.value;
-      final configuredType = _getConfiguredFieldType(
-        config,
-        'className',
-        fieldName,
-        fieldType,
-      );
+    final arrangement = [
+      // late final UserModel tUserModel;
+      declareFinal(testModelName, late: true, type: refer(modelClassName)),
 
-      if (fieldType.toLowerCase().contains('datetime')) {
-        buffer.writeln(
-          '    // Handle DateTime field: '
-          '$fieldName (configured as: $configuredType)',
-        );
+      // late final DataMap tMap;
+      declareFinal('tMap', late: true, type: refer('DataMap')),
+    ];
 
-        switch (configuredType) {
-          case 'timestamp_ms':
-          case 'timestamp_s':
-            buffer.writeln("    if (tMap['$fieldName'] is String) {");
-            buffer.writeln(
-              '      // Convert ISO string to timestamp for API consistency',
+    final setUp = refer('setUpAll').call([
+      Method((methodBuilder) {
+        methodBuilder.body = Block((body) {
+          // final fixtureString = fixture('file.json');
+          body
+            ..addExpression(
+              declareFinal(
+                'fixtureString',
+              ).assign(refer('fixture').call([literalString(fixtureFileName)])),
+            )
+            // tMap = jsonDecode(fixtureString) as DataMap;
+            ..addExpression(
+              refer('tMap').assign(
+                refer(
+                  'jsonDecode',
+                ).call([refer('fixtureString')]).asA(refer('DataMap')),
+              ),
             );
-            buffer.writeln(
-              '      final dateTime = '
-              "DateTime.parse(tMap['$fieldName'] as String);",
-            );
-            if (configuredType == 'timestamp_ms') {
-              buffer.writeln(
-                "      tMap['$fieldName'] = dateTime.millisecondsSinceEpoch;",
-              );
-            } else {
-              buffer.writeln(
-                "      tMap['$fieldName'] = "
-                'dateTime.millisecondsSinceEpoch ~/ 1000;',
+
+          // Hydrate Custom Types in tMap
+          // Since the fixture generator skips Custom Types
+          // (returns CustomType sentinel), we must inject valid data into
+          // tMap so .fromMap() doesn't crash.
+          for (final param in visitor.params) {
+            if (param.rawType.isCustomType &&
+                !param.rawType.isDartCoreList &&
+                !param.rawType.isEnum) {
+              final fieldName = param.name;
+              final subModelName = param.rawType.modelize;
+
+              // tMap['field'] = SubModel.empty().toMap();
+              body.addExpression(
+                refer('tMap')
+                    .index(literalString(fieldName))
+                    .assign(
+                      refer(subModelName)
+                          .newInstanceNamed('empty', [])
+                          .property('toMap')
+                          .call([]),
+                    ),
               );
             }
-            buffer.writeln('    }');
-          case 'iso_string':
-          default:
-            buffer.writeln("    if (tMap['$fieldName'] is int) {");
-            buffer.writeln(
-              '      // Convert timestamp to ISO string for API consistency',
-            );
-            buffer.writeln(
-              "      final timestamp = tMap['$fieldName'] as int;",
-            );
-            buffer.writeln('      final dateTime = timestamp > 1000000000000');
-            buffer.writeln(
-              '          ? DateTime.fromMillisecondsSinceEpoch(timestamp)',
-            );
-            buffer.writeln(
-              '          : DateTime.fromMillisecondsSinceEpoch(timestamp '
-              '* 1000);',
-            );
-            buffer.writeln(
-              "      tMap['$fieldName'] = dateTime.toIso8601String();",
-            );
-            buffer.writeln('    }');
-        }
-      } else if (fieldType.toLowerCase().contains('double') &&
-          configuredType.isNotEmpty) {
-        buffer.writeln(
-          '    // Handle double field: $fieldName '
-          '(configured as: $configuredType)',
-        );
-        switch (configuredType) {
-          case 'int':
-            buffer.writeln("    if (tMap['$fieldName'] is double) {");
-            buffer.writeln(
-              "      tMap['$fieldName'] = (tMap['$fieldName'] "
-              'as double).toInt();',
-            );
-            buffer.writeln('    }');
-          case 'string':
-            buffer.writeln("    if (tMap['$fieldName'] is num) {");
-            buffer.writeln(
-              "      tMap['$fieldName'] = tMap['$fieldName'].toString();",
-            );
-            buffer.writeln('    }');
-          case 'double':
-          default:
-            buffer.writeln("    if (tMap['$fieldName'] is int) {");
-            buffer.writeln(
-              "      tMap['$fieldName'] = (tMap['$fieldName'] "
-              'as int).toDouble();',
-            );
-            buffer.writeln('    }');
-        }
-      } else if (fieldType.toLowerCase().contains('int') &&
-          configuredType == 'string') {
-        buffer
-          ..writeln(
-            '    // Handle int field: $fieldName (configured as: string)',
-          )
-          ..writeln("    if (tMap['$fieldName'] is int) {")
-          ..writeln(
-            "      tMap['$fieldName'] = tMap['$fieldName'].toString();",
-          )
-          ..writeln('    }');
-      } else if (fieldType.isCustomType &&
-          !fieldType.toLowerCase().contains('list')) {
-        buffer
-          ..writeln(
-            '    // Handle custom type field: $fieldName ($fieldType)',
-          )
-          ..writeln(
-            "    tMap['$fieldName'] = "
-            '${fieldType}Model.empty().toMap();',
+          }
+
+          // Instantiate tModel using empty().copyWith()
+          // We only override DateTimes to match the static fixture date.
+          final copyWithArgs = <String, Expression>{};
+
+          for (final param in visitor.params) {
+            if (param.rawType.isDateTime && !param.isNullable) {
+              final configuredType = _getConfiguredFieldType(
+                config: config,
+                className: className,
+                fieldName: param.name,
+                fieldType: param.type,
+              );
+
+              copyWithArgs[param.name.camelCase] = _getDateTimeExpression(
+                configuredType,
+              );
+            }
+          }
+
+          // tModel = UserModel.empty().copyWith(...);
+          body.addExpression(
+            refer(testModelName).assign(
+              refer(modelClassName)
+                  .newInstanceNamed('empty', [])
+                  .property('copyWith')
+                  .call([], copyWithArgs),
+            ),
           );
-      }
-      buffer.writeln();
-    }
-    buffer.writeln();
+        });
+      }).closure,
+    ]);
+    return [...arrangement, setUp];
   }
 
-  void _generateEntitySubclassTest(
-    StringBuffer buffer,
-    String modelClassName,
-    String entityClassName,
-  ) {
-    buffer
-      ..writeln(
-        "  test('should be a subclass of $entityClassName entity', () {",
-      )
-      ..writeln('    expect(t$modelClassName, isA<$entityClassName>());')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateFromMapTest(StringBuffer buffer, String modelClassName) {
-    buffer
-      ..writeln("  group('fromMap', () {")
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return a valid model when the map is valid',",
-      )
-      ..writeln('      () {')
-      ..writeln('        final result = $modelClassName.fromMap(tMap);')
-      ..writeln()
-      ..writeln('        expect(result, isA<$modelClassName>());')
-      ..writeln('        expect(result, equals(t$modelClassName));')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln()
-      ..writeln('    test(')
-      ..writeln(
-        "      'should handle null values gracefully for optional fields',",
-      )
-      ..writeln('      () {')
-      ..writeln(
-        '        final mapWithNulls = Map<String, dynamic>.from(tMap);',
-      )
-      ..writeln('        // Set optional fields to null')
-      ..writeln("        // mapWithNulls['optionalField'] = null;")
-      ..writeln()
-      ..writeln(
-        '        final result = $modelClassName.fromMap(mapWithNulls);',
-      )
-      ..writeln()
-      ..writeln('        expect(result, isA<$modelClassName>());')
-      ..writeln('        // Add specific assertions for null handling')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateToMapTest(StringBuffer buffer, String modelClassName) {
-    buffer
-      ..writeln("  group('toMap', () {")
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return a JSON map containing the proper data',",
-      )
-      ..writeln('      () {')
-      ..writeln('        final result = t$modelClassName.toMap();')
-      ..writeln()
-      ..writeln('        expect(result, isA<DataMap>());')
-      ..writeln(
-        '        // Compare key fields to ensure proper serialization',
-      )
-      ..writeln("        expect(result['id'], t$modelClassName.id);")
-      ..writeln('        // Add more field comparisons as needed')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateCopyWithTest(
-    StringBuffer buffer,
-    String modelClassName,
-    ModelVisitor visitor,
-  ) {
-    buffer.writeln("  group('copyWith', () {");
-
-    // Find a string field for testing
-    String? testField;
-    String? testFieldType;
-    for (final field in visitor.fields.entries) {
-      if (field.value.toLowerCase().contains('string')) {
-        testField = field.key.camelCase;
-        testFieldType = 'String';
-        break;
-      }
+  /// Helper to generate the exact DateTime object expected by the fixture
+  Expression _getDateTimeExpression(String configuredType) {
+    // ISO String (Default)
+    if (configuredType.isEmpty || configuredType == 'iso_string') {
+      return refer('DateTime').property('parse').call([
+        literalString('2024-01-01T00:00:00.000Z'),
+      ]);
     }
 
-    if (testField == null) {
-      // Fallback to first field
-      final firstField = visitor.fields.entries.first;
-      testField = firstField.key.camelCase;
-      testFieldType = firstField.value;
+    // Timestamps (Milliseconds)
+    if (configuredType == 'timestamp_ms') {
+      return refer('DateTime')
+          .newInstanceNamed(
+            'fromMillisecondsSinceEpoch',
+            [literalNum(1704067200000)],
+          )
+          .property('toUtc')
+          .call([]);
     }
 
-    buffer
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return a copy of the model with updated fields',",
-      )
-      ..writeln('      () {');
-
-    String testValue;
-    if (testFieldType?.toLowerCase().contains('string') ?? false) {
-      testValue = "'Updated $testField'";
-    } else if (testFieldType?.toLowerCase().contains('int') ?? false) {
-      testValue = '999';
-    } else if (testFieldType?.toLowerCase().contains('double') ?? false) {
-      testValue = '99.9';
-    } else if (testFieldType?.toLowerCase().contains('bool') ?? false) {
-      testValue = '!t$modelClassName.$testField';
-    } else {
-      testValue = 'null'; // For complex types
+    // Timestamps (Seconds)
+    if (configuredType == 'timestamp_s') {
+      // Note: fromMillisecondsSinceEpoch takes ms, so we pass the ms value
+      // derived from the seconds (1704067200 * 1000)
+      return refer('DateTime')
+          .newInstanceNamed(
+            'fromMillisecondsSinceEpoch',
+            [literalNum(1704067200000)],
+          )
+          .property('toUtc')
+          .call([]);
     }
 
-    buffer
-      ..writeln(
-        '        final result = '
-        't$modelClassName.copyWith($testField: $testValue);',
-      )
-      ..writeln()
-      ..writeln('        expect(result, isA<$modelClassName>());')
-      ..writeln('        expect(result.$testField, $testValue);')
-      ..writeln('        // Ensure other fields remain unchanged');
-
-    // Test that other fields remain the same
-    for (final field in visitor.fields.entries) {
-      final fieldName = field.key.camelCase;
-      if (fieldName != testField) {
-        buffer.writeln(
-          '        expect(result.$fieldName, t$modelClassName.$fieldName);',
-        );
-        break; // Just test one other field to keep it concise
-      }
-    }
-
-    buffer
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln()
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return the same instance when no "
-        "parameters are provided',",
-      )
-      ..writeln('      () {')
-      ..writeln('        final result = t$modelClassName.copyWith();')
-      ..writeln()
-      ..writeln('        expect(result, equals(t$modelClassName));')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln('  });')
-      ..writeln();
+    // Fallback
+    return refer('DateTime').property('parse').call([
+      literalString('2024-01-01T00:00:00.000Z'),
+    ]);
   }
 
-  void _generateFromJsonTest(StringBuffer buffer, String modelClassName) {
-    buffer
-      ..writeln("  group('fromJson', () {")
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return a valid model when the JSON string is valid',",
-      )
-      ..writeln('      () {')
-      ..writeln('        final jsonString = jsonEncode(tMap);')
-      ..writeln(
-        '        final result = $modelClassName.fromJson(jsonString);',
-      )
-      ..writeln()
-      ..writeln('        expect(result, isA<$modelClassName>());')
-      ..writeln('        expect(result, equals(t$modelClassName));')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateToJsonTest(StringBuffer buffer, String modelClassName) {
-    buffer
-      ..writeln("  group('toJson', () {")
-      ..writeln('    test(')
-      ..writeln(
-        "      'should return a JSON string containing the proper data',",
-      )
-      ..writeln('      () {')
-      ..writeln('        final result = t$modelClassName.toJson();')
-      ..writeln('        final expectedJson = jsonEncode(tMap);')
-      ..writeln()
-      ..writeln('        expect(result, isA<String>());')
-      ..writeln(
-        '        // Parse both to compare as maps (order-independent)',
-      )
-      ..writeln('        final resultMap = jsonDecode(result) as DataMap;')
-      ..writeln(
-        '        final expectedMap = jsonDecode(expectedJson) as DataMap;',
-      )
-      ..writeln('        expect(resultMap, equals(expectedMap));')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateFixtureComments({
-    required String className,
-    required StringBuffer buffer,
-    required GeneratorConfig config,
+  Expression _generateEntitySubclassTest({
+    required String modelClassName,
+    required String entityClassName,
   }) {
-    if (config.multiFileOutput.enabled) return;
-    buffer
-      ..writeln()
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln('// Fixture Generator - $className Fixture')
-      ..writeln(
-        '// **************************************************************************',
-      )
-      ..writeln()
-      ..writeln('// GENERATED FIXTURE FILE (YAML Config-Aware)')
-      ..writeln(
-        '// Create this file at: test/fixtures/${className.snakeCase}.json',
-      )
-      ..writeln('// Content generated based on YAML configuration:')
-      ..writeln('/*');
+    final testModelName = 't$modelClassName';
+
+    return refer('test').call([
+      literalString('should be a subclass of $entityClassName entity'),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((body) {
+          body.addExpression(
+            refer('expect').call([
+              refer(testModelName),
+              refer('isA').call([], {}, [refer(entityClassName)]),
+            ]),
+          );
+        });
+      }).closure,
+    ]);
   }
 
-  void _generateFixtureFile({
-    required StringBuffer buffer,
+  Expression _generateFromMapTest(String modelClassName) {
+    final testModelName = 't$modelClassName';
+
+    return refer('group').call([
+      literalString('fromMap'),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((block) {
+          block.addExpression(
+            refer('test').call([
+              literalString(
+                'should return a valid model when the map is valid',
+              ),
+              Method((methodBuilder) {
+                methodBuilder.body = Block((body) {
+                  body
+                    ..addExpression(
+                      declareFinal('result').assign(
+                        refer(
+                          modelClassName,
+                        ).property('fromMap').call([refer('tMap')]),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('isA').call([], {}, [refer(modelClassName)]),
+                      ]),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('equals').call([refer(testModelName)]),
+                      ]),
+                    );
+                });
+              }).closure,
+            ]),
+          );
+        });
+      }).closure,
+    ]);
+  }
+
+  Expression _generateToMapTest(String modelClassName) {
+    final testModelName = 't$modelClassName';
+
+    return refer('group').call([
+      literalString('toMap'),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((block) {
+          block.addExpression(
+            refer('test').call([
+              literalString(
+                'should return a JSON map containing the proper data',
+              ),
+              Method((methodBuilder) {
+                methodBuilder.body = Block((body) {
+                  body
+                    ..addExpression(
+                      declareFinal('result').assign(
+                        refer(testModelName).property('toMap').call([]),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('isA').call([], {}, [refer('DataMap')]),
+                      ]),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('equals').call([refer('tMap')]),
+                      ]),
+                    );
+                });
+              }).closure,
+            ]),
+          );
+        });
+      }).closure,
+    ]);
+  }
+
+  Expression _generateCopyWithTest({
+    required String modelClassName,
+    required ModelVisitor visitor,
+  }) {
+    final testModelName = 't$modelClassName';
+
+    return refer('group').call([
+      literalString('copyWith'),
+      Method((groupBuilder) {
+        groupBuilder.body = Block((block) {
+          // 1. SELECT A CANDIDATE FIELD
+          // We prioritize non-nullable primitives because they are the safest
+          // to generate "different" values for without complex logic.
+          Param? candidate;
+          Expression? valueToUpdate;
+
+          // Priority 1: String
+          candidate = visitor.params.firstWhereOrNull(
+            (param) => param.rawType.isDartCoreString,
+          );
+          if (candidate != null) {
+            valueToUpdate = literalString(
+              'Updated ${candidate.name.camelCase}',
+            );
+          }
+
+          // Priority 2: Int (If no String)
+          if (candidate == null) {
+            candidate = visitor.params.firstWhereOrNull(
+              (param) => param.rawType.isDartCoreInt,
+            );
+            if (candidate != null) {
+              // Setup usually uses '1', so we use '2'
+              valueToUpdate = literalNum(2);
+            }
+          }
+
+          // Priority 3: Bool (If no String/Int)
+          if (candidate == null) {
+            candidate = visitor.params.firstWhereOrNull(
+              (param) => param.rawType.isDartCoreBool,
+            );
+            if (candidate != null) {
+              // Setup usually uses 'true', so we use 'false'
+              valueToUpdate = literalFalse;
+            }
+          }
+
+          // Priority 4: Double
+          if (candidate == null) {
+            candidate = visitor.params.firstWhereOrNull(
+              (param) => param.rawType.isDartCoreDouble,
+            );
+            if (candidate != null) {
+              // Setup usually uses '1.0', so we use '2.0'
+              valueToUpdate = literalNum(2.0);
+            }
+          }
+
+          // ONLY generate the update test if we found a safe candidate.
+          // If the model only contains List<CustomType>, generating a valid
+          // copyWith test automatically is too risky/complex for a generic tool.
+          if (candidate != null && valueToUpdate != null) {
+            block.addExpression(
+              refer('test').call([
+                literalString(
+                  'should return a copy of the model with updated fields',
+                ),
+                Method((methodBuilder) {
+                  methodBuilder.body = Block((body) {
+                    body
+                      ..addExpression(
+                        declareFinal('result').assign(
+                          refer(testModelName).property('copyWith').call([], {
+                            candidate!.name.camelCase: valueToUpdate!,
+                          }),
+                        ),
+                      )
+                      ..addExpression(
+                        refer('expect').call([
+                          refer('result'),
+                          refer('isA').call([], {}, [refer(modelClassName)]),
+                        ]),
+                      )
+                      ..addExpression(
+                        refer('expect').call([
+                          refer('result').property(candidate.name.camelCase),
+                          refer('equals').call([valueToUpdate]),
+                        ]),
+                      );
+
+                    // Assert Other Fields Unchanged
+                    // Find one other field that isn't the candidate
+                    final otherField = visitor.params.firstWhereOrNull(
+                      (param) => param.name != candidate!.name,
+                    );
+
+                    if (otherField != null) {
+                      body.statements.add(
+                        const Code('// Ensure other fields remain unchanged'),
+                      );
+                      body.addExpression(
+                        refer('expect').call([
+                          refer('result').property(otherField.name.camelCase),
+                          refer('equals').call([
+                            refer(
+                              testModelName,
+                            ).property(otherField.name.camelCase),
+                          ]),
+                        ]),
+                      );
+                    }
+                  });
+                }).closure,
+              ]),
+            );
+          }
+
+          // 2. TEST NO ARGS (Identity/Equality Check)
+          // This is always safe to generate
+          block.addExpression(
+            refer('test').call([
+              literalString(
+                'should return the same instance when no '
+                'parameters are provided',
+              ),
+              Method((methodBuilder) {
+                methodBuilder.body = Block((body) {
+                  body
+                    ..addExpression(
+                      declareFinal('result').assign(
+                        refer(testModelName).property('copyWith').call([]),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('equals').call([refer(testModelName)]),
+                      ]),
+                    );
+                });
+              }).closure,
+            ]),
+          );
+        });
+      }).closure,
+    ]);
+  }
+
+  Expression _generateFromJsonTest({required String modelClassName}) {
+    final testModelName = 't$modelClassName';
+
+    return refer('group').call([
+      literalString('fromJson'),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((block) {
+          block.addExpression(
+            refer('test').call([
+              literalString(
+                'should return a valid model when the JSON string is valid',
+              ),
+              Method((testBuilder) {
+                testBuilder.body = Block((body) {
+                  body
+                    ..addExpression(
+                      declareFinal('jsonString').assign(
+                        refer('jsonEncode').call([refer('tMap')]),
+                      ),
+                    )
+                    ..addExpression(
+                      declareFinal('result').assign(
+                        refer(
+                          modelClassName,
+                        ).property('fromJson').call([refer('jsonString')]),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('isA').call([], {}, [refer(modelClassName)]),
+                      ]),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('equals').call([refer(testModelName)]),
+                      ]),
+                    );
+                });
+              }).closure,
+            ]),
+          );
+        });
+      }).closure,
+    ]);
+  }
+
+  Expression _generateToJsonTest({required String modelClassName}) {
+    final testModelName = 't$modelClassName';
+    return refer('group').call([
+      literalString('toJson'),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((block) {
+          block.addExpression(
+            refer('test').call([
+              literalString(
+                'should return a JSON string containing the proper data',
+              ),
+              Method((methodBuilder) {
+                methodBuilder.body = Block((body) {
+                  // 1. Act: Call toJson()
+                  body
+                    ..addExpression(
+                      declareFinal('result').assign(
+                        refer(testModelName).property('toJson').call([]),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('result'),
+                        refer('isA').call([], {}, [refer('String')]),
+                      ]),
+                    )
+                    ..statements.add(
+                      const Code(
+                        '// Parse both to compare as maps (order-independent)',
+                      ),
+                    )
+                    ..addExpression(
+                      declareFinal('resultMap').assign(
+                        refer(
+                          'jsonDecode',
+                        ).call([refer('result')]).asA(refer('DataMap')),
+                      ),
+                    )
+                    ..addExpression(
+                      refer('expect').call([
+                        refer('resultMap'),
+                        refer('equals').call([refer('tMap')]),
+                      ]),
+                    );
+                });
+              }).closure,
+            ]),
+          );
+        });
+      }).closure,
+    ]);
+  }
+
+  Method _generateFixtureReader() {
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'fixture'
+        ..returns = const Reference('String')
+        ..requiredParameters.add(
+          Parameter((paramBuilder) {
+            paramBuilder
+              ..name = 'name'
+              ..type = const Reference('String');
+          }),
+        )
+        ..lambda = true
+        ..body = refer('File')
+            .call([literalString(r'test/fixtures/$name')])
+            .property('readAsStringSync')
+            .call([])
+            .code;
+    });
+  }
+
+  DataMap _generateFixtureFile({
     required String className,
     required ModelVisitor visitor,
     required GeneratorConfig config,
   }) {
-    final isMultiFileEnabled = config.multiFileOutput.enabled;
-    // Generate fixture comments
-    _generateFixtureComments(
-      className: className,
-      buffer: buffer,
-      config: config,
-    );
+    final fixture = <String, dynamic>{};
 
-    buffer.writeln('{');
-
-    final fields = visitor.fields.entries.toList();
-    for (var i = 0; i < fields.length; i++) {
-      final field = fields[i];
-      final fieldName = field.key;
-      final fieldType = field.value;
-      final isLast = i == fields.length - 1;
-
-      if (fieldType.isCustomType && !fieldType.toLowerCase().contains('list')) {
-        // check if it's a multiFile, if it isn't write a comment and
-        // continue otherwise, just continue
-        if (!isMultiFileEnabled) {
-          buffer.writeln(
-            '  // Custom type field: $fieldName ($fieldType) - '
-            'This will be injected in the test directly during the fixture '
-            'setup',
-          );
-        }
+    for (final param in visitor.params) {
+      final value = _getJsonValueForConfiguredType(
+        field: param,
+        configuredType: _getConfiguredFieldType(
+          config: config,
+          className: className,
+          fieldName: param.name,
+          fieldType: param.type,
+        ),
+      );
+      if (value is CustomType) continue;
+      if (value is UnsupportedJsonType) {
+        stderr.writeln(
+          '[ModelTestGenerator] Warning: Unsupported type for field '
+          '${param.name} (${param.type}). Skipping in fixture generation.',
+        );
         continue;
       }
-
-      // Get configured field type from YAML, fallback to default
-      final configuredType = _getConfiguredFieldType(
-        config,
-        className,
-        fieldName,
-        fieldType,
-      );
-      final jsonValue = _getJsonValueForConfiguredType(
-        fieldType,
-        fieldName,
-        configuredType,
-      );
-
-      final optionalComment = isMultiFileEnabled
-          ? ''
-          : ' // ${configuredType.isNotEmpty ? 'Configured as: $configuredType' : 'Default type'}';
-
-      buffer.writeln(
-        '  "$fieldName": $jsonValue${isLast ? '' : ','}$optionalComment',
-      );
+      fixture[param.name] = value;
     }
 
-    buffer.writeln('}');
-
-    if (!isMultiFileEnabled) {
-      buffer
-        ..writeln('*/')
-        ..writeln();
-    }
-
-    // Generate configuration template for unconfigured fields
-    _generateConfigurationTemplate(buffer, className, visitor, config);
+    return fixture;
   }
 
-  String _getJsonValueForType(String fieldType, String fieldName) {
-    final type = fieldType.toLowerCase();
-
-    // I've intentionally put the collection types first to avoid
-    // misclassification (e.g., 'list of strings' should match 'list' first)
-    if (type.startsWith('list')) {
-      return '[]';
-    } else if (type.contains('map')) {
-      return '{}';
-    } else if (type.contains('string')) {
-      return '"Test $fieldName"';
-    } else if (type.contains('int')) {
-      return '1';
-    } else if (type.contains('double')) {
-      return '1.0';
-    } else if (type.contains('bool')) {
-      return 'true';
-    } else if (type.contains('datetime')) {
-      return '"2024-01-01T00:00:00.000Z"';
-    } else if (type.isCustomType) {
-      // For custom types, I'll inject it in the actual test by calling
-      // CustomType.empty().toMap() and adding that to the fixture, since I
-      // can't possibly get access to the custom type here.
-      return '';
-    } else {
-      // For custom objects, create a minimal structure
-      return '{"id": "test_id"}';
-    }
-  }
-
-  String _getConfiguredFieldType(
-    GeneratorConfig config,
-    String className,
-    String fieldName,
-    String fieldType,
-  ) {
+  String _getConfiguredFieldType({
+    required GeneratorConfig config,
+    required String className,
+    required String fieldName,
+    required String fieldType,
+  }) {
     // Use the actual YAML configuration
-    return config.modelTestConfig.getFieldType(className, fieldName, fieldType);
+    return config.modelTestConfig.getFieldType(
+      modelName: className,
+      fieldName: fieldName,
+      dartType: fieldType,
+    );
   }
 
   /// Get JSON value based on configured type from YAML
   /// for fields that can have multiple formats.
   ///
   /// If no special configuration, falls back to default value.
-  String _getJsonValueForConfiguredType(
-    String fieldType,
-    String fieldName,
-    String configuredType,
-  ) {
-    final type = fieldType.toLowerCase();
-
+  Object? _getJsonValueForConfiguredType({
+    required Param field,
+    required String configuredType,
+  }) {
+    if (field.isNullable) return null;
+    final fieldType = field.rawType;
     // I've intentionally put the collection types first to avoid
     // misclassification (e.g., 'list of strings' should match 'list' first)
-    if (type.startsWith('list')) {
-      return '[]';
-    } else if (type.contains('map')) {
-      return '{}';
-    } else if (type.contains('datetime')) {
-      switch (configuredType) {
-        case 'iso_string':
-          return '"2024-01-01T00:00:00.000Z"';
-        case 'timestamp_ms':
-          return '1704067200000'; // 2024-01-01 in milliseconds
-        case 'timestamp_s':
-          return '1704067200'; // 2024-01-01 in seconds
-        default:
-          return '"2024-01-01T00:00:00.000Z"'; // Default to ISO string
-      }
-    } else if (type.contains('double')) {
-      switch (configuredType) {
-        case 'double':
-          return '1.0';
-        case 'int':
-          return '1';
-        case 'string':
-          return '"1.0"';
-        default:
-          return '1.0';
-      }
-    } else if (type.contains('int')) {
-      switch (configuredType) {
-        case 'int':
-          return '1';
-        case 'string':
-          return '"1"';
-        default:
-          return '1';
-      }
-    } else {
-      // Use the original method for other types
-      return _getJsonValueForType(fieldType, fieldName);
+    if (fieldType.isDartCoreList ||
+        fieldType.isDartCoreSet ||
+        fieldType.isDartCoreIterable) {
+      return [];
     }
-  }
+    if (fieldType.isDartCoreMap) {
+      return {};
+    } else if (fieldType.isDartCoreString) {
+      return 'Test String';
+    } else if (fieldType.isDartCoreBool) {
+      return true;
+    } else if (fieldType.isDateTime) {
+      return switch (configuredType) {
+        // 2024-01-01 in milliseconds
+        'timestamp_ms' => 1704067200000,
+        // 2024-01-01 in seconds
+        'timestamp_s' => 1704067200,
+        // includes 'iso_string'
+        _ => '2024-01-01T00:00:00.000Z',
+      };
+    } else if (fieldType.isDartCoreDouble) {
+      return switch (configuredType) {
+        'int' => 1,
+        'string' => '1.0',
+        // includes 'double'
+        _ => 1.0,
+      };
+    } else if (fieldType.isDartCoreInt) {
+      return switch (configuredType) {
+        'string' => '1',
+        // includes 'int'
+        _ => 1,
+      };
+    } else if (fieldType.isEnum) {
+      return 'unknown';
+    } else if (fieldType.isCustomType) {
+      // TODO(Documentation): Mention in the docs that custom types will be
+      //  skipped in fixture generation, but will be injected in the actual test
 
-  void _generateConfigurationTemplate(
-    StringBuffer buffer,
-    String className,
-    ModelVisitor visitor,
-    GeneratorConfig config,
-  ) {
-    if (config.multiFileOutput.enabled) return;
-
-    buffer
-      ..writeln('// CONFIGURATION OPTIONS')
-      ..writeln('// Add to clean_arch_config.yaml:')
-      ..writeln('/*')
-      ..writeln('model_test_config:')
-      ..writeln('  ${className.snakeCase}:')
-      ..writeln('    field_types:');
-
-    // Generate configuration options for fields that can have multiple formats
-    for (final field in visitor.fields.entries) {
-      final fieldName = field.key;
-      final fieldType = field.value;
-
-      if (fieldType.toLowerCase().contains('datetime')) {
-        buffer
-          ..writeln(
-            '      $fieldName: "iso_string"  # Options: iso_string, '
-            'timestamp_ms, timestamp_s',
-          )
-          ..writeln('        # iso_string: "2024-01-01T00:00:00.000Z"')
-          ..writeln('        # timestamp_ms: 1704067200000')
-          ..writeln('        # timestamp_s: 1704067200');
-      } else if (fieldType.toLowerCase().contains('double')) {
-        buffer
-          ..writeln(
-            '      $fieldName: "double"      # Options: double, int, string',
-          )
-          ..writeln('        # double: 1.0, int: 1, string: "1.0"');
-      } else if (fieldType.toLowerCase().contains('int')) {
-        buffer
-          ..writeln(
-            '      $fieldName: "int"         # Options: int, string',
-          )
-          ..writeln('        # int: 1, string: "1"');
-      }
+      // For custom types, I'll inject it in the actual test by calling
+      // CustomType.empty().toMap() and adding that to the fixture, since I
+      // can't possibly get access to the custom type here.
+      return CustomType();
     }
-
-    buffer
-      ..writeln()
-      ..writeln('  # Global defaults for all models:')
-      ..writeln('  defaults:')
-      ..writeln(
-        '    datetime_format: "iso_string"  # Default DateTime format',
-      )
-      ..writeln(
-        '    number_format: "double"        # Default number format',
-      )
-      ..writeln('*/')
-      ..writeln()
-      // Show current configuration being used
-      ..writeln('// CURRENT CONFIGURATION DETECTED:')
-      ..writeln('// (Based on YAML config or defaults)');
-    for (final field in visitor.fields.entries) {
-      final fieldName = field.key;
-      final fieldType = field.value;
-      final configuredType = _getConfiguredFieldType(
-        config,
-        className,
-        fieldName,
-        fieldType,
-      );
-
-      if (configuredType.isNotEmpty) {
-        buffer.writeln(
-          '// $fieldName ($fieldType) -> configured as: $configuredType',
-        );
-      }
-    }
+    return UnsupportedJsonType();
   }
 }
+
+/// A placeholder class to represent custom types in fixture generation.
+class CustomType {}
+
+/// A placeholder class to represent unsupported types in fixture generation.
+class UnsupportedJsonType {}
