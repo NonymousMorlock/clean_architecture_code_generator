@@ -1,18 +1,29 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
+import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
+import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/models/function.dart';
+import 'package:generators/src/models/param.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
+
+/// Arguments for generating test methods.
+typedef TestMethodArgs = ({
+  List<Expression> positionalWhenArguments,
+  List<Expression> positionalVerifyArguments,
+  Map<String, Expression> namedWhenArguments,
+  Map<String, Expression> namedVerifyArguments,
+});
 
 /// Generator for creating test files for repository implementations.
 ///
@@ -29,46 +40,81 @@ class RepoImplTestGenerator
     final visitor = RepoVisitor();
     element.visitChildren(visitor);
 
-    // Load config to check if multi-file output is enabled
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
-    if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer, buildStep);
+    final methodArguments = _preprocessTestArgs(methods: visitor.methods);
+
+    final className = visitor.className;
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
+
+    final repoName = className.replaceAll('TBG', '');
+    final repoImplName = '${repoName}Impl';
+
+    if (writer.isMultiFileEnabled && featureName != null) {
+      return _generateMultiFile(
+        visitor: visitor,
+        writer: writer,
+        featureName: featureName,
+        repoImplName: repoImplName,
+        methodArguments: methodArguments,
+      );
     }
+
+    final remoteDataSourceName =
+        '${featureName?.pascalCase ?? writer.extractBaseName(repoName)}'
+        'RemoteDataSource';
 
     // Default behavior: generate to .g.dart
-    final buffer = StringBuffer();
-    _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
-    return buffer.toString();
+    return writer.resolveGeneratedCode(
+      library: _generateLibraryForSingleFileOutput(
+        repoImplName: repoImplName,
+        remoteDataSourceName: remoteDataSourceName,
+        visitor: visitor,
+        methodArguments: methodArguments,
+      ),
+    );
   }
 
-  String _generateMultiFile(
-    RepoVisitor visitor,
-    FeatureFileWriter writer,
-    BuildStep buildStep,
-  ) {
-    final featureName = writer.extractFeatureName(repoName: visitor.className);
-    if (featureName == null) {
-      // Fallback to default
-      final buffer = StringBuffer();
-      _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
-      return buffer.toString();
-    }
-
+  String _generateMultiFile({
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+    required String featureName,
+    required String repoImplName,
+    required Map<String, TestMethodArgs> methodArguments,
+  }) {
+    final remoteDataSourceName = '${featureName.pascalCase}RemoteDataSource';
     final testPath = writer.getRepoImplTestPath(featureName);
 
-    // Generate test code
-    final buffer = StringBuffer();
-    _generateRepoImplTest(buffer: buffer, visitor: visitor, writer: writer);
+    final (:imports, :importComments) = writer.generateSmartRepoImplTestImports(
+      featureName: featureName,
+      candidates: visitor.discoverRequiredEntities(),
+    );
 
-    // Generate complete file with imports (imports are already
-    // in the generated code)
+    final mockDataSourceClass = _generateMockDataSourceClass(
+      remoteDataSourceName: remoteDataSourceName,
+    );
+
+    final repoImplTest = _generateRepoImplTest(
+      remoteDataSourceName: remoteDataSourceName,
+      repoImplName: repoImplName,
+      visitor: visitor,
+      methodArguments: methodArguments,
+    );
+
+    // Generate complete file with imports
+    final completeFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        library
+          ..body.addAll([mockDataSourceClass, repoImplTest])
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import));
+      }),
+    );
 
     // Write to the test file
     try {
-      writer.writeToFile(testPath, buffer.toString());
-      // Return a minimal marker for the .g.dart file
+      writer.writeToFile(testPath, completeFile);
       return '// Repository implementation test written to: $testPath\n';
     } on Exception catch (e) {
       stderr.writeln('Warning: Could not write to $testPath: $e');
@@ -76,561 +122,565 @@ class RepoImplTestGenerator
     }
   }
 
-  void _generateRepoImplTest({
-    required StringBuffer buffer,
-    required RepoVisitor visitor,
-    required FeatureFileWriter writer,
+  Map<String, TestMethodArgs> _preprocessTestArgs({
+    required List<IFunction> methods,
   }) {
-    final className = visitor.className;
-    final repoName = className.replaceAll('TBG', '');
-    final repoImplName = '${repoName}Impl';
-    final remoteDataSourceName =
-        '${className.substring(0, className.length - 4)}RemoteDataSource';
-    final mockDataSourceName = 'Mock$remoteDataSourceName';
-
-    final currentFeatureName = className
-        .replaceAll('RepoTBG', '')
-        .replaceAll('Repo', '')
-        .snakeCase;
-
-    final usedEntities = visitor.discoverRequiredEntities();
-
-    // Generate Imports (Dynamic based on discovery)
-    writer
-        .generateSmartRepoImplTestImports(
-          currentFeatureName,
-          repoName,
-          repoImplName,
-          remoteDataSourceName,
-          usedEntities,
-        )
-        .forEach(buffer.writeln);
-
-    buffer
-      ..writeln()
-      // Generate mock class
-      ..writeln(
-        'class $mockDataSourceName extends Mock '
-        'implements $remoteDataSourceName {}',
-      )
-      ..writeln()
-      // Generate main test function
-      ..writeln('void main() {')
-      ..writeln('  late $mockDataSourceName remoteDataSource;')
-      ..writeln('  late $repoImplName repoImpl;')
-      ..writeln();
-
-    // Register Fallbacks for discovered entities
-    _generateFallbackRegistration(buffer, usedEntities);
-
-    buffer
-      ..writeln('  setUp(() {')
-      ..writeln('    remoteDataSource = $mockDataSourceName();')
-      ..writeln('    repoImpl = $repoImplName(remoteDataSource);')
-      ..writeln('  });')
-      ..writeln();
-
-    // Generate tests for each method
-    for (final method in visitor.methods) {
-      _generateMethodTest(
-        buffer,
-        method,
-        currentFeatureName,
-        remoteDataSourceName,
+    final argumentMap = <String, TestMethodArgs>{};
+    for (final method in methods) {
+      final positionalArgumentsWithAny = <Expression>[];
+      final namedArgumentsWithAny = <String, Expression>{};
+      final positionalArgumentsWithTest = <Expression>[];
+      final namedArgumentsWithTest = <String, Expression>{};
+      for (final param in method.params ?? <Param>[]) {
+        if (param.isNamed) {
+          namedArgumentsWithAny[param.name] = refer(
+            'any',
+          ).call([], {'named': literalString(param.name)});
+          namedArgumentsWithTest[param.name] = refer(
+            't${param.name.pascalCase}',
+          );
+        } else {
+          positionalArgumentsWithAny.add(refer('any').call([]));
+          positionalArgumentsWithTest.add(refer('t${param.name.pascalCase}'));
+        }
+      }
+      argumentMap[method.name] = (
+        positionalWhenArguments: positionalArgumentsWithAny,
+        positionalVerifyArguments: positionalArgumentsWithTest,
+        namedWhenArguments: namedArgumentsWithAny,
+        namedVerifyArguments: namedArgumentsWithTest,
       );
     }
 
-    buffer.writeln('}');
+    return argumentMap;
   }
 
-  void _generateFallbackRegistration(
-    StringBuffer buffer,
-    Set<String> entities,
-  ) {
-    if (entities.isEmpty) return;
-
-    // Create instances
-    for (final entity in entities) {
-      buffer.writeln('  final t$entity = $entity.empty();');
-    }
-
-    buffer
-      ..writeln()
-      ..writeln('  setUpAll(() {');
-
-    for (final entity in entities) {
-      buffer.writeln('    registerFallbackValue(t$entity);');
-    }
-
-    buffer
-      ..writeln('  });')
-      ..writeln();
+  Library _generateLibraryForSingleFileOutput({
+    required String repoImplName,
+    required String remoteDataSourceName,
+    required RepoVisitor visitor,
+    required Map<String, TestMethodArgs> methodArguments,
+  }) {
+    return Library((library) {
+      library.body.addAll([
+        _generateMockDataSourceClass(
+          remoteDataSourceName: remoteDataSourceName,
+        ),
+        _generateRepoImplTest(
+          remoteDataSourceName: remoteDataSourceName,
+          repoImplName: repoImplName,
+          visitor: visitor,
+          methodArguments: methodArguments,
+        ),
+      ]);
+    });
   }
 
-  void _generateMethodTest(
-    StringBuffer buffer,
-    IFunction method,
-    String featureName,
-    String remoteDataSourceName,
-  ) {
-    final methodName = method.name;
-    final returnType = method.returnType.rightType;
-    final isStream = method.returnType.startsWith('Stream');
-    final isVoid = returnType.toLowerCase().trim() == 'void';
+  Method _generateRepoImplTest({
+    required String remoteDataSourceName,
+    required String repoImplName,
+    required RepoVisitor visitor,
+    required Map<String, TestMethodArgs> methodArguments,
+  }) {
+    remoteDataSourceName = remoteDataSourceName.pascalCase;
+    repoImplName = repoImplName.pascalCase;
 
-    buffer.writeln("  group('$methodName', () {");
+    return Method((methodBuilder) {
+      methodBuilder
+        ..name = 'main'
+        ..returns = const Reference('void')
+        ..body = Block((body) {
+          body
+            ..addExpression(
+              declareVar(
+                'remoteDataSource',
+                type: refer(remoteDataSourceName),
+                late: true,
+              ),
+            )
+            ..addExpression(
+              declareVar('repoImpl', type: refer(repoImplName), late: true),
+            )
+            ..addExpression(
+              refer('setUp').call([
+                Method((methodBuilder) {
+                  methodBuilder.body = Block((body) {
+                    body
+                      ..addExpression(
+                        refer('remoteDataSource').assign(
+                          refer('Mock$remoteDataSourceName').newInstance([]),
+                        ),
+                      )
+                      ..addExpression(
+                        refer('repoImpl').assign(
+                          refer(repoImplName).newInstance(
+                            [refer('remoteDataSource')],
+                          ),
+                        ),
+                      );
+                  });
+                }).closure,
+              ]),
+            )
+            ..addExpression(
+              declareConst('serverFailure').assign(
+                refer('ServerFailure').newInstance(
+                  [],
+                  {
+                    'message': literalString('Something went wrong'),
+                    'statusCode': literalNum(500),
+                  },
+                ),
+              ),
+            );
+          for (final method in visitor.methods) {
+            body.addExpression(
+              _generateMethodTest(
+                method: method,
+                arguments: methodArguments[method.name]!,
+              ),
+            );
+          }
+        });
+    });
+  }
 
-    // Generate test data
-    _generateTestData(buffer, method, returnType, featureName);
+  Class _generateMockDataSourceClass({
+    required String remoteDataSourceName,
+  }) {
+    return Class((classBuilder) {
+      classBuilder
+        ..name = 'Mock$remoteDataSourceName'
+        ..extend = refer('Mock')
+        ..implements.add(refer(remoteDataSourceName));
+    });
+  }
 
-    // Generate success test
-    _generateSuccessTest(
-      buffer,
-      method,
-      returnType,
-      isStream,
-      isVoid,
-      featureName,
+  Expression _generateMethodTest({
+    required IFunction method,
+    required TestMethodArgs arguments,
+  }) {
+    return refer('group').call([
+      literalString(method.name),
+      Method((methodBuilder) {
+        methodBuilder.body = Block((block) {
+          // Generate test data
+          _generateTestData(method: method).forEach(block.addExpression);
+
+          // Generate success test
+          block
+            ..addExpression(
+              _generateSuccessTest(method: method, arguments: arguments),
+            )
+            // Generate failure test
+            ..addExpression(
+              _generateFailureTest(method: method, arguments: arguments),
+            );
+        });
+      }).closure,
+    ]);
+  }
+
+  List<Expression> _generateTestData({
+    required IFunction method,
+  }) {
+    final expressions = <Expression>[];
+    final returnType = method.rawType.rightType;
+    final resultRef = returnType.fallbackValue(
+      useConstForCollections: false,
+      useModelForCustomType: true,
+      skipIfNullable: false,
     );
 
-    // Generate failure test
-    _generateFailureTest(buffer, method, returnType, isStream, isVoid);
-
-    buffer
-      ..writeln('  });')
-      ..writeln();
-  }
-
-  void _generateTestData(
-    StringBuffer buffer,
-    IFunction method,
-    String returnType,
-    String featureName,
-  ) {
-    if (returnType.toLowerCase().startsWith('list')) {
-      final innerType = returnType.substring(5, returnType.length - 1);
-      final modelType = '${innerType}Model';
-      buffer
-        ..writeln('    final expected${innerType}s = [')
-        ..writeln('      $modelType.empty(),')
-        ..writeln("      $modelType.empty().copyWith(id: '1'),")
-        ..writeln('    ];');
-    } else if (!returnType.toLowerCase().trim().contains('void')) {
-      final modelType = '${returnType}Model';
-      buffer.writeln('    final expected$returnType = $modelType.empty();');
+    if (returnType is! VoidType) {
+      final resultDeclaration = returnType.isConst
+          ? declareConst('tResult')
+          : declareFinal('tResult');
+      expressions.add(resultDeclaration.assign(resultRef));
     }
 
-    // Generate parameter constants
-    if (method.params != null) {
+    if (method.hasParams) {
       for (final param in method.params!) {
-        if (param.type.toLowerCase() == 'string') {
-          buffer.writeln(
-            "    const ${param.name} = 'sample${param.name.upperCamelCase}';",
-          );
-        } else if (param.type.toLowerCase() == 'int') {
-          buffer.writeln('    const ${param.name} = 1;');
-        } else if (param.type.toLowerCase() == 'bool') {
-          buffer.writeln('    const ${param.name} = true;');
-        }
-      }
-    }
-
-    buffer
-      ..writeln()
-      ..writeln('    const serverFailure = ServerFailure(')
-      ..writeln("      message: 'Server error',")
-      ..writeln("      statusCode: '500',")
-      ..writeln('    );')
-      ..writeln();
-  }
-
-  void _generateSuccessTest(
-    StringBuffer buffer,
-    IFunction method,
-    String returnType,
-    bool isStream,
-    bool isVoid,
-    String featureName,
-  ) {
-    final methodName = method.name;
-    final namedParams =
-        method.params
-            ?.where((p) => p.isNamed)
-            .map((p) => '${p.name}: ${p.name}')
-            .join(', ') ??
-        '';
-    final positionalParams =
-        method.params?.where((p) => !p.isNamed).map((p) => p.name).join(', ') ??
-        '';
-
-    final callParams = method.params != null
-        ? (namedParams.isNotEmpty && positionalParams.isNotEmpty)
-              ? '$positionalParams, $namedParams'
-              : namedParams.isNotEmpty
-              ? namedParams
-              : positionalParams
-        : '';
-
-    if (isStream) {
-      buffer
-        ..writeln('    test(')
-        ..writeln(
-          "      'should return a stream of Right<$returnType> "
-          "when remote data source '",
-        )
-        ..writeln("      'is successful',")
-        ..writeln('      () {');
-
-      // Mock setup
-      if (method.params != null) {
-        final mockParams = method.params!
-            .map((p) => 'any(${p.isNamed ? "named: '${p.name}'" : ''})')
-            .join(', ');
-        buffer.writeln(
-          '        when(() => '
-          'remoteDataSource.$methodName($mockParams)).thenAnswer(',
-        );
-      } else {
-        buffer.writeln(
-          '        when(() => remoteDataSource.$methodName()).thenAnswer(',
-        );
-      }
-
-      if (returnType.toLowerCase().startsWith('list')) {
-        final innerType = returnType.substring(5, returnType.length - 1);
-        buffer.writeln('          (_) => Stream.value(expected${innerType}s),');
-      } else {
-        buffer.writeln('          (_) => Stream.value(expected$returnType),');
-      }
-      buffer
-        ..writeln('        );')
-        ..writeln();
-
-      // Test execution
-      if (callParams.isNotEmpty) {
-        buffer.writeln(
-          '        final stream = repoImpl.$methodName($callParams);',
-        );
-      } else {
-        buffer.writeln('        final stream = repoImpl.$methodName();');
-      }
-      buffer.writeln();
-
-      // Expectation
-      if (returnType.toLowerCase().startsWith('list')) {
-        final innerType = returnType.substring(5, returnType.length - 1);
-        buffer
-          ..writeln('        expect(')
-          ..writeln('          stream,')
-          ..writeln(
-            '          emits(Right<Failure, '
-            '$returnType>(expected${innerType}s)),',
-          )
-          ..writeln('        );');
-      } else {
-        buffer
-          ..writeln('        expect(')
-          ..writeln('          stream,')
-          ..writeln(
-            '          emits(Right<Failure, '
-            '$returnType>(expected$returnType)),',
-          )
-          ..writeln('        );');
-      }
-    } else {
-      // Future test
-      buffer.writeln('    test(');
-      if (isVoid) {
-        buffer.writeln(
-          "      'should complete successfully "
-          "when call to remote source is successful',",
-        );
-      } else {
-        buffer.writeln(
-          "      'should return Right<$returnType> "
-          "when remote data source is successful',",
-        );
-      }
-      buffer.writeln('      () async {');
-
-      // Mock setup
-      if (method.params != null) {
-        final mockParams = method.params!
-            .map((p) => 'any(${p.isNamed ? "named: '${p.name}'" : ''})')
-            .join(', ');
-        buffer.writeln(
-          '        when(() => '
-          'remoteDataSource.$methodName($mockParams)).thenAnswer(',
-        );
-      } else {
-        buffer.writeln(
-          '        when(() => remoteDataSource.$methodName()).thenAnswer(',
-        );
-      }
-
-      if (isVoid) {
-        buffer.writeln('          (_) async => Future.value(),');
-      } else if (returnType.toLowerCase().startsWith('list')) {
-        final innerType = returnType.substring(5, returnType.length - 1);
-        buffer.writeln('          (_) async => expected${innerType}s,');
-      } else {
-        buffer.writeln('          (_) async => expected$returnType,');
-      }
-      buffer
-        ..writeln('        );')
-        ..writeln();
-
-      // Test execution
-      if (callParams.isNotEmpty) {
-        buffer.writeln(
-          '        final result = await repoImpl.$methodName($callParams);',
-        );
-      } else {
-        buffer.writeln('        final result = await repoImpl.$methodName();');
-      }
-      buffer.writeln();
-
-      // Expectation
-      if (isVoid) {
-        buffer.writeln(
-          '        expect(result, equals(const Right<dynamic, void>(null)));',
-        );
-      } else if (returnType.toLowerCase().startsWith('list')) {
-        final innerType = returnType.substring(5, returnType.length - 1);
-        buffer.writeln(
-          '        expect(result, '
-          'equals(Right<Failure, $returnType>(expected${innerType}s)));',
-        );
-      } else {
-        buffer.writeln(
-          '        expect(result, equals(Right<Failure, '
-          '$returnType>(expected$returnType)));',
+        final variableName = 't${param.name.pascalCase}';
+        final variableRef = param.rawType.isConst
+            ? declareConst(variableName)
+            : declareFinal(variableName);
+        expressions.add(
+          variableRef.assign(
+            param.fallbackValue(
+              useConstForCollections: false,
+              skipIfNullable: false,
+              useModelForCustomType: true,
+            ),
+          ),
         );
       }
     }
 
-    buffer.writeln();
+    final paramsToRegister = method.params?.where((param) {
+      return param.type.isCustomType &&
+          !param.rawType.isDartCoreList &&
+          !param.rawType.isEnum;
+    });
 
-    // Verification
-    if (method.params != null) {
-      if (namedParams.isNotEmpty || positionalParams.isNotEmpty) {
-        buffer
-          ..writeln('        verify(')
-          ..writeln('          () => remoteDataSource.$methodName(');
-        if (callParams.isNotEmpty) {
-          if (namedParams.isNotEmpty && positionalParams.isNotEmpty) {
-            buffer.writeln('            $positionalParams,');
-            for (final param in method.params!.where((p) => p.isNamed)) {
-              buffer.writeln('            ${param.name}: ${param.name},');
-            }
-          } else if (namedParams.isNotEmpty) {
-            for (final param in method.params!.where((p) => p.isNamed)) {
-              buffer.writeln('            ${param.name}: ${param.name},');
-            }
-          } else {
-            buffer.writeln('            $positionalParams,');
-          }
-        }
-        buffer
-          ..writeln('          ),')
-          ..writeln('        ).called(1);');
-      } else {
-        buffer.writeln(
-          '        verify(() => remoteDataSource.$methodName()).called(1);',
-        );
-      }
-    } else {
-      buffer.writeln(
-        '        verify(() => remoteDataSource.$methodName()).called(1);',
+    if (paramsToRegister?.isNotEmpty ?? false) {
+      expressions.add(
+        refer('setUp').call([
+          Method((methodBuilder) {
+            methodBuilder.body = Block((body) {
+              for (final param in paramsToRegister!) {
+                body.addExpression(
+                  refer(
+                    'registerFallbackValue',
+                  ).call([refer('t${param.name.pascalCase}')]),
+                );
+              }
+            });
+          }).closure,
+        ]),
       );
     }
-
-    buffer
-      ..writeln('        verifyNoMoreInteractions(remoteDataSource);')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln();
+    return expressions;
   }
 
-  void _generateFailureTest(
-    StringBuffer buffer,
-    IFunction method,
-    String returnType,
-    bool isStream,
-    bool isVoid,
-  ) {
+  Expression _generateSuccessTest({
+    required IFunction method,
+    required TestMethodArgs arguments,
+  }) {
+    final isStream = method.rawType.isDartAsyncStream;
     final methodName = method.name;
-    final namedParams =
-        method.params
-            ?.where((p) => p.isNamed)
-            .map((p) => '${p.name}: ${p.name}')
-            .join(', ') ??
-        '';
-    final positionalParams =
-        method.params?.where((p) => !p.isNamed).map((p) => p.name).join(', ') ??
-        '';
+    final returnType = method.rawType.rightType;
+    final isVoid = returnType is VoidType;
 
-    final callParams = method.params != null
-        ? (namedParams.isNotEmpty && positionalParams.isNotEmpty)
-              ? '$positionalParams, $namedParams'
-              : namedParams.isNotEmpty
-              ? namedParams
-              : positionalParams
-        : '';
+    final (
+      :positionalWhenArguments,
+      :positionalVerifyArguments,
+      :namedWhenArguments,
+      :namedVerifyArguments,
+    ) = arguments;
 
-    if (isStream) {
-      buffer
-        ..writeln('    test(')
-        ..writeln(
-          "      'should return a stream of Left<Failure> when "
-          "remote data source throws '",
-        )
-        ..writeln("      'an error',")
-        ..writeln('      () {');
-
-      // Mock setup
-      if (method.params != null) {
-        final mockParams = method.params!
-            .map((p) => 'any(${p.isNamed ? "named: '${p.name}'" : ''})')
-            .join(', ');
-        buffer.writeln(
-          '        when(() => '
-          'remoteDataSource.$methodName($mockParams)).thenAnswer(',
-        );
-      } else {
-        buffer.writeln(
-          '        when(() => remoteDataSource.$methodName()).thenAnswer(',
-        );
-      }
-
-      buffer
-        ..writeln('          (_) => Stream.error(')
-        ..writeln('            ServerException(')
-        ..writeln('              message: serverFailure.message,')
-        ..writeln(
-          '              statusCode: serverFailure.statusCode.toString(),',
-        )
-        ..writeln('            ),')
-        ..writeln('          ),')
-        ..writeln('        );')
-        ..writeln();
-
-      // Test execution
-      if (callParams.isNotEmpty) {
-        buffer.writeln(
-          '        final stream = repoImpl.$methodName($callParams);',
-        );
-      } else {
-        buffer.writeln('        final stream = repoImpl.$methodName();');
-      }
-      buffer
-        ..writeln()
-        // Expectation
-        ..writeln('        expect(')
-        ..writeln('          stream,')
-        ..writeln(
-          '          emits(equals(const Left<Failure, '
-          '$returnType>(serverFailure))),',
-        )
-        ..writeln('        );');
+    String testDescription;
+    if (isVoid && !isStream) {
+      testDescription =
+          'should complete successfully when call to remote '
+          'source is successful';
     } else {
-      // Future test
-      buffer
-        ..writeln('    test(')
-        ..writeln(
-          "      'should return [ServerFailure] when call to "
-          "remote source is '",
-        )
-        ..writeln("      'unsuccessful',")
-        ..writeln('      () async {');
-
-      // Mock setup
-      if (method.params != null) {
-        final mockParams = method.params!
-            .map((p) => 'any(${p.isNamed ? "named: '${p.name}'" : ''})')
-            .join(', ');
-        buffer.writeln(
-          '        when(() => '
-          'remoteDataSource.$methodName($mockParams)).thenThrow(',
-        );
-      } else {
-        buffer.writeln(
-          '        when(() => remoteDataSource.$methodName()).thenThrow(',
-        );
-      }
-
-      buffer
-        ..writeln(
-          '          const ServerException(message: '
-          "'message', statusCode: 'statusCode'),",
-        )
-        ..writeln('        );')
-        ..writeln();
-
-      // Test execution
-      if (callParams.isNotEmpty) {
-        buffer.writeln(
-          '        final result = await repoImpl.$methodName($callParams);',
-        );
-      } else {
-        buffer.writeln('        final result = await repoImpl.$methodName();');
-      }
-      buffer
-        ..writeln()
-        // Expectation
-        ..writeln('        expect(')
-        ..writeln('          result,')
-        ..writeln('          equals(')
-        ..writeln('            const Left<ServerFailure, dynamic>(')
-        ..writeln(
-          '              ServerFailure(message: '
-          "'message', statusCode: 'statusCode'),",
-        )
-        ..writeln('            ),')
-        ..writeln('          ),')
-        ..writeln('        );');
+      final action = isStream ? 'emit' : 'return';
+      // Generates: should return [Right<User>] when call to...
+      testDescription =
+          'should $action [Right<${returnType.displayString()}>] when call to '
+          'remote source is successful';
     }
 
-    buffer.writeln();
-
-    // Verification
-    if (method.params != null) {
-      if (namedParams.isNotEmpty || positionalParams.isNotEmpty) {
-        buffer
-          ..writeln('        verify(')
-          ..writeln('          () => remoteDataSource.$methodName(');
-        if (callParams.isNotEmpty) {
-          if (namedParams.isNotEmpty && positionalParams.isNotEmpty) {
-            buffer.writeln('            $positionalParams,');
-            for (final param in method.params!.where((p) => p.isNamed)) {
-              buffer.writeln('            ${param.name}: ${param.name},');
-            }
-          } else if (namedParams.isNotEmpty) {
-            for (final param in method.params!.where((p) => p.isNamed)) {
-              buffer.writeln('            ${param.name}: ${param.name},');
-            }
-          } else {
-            buffer.writeln('            $positionalParams,');
-          }
+    return refer('test').call([
+      literalString(testDescription),
+      Method((methodBuilder) {
+        if (!isStream) {
+          methodBuilder.modifier = MethodModifier.async;
         }
-        buffer
-          ..writeln('          ),')
-          ..writeln('        ).called(1);');
-      } else {
-        buffer.writeln(
-          '        verify(() => remoteDataSource.$methodName()).called(1);',
+
+        final useLambdas = Utils.shouldUseLambdaBody(
+          methodHasParams: method.hasParams,
+          namedArgumentsLength: namedWhenArguments.length,
+          positionalWhenArgumentsLength: positionalWhenArguments.length,
         );
-      }
+
+        methodBuilder.body = Block((body) {
+          // ARRANGE
+          body
+            ..addExpression(
+              _generateWhenExpression(
+                method: method,
+                useLambdas: useLambdas,
+                positionalWhenArguments: positionalWhenArguments,
+                namedWhenArguments: namedWhenArguments,
+                isFailure: false,
+              ),
+            )
+            // ACT
+            ..addExpression(
+              _generateActExpression(
+                methodName: methodName,
+                isStream: isStream,
+                positionalArgs: positionalVerifyArguments,
+                namedArgs: namedVerifyArguments,
+              ),
+            )
+            // ASSERT
+            ..addExpression(
+              _generateExpectExpression(
+                method: method,
+                isFailure: false,
+              ),
+            );
+
+          // VERIFY
+          _generateVerificationExpressions(
+            useLambdas: useLambdas,
+            methodName: methodName,
+            positionalVerifyArguments: positionalVerifyArguments,
+            namedVerifyArguments: namedVerifyArguments,
+          ).forEach(body.addExpression);
+        });
+      }).closure,
+    ]);
+  }
+
+  Expression _generateFailureTest({
+    required IFunction method,
+    required TestMethodArgs arguments,
+  }) {
+    final isStream = method.rawType.isDartAsyncStream;
+    final methodName = method.name;
+
+    final (
+      :positionalWhenArguments,
+      :positionalVerifyArguments,
+      :namedWhenArguments,
+      :namedVerifyArguments,
+    ) = arguments;
+    final testDescription =
+        'should ${isStream ? 'emit' : 'return'} [Left<Failure>] when call to '
+        'remote source is unsuccessful';
+
+    return refer('test').call([
+      literalString(testDescription),
+      Method((methodBuilder) {
+        if (!isStream) {
+          methodBuilder.modifier = MethodModifier.async;
+        }
+
+        final useLambdas = Utils.shouldUseLambdaBody(
+          methodHasParams: method.hasParams,
+          namedArgumentsLength: namedWhenArguments.length,
+          positionalWhenArgumentsLength: positionalWhenArguments.length,
+        );
+
+        methodBuilder.body = Block((body) {
+          // ARRANGE
+          body
+            ..addExpression(
+              _generateWhenExpression(
+                method: method,
+                useLambdas: useLambdas,
+                positionalWhenArguments: positionalWhenArguments,
+                namedWhenArguments: namedWhenArguments,
+                isFailure: true,
+              ),
+            )
+            // ACT
+            ..addExpression(
+              _generateActExpression(
+                methodName: method.name,
+                isStream: isStream,
+                positionalArgs: arguments.positionalVerifyArguments,
+                namedArgs: arguments.namedVerifyArguments,
+              ),
+            )
+            // ASSERT
+            ..addExpression(
+              _generateExpectExpression(
+                method: method,
+                isFailure: true,
+              ),
+            );
+          _generateVerificationExpressions(
+            useLambdas: useLambdas,
+            methodName: methodName,
+            positionalVerifyArguments: positionalVerifyArguments,
+            namedVerifyArguments: namedVerifyArguments,
+          ).forEach(body.addExpression);
+        });
+      }).closure,
+    ]);
+  }
+
+  List<Expression> _generateVerificationExpressions({
+    required bool useLambdas,
+    required String methodName,
+    required List<Expression> positionalVerifyArguments,
+    required Map<String, Expression> namedVerifyArguments,
+  }) {
+    return [
+      refer('verify')
+          .call([
+            Method((methodBuilder) {
+              final body = refer('remoteDataSource')
+                  .property(methodName)
+                  .call(
+                    positionalVerifyArguments,
+                    namedVerifyArguments,
+                  );
+              methodBuilder
+                ..lambda = useLambdas
+                ..body = useLambdas
+                    ? body.code
+                    : Block((block) => block.addExpression(body));
+            }).closure,
+          ])
+          .property('called')
+          .call([literalNum(1)]),
+      refer(
+        'verifyNoMoreInteractions',
+      ).call([refer('remoteDataSource')]),
+    ];
+  }
+
+  Expression _generateWhenExpression({
+    required IFunction method,
+    required List<Expression> positionalWhenArguments,
+    required Map<String, Expression> namedWhenArguments,
+    required bool useLambdas,
+    required bool isFailure,
+  }) {
+    final methodName = method.name;
+    final isStream = method.rawType.isDartAsyncStream;
+    final isVoid = method.rawType.rightType is VoidType;
+
+    // the Exception (Failure Payload)
+    final exceptionRef = refer('ServerException').newInstance(
+      [],
+      {
+        'message': refer('serverFailure').property('message'),
+        'statusCode': refer('serverFailure').property('statusCode'),
+      },
+    );
+
+    // the Success Payload
+    Expression successResponse;
+    if (isStream) {
+      // Stream.value(tResult)
+      successResponse = refer(
+        'Stream',
+      ).property('value').call([if (isVoid) literalNull else refer('tResult')]);
+    } else if (isVoid) {
+      // Future.value() -> Void callback
+      successResponse = refer('Future').property('value').call([]);
     } else {
-      buffer.writeln(
-        '        verify(() => remoteDataSource.$methodName()).called(1);',
-      );
+      // Just tResult
+      successResponse = refer('tResult');
     }
 
-    buffer
-      ..writeln('        verifyNoMoreInteractions(remoteDataSource);')
-      ..writeln('      },')
-      ..writeln('    );')
-      ..writeln();
+    // Determine 'then' Strategy
+    // Streams ALWAYS use thenAnswer (to return a Stream object).
+    // Futures use thenAnswer (Success) or thenThrow (Failure).
+    final thenMethod = (isStream || !isFailure) ? 'thenAnswer' : 'thenThrow';
+
+    Expression thenArgument;
+
+    if (isFailure) {
+      if (isStream) {
+        // Failure Stream: (_) => Stream.error(ex)
+        thenArgument = Method((methodBuilder) {
+          methodBuilder
+            ..requiredParameters.add(
+              Parameter((param) => param.name = '_'),
+            )
+            ..body = refer(
+              'Stream',
+            ).property('error').call([exceptionRef]).returned.statement;
+        }).closure;
+      } else {
+        // Failure Future: exceptionRef (passed to thenThrow)
+        thenArgument = exceptionRef;
+      }
+    } else {
+      // Success (Stream or Future)
+      // (_) async => successResponse
+      thenArgument = Method(
+        (methodBuilder) => methodBuilder
+          ..requiredParameters.add(Parameter((param) => param.name = '_'))
+          ..modifier = isStream ? null : MethodModifier.async
+          ..lambda = true
+          ..body = successResponse.code,
+      ).closure;
+    }
+
+    return refer('when')
+        .call([
+          Method((methodBuilder) {
+            final body = refer('remoteDataSource')
+                .property(methodName)
+                .call(
+                  positionalWhenArguments,
+                  namedWhenArguments,
+                );
+            methodBuilder
+              ..lambda = useLambdas
+              ..body = useLambdas
+                  ? body.code
+                  : Block(
+                      (block) => block.addExpression(body.returned),
+                    );
+          }).closure,
+        ])
+        .property(thenMethod)
+        .call([thenArgument]);
+  }
+
+  Expression _generateActExpression({
+    required String methodName,
+    required bool isStream,
+    required List<Expression> positionalArgs,
+    required Map<String, Expression> namedArgs,
+  }) {
+    // repoImpl.method(args)
+    final callExpression = refer('repoImpl')
+        .property(methodName)
+        .call(
+          positionalArgs,
+          namedArgs,
+        );
+
+    final resultName = isStream ? 'stream' : 'result';
+
+    // final result = await callExpr;
+    return declareFinal(resultName).assign(
+      isStream ? callExpression : callExpression.awaited,
+    );
+  }
+
+  Expression _generateExpectExpression({
+    required IFunction method,
+    required bool isFailure,
+  }) {
+    final isStream = method.rawType.isDartAsyncStream;
+    final returnType = method.rawType.rightType;
+    final isVoid = returnType is VoidType;
+
+    final resultRef = refer(isStream ? 'stream' : 'result');
+
+    final containerSymbol = isFailure ? 'Left' : 'Right';
+
+    // Generic Types: <Failure, ReturnType>
+    final typeRef = TypeReference(
+      (ref) => ref
+        ..symbol = containerSymbol
+        ..types.addAll([
+          refer('Failure'),
+          refer(returnType.displayString()),
+        ]),
+    );
+
+    Expression expectedValue;
+
+    if (isFailure) {
+      // Left(serverFailure)
+      expectedValue = typeRef.constInstance([refer('serverFailure')]);
+    } else if (isVoid) {
+      // const Right(null)
+      expectedValue = typeRef.constInstance([literalNull]);
+    } else {
+      // Right(tResult)
+      expectedValue = typeRef.newInstance([refer('tResult')]);
+    }
+
+    // Wrap in Matcher (equals vs emits)
+    final matcher = isStream
+        ? refer('emits').call([expectedValue])
+        : refer('equals').call([expectedValue]);
+
+    // expect(result, matcher);
+    return refer('expect').call([resultRef, matcher]);
   }
 }
