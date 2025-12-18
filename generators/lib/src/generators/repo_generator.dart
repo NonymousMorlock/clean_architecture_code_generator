@@ -1,17 +1,14 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:annotations/annotations.dart';
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/code_builder_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
-import 'package:generators/core/services/functions.dart';
-import 'package:generators/core/utils/utils.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -31,45 +28,54 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
 
     // Load config to check if multi-file output is enabled
     final config = GeneratorConfig.fromFile('clean_arch_config.yaml');
-    final writer = FeatureFileWriter(config, buildStep);
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
+    final featureName = writer.extractFeatureName(repoName: visitor.className);
 
-    if (writer.isMultiFileEnabled) {
-      return _generateMultiFile(visitor, writer);
+    if (writer.isMultiFileEnabled && featureName != null) {
+      return _generateMultiFile(
+        visitor: visitor,
+        writer: writer,
+        featureName: featureName,
+      );
     }
 
     // Default behavior: generate to .g.dart
-    final buffer = StringBuffer();
-    repo(buffer, visitor);
-    return buffer.toString();
+    final repoClass = repo(visitor);
+
+    return writer.resolveGeneratedCode(
+      library: Library((library) => library.body.add(repoClass)),
+    );
   }
 
-  String _generateMultiFile(
-    RepoVisitor visitor,
-    FeatureFileWriter writer,
-  ) {
-    final featureName = writer.extractFeatureName(repoName: visitor.className);
-    if (featureName == null) {
-      // Fallback to default if feature name can't be extracted
-      final buffer = StringBuffer();
-      repo(buffer, visitor);
-      return buffer.toString();
-    }
-
-    final baseName = writer.extractBaseName(visitor.className);
-    final repoPath = writer.getDomainRepoPath(featureName, baseName);
+  String _generateMultiFile({
+    required RepoVisitor visitor,
+    required FeatureFileWriter writer,
+    required String featureName,
+  }) {
+    final repoPath = writer.getDomainRepoPath(featureName);
 
     // Generate repository interface code
-    final buffer = StringBuffer();
-    repo(buffer, visitor);
+    final repoBuilder = repo(visitor);
 
     // Generate complete file with imports
-    final imports = writer.generateSmartRepoImports(
+    final (:imports, :importComments) = writer.generateSmartRepoImports(
       featureName: featureName,
       candidates: visitor.discoverRequiredEntities(),
     );
-    final completeFile = writer.generateCompleteFile(
-      imports: imports,
-      generatedCode: buffer.toString(),
+
+    final completeFile = writer.resolveGeneratedCode(
+      library: Library((library) {
+        if (visitor.methods.length < 2) {
+          library.comments.addAll([
+            'I need this class to be an interface.',
+            'ignore_for_file: one_member_abstracts',
+          ]);
+        }
+        library
+          ..body.add(repoBuilder)
+          ..comments.addAll(importComments)
+          ..directives.addAll(imports.map(Directive.import));
+      }),
     );
 
     // Write to the actual repository file
@@ -87,26 +93,37 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
   ///
   /// Creates an abstract interface class defining the contract
   /// for repository implementations.
-  void repo(StringBuffer buffer, RepoVisitor visitor) {
+  Class repo(RepoVisitor visitor) {
     final className = visitor.className;
-    Utils.oneMemberAbstractHandler(
-      buffer: buffer,
-      methodLength: visitor.methods.length,
-    );
-    buffer
-      ..writeln('abstract interface class $className {')
-      ..writeln('const $className();');
-    for (final method in visitor.methods) {
-      final returnType = method.returnType.rightType;
-      final isStream = method.returnType.startsWith('Stream');
-      final param = method.params == null
-          ? ''
-          : method.params!.map((e) => paramToString(method, e)).join(', ');
-      final asynchronyType = isStream ? 'Stream' : 'Future';
-      buffer.writeln(
-        'Result$asynchronyType<$returnType> ${method.name}($param);',
-      );
-    }
-    buffer.writeln('}');
+    return Class((builder) {
+      builder
+        ..name = className
+        ..abstract = true
+        ..modifier = ClassModifier.interface
+        ..constructors.add(
+          Constructor((builder) => builder..constant = true),
+        )
+        ..methods.addAll(
+          visitor.methods.map(
+            (method) {
+              final returnType = method.returnType.rightType;
+              final isStream = method.rawType.isDartAsyncStream;
+              final asynchronyType = isStream ? 'Stream' : 'Future';
+              return Method(
+                (methodBuilder) {
+                  methodBuilder
+                    ..name = method.name
+                    ..returns = TypeReference((ref) {
+                      ref
+                        ..symbol = 'Result$asynchronyType'
+                        ..types.add(Reference(returnType));
+                    })
+                    ..addParamsFrom(method);
+                },
+              );
+            },
+          ),
+        );
+    });
   }
 }
