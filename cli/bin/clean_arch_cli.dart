@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:cli/src/command_runner.dart';
+import 'package:clean_arch_cli/src/command_runner.dart';
 
 Future<void> main(List<String> args) async {
   await _flushThenExit(await CliCommandRunner().run(args));

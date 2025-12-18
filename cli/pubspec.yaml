@@ -1,4 +1,4 @@
-name: cli
+name: clean_arch_cli
 description: A command-line interface for the Clean Architecture Code Generator
 version: 0.0.1
 publish_to: none

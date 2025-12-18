@@ -1,13 +1,13 @@
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
-import 'package:cli/src/commands/commands.dart';
-import 'package:cli/src/version.dart';
+import 'package:clean_arch_cli/src/commands/commands.dart';
+import 'package:clean_arch_cli/src/version.dart';
 import 'package:cli_completion/cli_completion.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:pub_updater/pub_updater.dart';
 
 const executableName = 'clean_arch_cli';
-const packageName = 'cli';
+const packageName = 'clean_arch_cli';
 const description =
     'A command-line interface for the Clean Architecture Code Generator';
 
