@@ -118,7 +118,13 @@ class CliCommandRunner extends CompletionCommandRunner<int> {
     }
 
     // Check for updates
-    if (topLevelResults.command?.name != UpdateCommand.commandName) {
+    // Skip checking if we are already updating or just rebuilding snapshots
+    final commandName = topLevelResults.command?.name;
+    final isUpdateCheckSkipped =
+        commandName == UpdateCommand.commandName ||
+        commandName == 'rebuild-snapshot';
+
+    if (!isUpdateCheckSkipped) {
       await _checkForUpdates();
     }
 
@@ -139,8 +145,8 @@ class CliCommandRunner extends CompletionCommandRunner<int> {
 ${lightYellow.wrap('Update available!')} ${lightCyan.wrap(packageVersion)} \u2192 ${lightCyan.wrap(latestVersion)}
 Run ${lightCyan.wrap('$executableName update')} to update''');
       }
-    } on Exception catch (_) {
-      _logger.err('Failed to check for updates.');
+    } on Exception catch (e) {
+      _logger.detail('Update check failed: $e');
     }
   }
 }
