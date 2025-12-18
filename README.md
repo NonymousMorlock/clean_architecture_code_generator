@@ -1,6 +1,6 @@
 # Clean Architecture Code Generator
 
-A powerful Flutter code generator that creates clean architecture boilerplate following industry best practices. Generate entities, models, repositories, use cases, data sources, dependency injection, and state management code automatically.
+A powerful Flutter code generator that creates clean architecture boilerplate following industry best practices. Generate entities, models, repositories, use cases, remote data sources, dependency injection, and state management code automatically.
 
 ## 🚀 Features
 
@@ -8,7 +8,7 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 - **Entity & Model Generation**: Create domain entities and data models with JSON serialization
 - **Repository Pattern**: Generate abstract repositories and implementations
 - **Use Cases**: Create use cases following the single responsibility principle
-- **Data Sources**: Generate both remote (HTTP/API) and local (SharedPreferences) data sources
+- **Data Sources**: Generate robust remote (HTTP/API) data sources
 - **Interface Adapter**: Generate Cubit/BLoC with comprehensive state management
 - **Dependency Injection**: Create GetIt service locator patterns automatically
 - **CLI Tool**: Command-line interface for easy project management
@@ -19,15 +19,15 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 
 ## 📋 Table of Contents
 
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [CLI Usage](#cli-usage)
-- [Annotations Reference](#annotations-reference)
-- [Generated Code Structure](#generated-code-structure)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [CLI Usage](#-cli-usage)
+- [Annotations Reference](#-annotations-reference)
+- [Generated Code Structure](#-generated-code-structure)
 - [Configuration](#configuration)
-- [Examples](#examples)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
+- [Examples](#-examples)
+- [Best Practices](#-best-practices)
+- [Troubleshooting](#-troubleshooting)
 
 ## 🛠️ Installation
 
@@ -56,11 +56,12 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
    cd annotations && flutter pub get && cd ..
    ```
 
-3. **Install CLI globally (optional):**
+3. **Install CLI globally:**
    ```bash
    cd cli
    dart pub global activate --source path .
    ```
+   *Note: After activation, you can run `clean_arch_cli` directly from any project directory.*
 
 ## 🚀 Quick Start
 
@@ -68,7 +69,7 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 
 1. **Create a new project:**
    ```bash
-   dart run clean_arch_cli:clean_arch_cli init --project-name my_app
+   clean_arch_cli init --project-name my_app
    cd my_app
    ```
 
@@ -79,7 +80,6 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
      equatable: ^2.0.5
      dartz: ^0.10.1
      get_it: ^7.6.4
-     shared_preferences: ^2.2.2
      dio: ^5.3.2
      bloc: ^8.1.2
      flutter_bloc: ^8.1.3
@@ -95,7 +95,7 @@ A powerful Flutter code generator that creates clean architecture boilerplate fo
 
 3. **Create your first feature:**
    ```bash
-   dart run clean_arch_cli:clean_arch_cli create --type feature --name authentication
+   clean_arch_cli create --type feature --name authentication
    ```
 
 ### Option 2: Manual Setup
@@ -139,7 +139,7 @@ The CLI tool provides several commands to help you manage your clean architectur
 
 ### Initialize Project
 ```bash
-dart run clean_arch_cli:clean_arch_cli init --project-name my_app [options]
+clean_arch_cli init --project-name my_app [options]
 ```
 
 **Options:**
@@ -149,7 +149,7 @@ dart run clean_arch_cli:clean_arch_cli init --project-name my_app [options]
 
 ### Generate Code
 ```bash
-dart run clean_arch_cli:clean_arch_cli generate [options]
+clean_arch_cli generate [options]
 ```
 
 **Options:**
@@ -159,7 +159,7 @@ dart run clean_arch_cli:clean_arch_cli generate [options]
 
 ### Create Components
 ```bash
-dart run clean_arch_cli:clean_arch_cli create --type <type> --name <name> [options]
+clean_arch_cli create --type <type> --name <name> [options]
 ```
 
 **Types:**
@@ -179,38 +179,45 @@ dart run clean_arch_cli:clean_arch_cli create --type <type> --name <name> [optio
 
 ```bash
 # Create a new project
-dart run clean_arch_cli:clean_arch_cli init -n my_ecommerce_app
+clean_arch_cli init -n my_ecommerce_app
 
 # Create a new feature
-dart run clean_arch_cli:clean_arch_cli create -t feature -n products
+clean_arch_cli create -t feature -n products
 
 # Create an entity
-dart run clean_arch_cli:clean_arch_cli create -t entity -n product -f products
+clean_arch_cli create -t entity -n product -f products
 
 # Create a repository
-dart run clean_arch_cli:clean_arch_cli create -t repository -n product -f products
+clean_arch_cli create -t repository -n product -f products
 
 # Generate code with watch mode
-dart run clean_arch_cli:clean_arch_cli generate --watch
+clean_arch_cli generate --watch
 ```
 
 ## 📝 Annotations Reference
 
 ### Entity & Model Generation
 
+The generator uses the parameter names in your `TBG` class as the keys for JSON serialization. If your API uses specific naming conventions (like snake_case or PascalCase), you should declare the properties in your annotated class using that exact casing.
+
 ```dart
-@entityGen  // Generates domain entity
-@modelGen   // Generates data model with JSON serialization
+@modelTestGen
+@modelGen
+@entityGen
 class UserTBG {
-  @required
-  final String id;
-  @required
-  final String email;
-  final String? profileImage;
-  @required
-  final DateTime createdAt;
+  const UserTBG({
+    required String id,
+    required String Email,           // Maps to 'Email' in JSON
+    required String Name,            // Maps to 'Name' in JSON
+    required Address PrimaryAddress, // Maps to 'PrimaryAddress' in JSON
+    required List<int> favoriteItemIds,
+    List<Address>? addresses,
+    DateTime? created_at,            // Maps to 'created_at' in JSON
+  });
 }
 ```
+
+Internal fields in the generated Entity and Model will automatically be converted to `camelCase` for idiomatic Dart usage, while preserving the original casing in `fromMap` and `toMap` for API compatibility.
 
 ### Repository & Use Case Generation
 
@@ -219,7 +226,6 @@ class UserTBG {
 @usecaseGen     // Generates use cases for each method
 @repoImplGen    // Generates repository implementation
 @remoteSrcGen   // Generates remote data source (HTTP/API)
-@localSrcGen    // Generates local data source (SharedPreferences)
 @injectionGen   // Generates dependency injection setup
 class AuthRepoTBG {
   external ResultFuture<User> login({required String email, required String password});
@@ -246,7 +252,6 @@ class AuthAdapterTBG {
 @usecaseTestGen    // Generates use case tests
 @repoImplTestGen   // Generates repository implementation tests
 @remoteSrcTestGen  // Generates remote data source tests
-@localSrcTestGen   // Generates local data source tests
 ```
 
 ## 🏗️ Generated Code Structure
@@ -259,8 +264,7 @@ When you annotate a `UserRepoTBG` class with all annotations, the generator crea
 lib/features/user/
 ├── data/
 │   ├── datasources/
-│   │   ├── user_remote_data_source.dart      # HTTP/API calls
-│   │   └── user_local_data_source.dart       # SharedPreferences
+│   │   └── user_remote_data_source.dart      # HTTP/API calls
 │   ├── models/
 │   │   └── user_model.dart                   # JSON serialization
 │   └── repositories/
@@ -296,9 +300,8 @@ Future<void> _initUser() async {
     ..registerLazySingleton(() => Login(sl()))
     ..registerLazySingleton(() => Register(sl()))
     ..registerLazySingleton(() => GetCurrentUser(sl()))
-    ..registerLazySingleton<UserRepo>(() => UserRepoImpl(sl(), sl()))
-    ..registerLazySingleton<UserRemoteDataSrc>(() => UserRemoteDataSrcImpl(sl()))
-    ..registerLazySingleton<UserLocalDataSrc>(() => UserLocalDataSrcImpl(sl()));
+    ..registerLazySingleton<UserRepo>(() => UserRepoImpl(sl()))
+    ..registerLazySingleton<UserRemoteDataSrc>(() => UserRemoteDataSrcImpl(sl()));
 }
 ```
 
@@ -373,27 +376,13 @@ remote_data_source:
 
 ### 🎯 Remote Data Source Configuration Benefits
 
-The remote data source generator now uses **YAML configuration** instead of terminal prompts, providing:
+The remote data source generator uses **YAML configuration** instead of terminal prompts, providing:
 
 - **🚀 Non-Interactive Builds**: No more terminal prompts during code generation
 - **🔄 Consistent Builds**: Same configuration produces identical results across environments
 - **⚙️ CI/CD Friendly**: Perfect for automated build pipelines
 - **📝 Version Controlled**: Configuration is part of your codebase
 - **🎛️ Declarative**: Clear, readable dependency specification
-
-**Before (Terminal Prompts):**
-```
-REMOTE DATA SOURCE DEPENDENCIES FOR UserRemoteDataSrc
-does it use FirebaseAuth? (yes/no): yes
-does it use Dio? (yes/no): yes
-```
-
-**After (YAML Configuration):**
-```yaml
-remote_data_source:
-  http_client: "dio"
-  firebase_auth: true
-```
 
 ## 📚 Examples
 
@@ -407,21 +396,16 @@ remote_data_source:
    @entityGen
    @modelGen
    class ProductTBG {
-     @required
-     final String id;
-     @required
-     final String name;
-     @required
-     final String description;
-     @required
-     final double price;
-     final String? imageUrl;
-     @required
-     final String categoryId;
-     @required
-     final DateTime createdAt;
-     @required
-     final DateTime updatedAt;
+     const ProductTBG({
+       required String id,
+       required String name,
+       required String description,
+       required double price,
+       required String categoryId,
+       required DateTime createdAt,
+       required DateTime updatedAt,
+       String? imageUrl,
+     });
    }
    ```
 
@@ -436,7 +420,6 @@ remote_data_source:
    @usecaseGen
    @repoImplGen
    @remoteSrcGen
-   @localSrcGen
    @injectionGen
    @adapterGen
    class ProductRepoTBG {
@@ -451,7 +434,7 @@ remote_data_source:
 
 3. **Generate the code:**
    ```bash
-   dart run clean_arch_cli:clean_arch_cli generate
+   clean_arch_cli generate
    ```
 
 4. **Use in your app:**
@@ -493,14 +476,7 @@ remote_data_source:
 
 ### 2. Required Fields
 
-Use `@required` annotation for mandatory fields:
-```dart
-class UserTBG {
-  @required
-  final String email;  // Will be required in constructors
-  final String? bio;   // Optional field
-}
-```
+The generator automatically detects required fields from your constructor.
 
 ### 3. Return Types
 
@@ -530,6 +506,10 @@ Future<void> getProducts() async {
   );
 }
 ```
+
+### 6. Test Data & Fixtures
+
+When generating model tests, the generator creates JSON fixtures. Note that **custom types (nested models)** are skipped in the generated fixture file to keep it manageable. However, the generated test code automatically "hydrates" these fields in the `setUpAll` block by injecting `CustomType.empty().toMap()`, ensuring your serialization tests remain robust.
 
 ## 🎯 Multi-File Output Mode
 
@@ -601,7 +581,7 @@ feature_scaffolding:
 
 ```bash
 # Create a feature with scaffolding
-dart run clean_arch_cli:clean_arch_cli create --type feature --name auth
+clean_arch_cli create --type feature --name auth
 ```
 
 If `auth` is defined in the config with `feature_scaffolding.enabled: true`, the CLI will:
@@ -615,7 +595,7 @@ If `auth` is defined in the config with `feature_scaffolding.enabled: true`, the
 Then run the generator to populate the files:
 
 ```bash
-dart run clean_arch_cli:clean_arch_cli generate
+clean_arch_cli generate
 ```
 
 ### Combined Workflow
@@ -674,7 +654,7 @@ When both features are enabled:
 3. **Watch mode issues:**
    ```bash
    # Stop watch mode and restart
-   dart run clean_arch_cli:clean_arch_cli generate --watch
+   clean_arch_cli generate --watch
    ```
 
 ## 🤝 Contributing
@@ -693,4 +673,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Happy coding with Clean Architecture! 🚀**
 
-For more examples and updates, visit our [GitHub repository](https://github.com/your-username/clean_architecture_code_generator).
+For more examples and updates, visit our [GitHub repository](https://github.com/NonymousMorlock/clean_architecture_code_generator).
