@@ -81,13 +81,13 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     // Generate Adapter
     final adapterClass = _interfaceAdapter(
       visitor: visitor,
-      featureName: feature,
+      className: feature.pascalCase,
     );
 
     // Generate States
     final adapterStateClass = _interfaceAdapterState(
       visitor: visitor,
-      featureName: feature,
+      className: feature.pascalCase,
     );
 
     return writer.resolveGeneratedCode(
@@ -95,7 +95,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         library
           ..comments.addAll([
             '// **************************************************************************',
-            '// AdapterGenerator - $feature Adapter',
+            '// AdapterGenerator - ${feature.pascalCase} Adapter',
             '// **************************************************************************',
           ])
           ..body.addAll([
@@ -104,7 +104,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
               stateLibrary
                 ..comments.addAll([
                   '// **************************************************************************',
-                  '// StateGenerator - $feature States',
+                  '// StateGenerator - ${feature.pascalCase} States',
                   '// **************************************************************************',
                 ])
                 ..body.addAll(adapterStateClass);
@@ -122,12 +122,12 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     // Generate adapter file
     final adapter = _interfaceAdapter(
       visitor: visitor,
-      featureName: featureName,
+      className: featureName,
     );
 
     final adapterState = _interfaceAdapterState(
       visitor: visitor,
-      featureName: featureName,
+      className: featureName,
     );
 
     final adapterPath = writer.getInterfaceAdapterPath(featureName.snakeCase);
@@ -184,10 +184,10 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
   Class _interfaceAdapter({
     required RepoVisitor visitor,
-    required String featureName,
+    required String className,
   }) {
-    final adapterName = '${featureName}Adapter';
-    final stateName = '${featureName}State';
+    final adapterName = '${className}Adapter';
+    final stateName = '${className}State';
 
     return Class((classBuilder) {
       final streamMethods = <IFunction>[];
@@ -221,7 +221,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                 }),
                 refer(
                   'super',
-                ).call([refer('${featureName}Initial').constInstance([])]).code,
+                ).call([refer('${className}Initial').constInstance([])]).code,
               ]);
           }),
         )
@@ -256,7 +256,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
           visitor.methods.map((method) {
             return _generateAdapterMethod(
               method: method,
-              featureName: featureName,
+              featureName: className,
             );
           }),
         )
@@ -492,18 +492,18 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
   List<Class> _interfaceAdapterState({
     required RepoVisitor visitor,
-    required String featureName,
+    required String className,
   }) {
-    final stateName = '${featureName}State';
+    final stateName = '${className}State';
 
     final stateClasses = [
       _generateBaseState(stateName: stateName),
       _generateChildState(
-        stateName: '${featureName}Initial',
+        stateName: '${className}Initial',
         parentClassName: stateName,
       ),
       _generateChildState(
-        stateName: '${featureName}Loading',
+        stateName: '${className}Loading',
         parentClassName: stateName,
       ),
     ];
@@ -515,7 +515,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       final returnType = method.returnType.rightType;
       final successState = StateNameGenerator.generate(
         methodName: method.name,
-        featureName: featureName,
+        featureName: className,
         returnType: returnType,
       );
 
@@ -535,7 +535,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     stateClasses.add(
       Class((classBuilder) {
         classBuilder
-          ..name = '${featureName}Error'
+          ..name = '${className}Error'
           ..extend = Reference(stateName)
           ..modifier = ClassModifier.final$
           ..constructors.addAll([
