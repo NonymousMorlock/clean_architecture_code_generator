@@ -168,7 +168,51 @@ class GenerateCommand extends Command<int> {
         );
 
         if (formatResult.exitCode != 0) {
-          _logger.err('❌ Failed to format code: ${formatResult.stderr}');
+          final stderr = formatResult.stderr.toString();
+
+          // CHECK FOR CONFLICT MARKERS
+          // The Dart parser usually fails on '=======' saying
+          // "The '===' operator is not supported"
+          // or we can look for the marker text directly.
+          if (stderr.contains('=======') ||
+              stderr.contains('<<<<<<<') ||
+              stderr.contains('operator is not supported')) {
+            _logger.warn(
+              '⚠️ Formatting skipped on some files due to Merge Conflicts.\n'
+              '   This is expected! Please resolve the '
+              'conflicts in your IDE manually.',
+            );
+            // 1. Create a Set to store unique file paths (O(1) lookup/insert)
+            final conflictFiles = <String>{};
+
+            // 2. Regex to reliably extract paths starting with lib/ or test/ and ending in .dart
+            //    Handles both forward slash (/) and backslash (\) for Windows support.
+            final pathRegex = RegExp(r'(lib|test)[\\/].+\.dart');
+
+            final lines = stderr.split('\n');
+
+            for (final line in lines) {
+              // Fast pre-check to avoid running Regex on irrelevant lines
+              if (line.contains('.dart')) {
+                final match = pathRegex.firstMatch(line);
+
+                if (match != null) {
+                  final filePath = match.group(0)!;
+
+                  // 3. The "One Loop" Optimization:
+                  // Set.add() returns `true` ONLY if the item wasn't
+                  // already there.
+                  // This lets us add + check + log in a single step.
+                  if (conflictFiles.add(filePath)) {
+                    _logger.warn('   -> Conflict likely in: $filePath');
+                  }
+                }
+              }
+            }
+          } else {
+            // Actual syntax error not caused by conflicts
+            _logger.err('❌ Failed to format code: $stderr');
+          }
         }
         if (watch) {
           _logger.success('👀 Watching for changes... Press Ctrl+C to stop.');
