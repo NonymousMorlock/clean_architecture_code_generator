@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:build/src/builder/build_step.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
+import 'package:generators/core/services/merge_engine.dart';
+import 'package:generators/core/services/snapshot_manager.dart';
 import 'package:generators/generators.dart';
 import 'package:path/path.dart' as path;
 
@@ -23,6 +25,9 @@ class FeatureFileWriter {
 
   /// The current build step.
   final BuildStep buildStep;
+
+  final SnapshotManager _snapshotManager = SnapshotManager();
+  final MergeEngine _mergeEngine = MergeEngine();
 
   /// Determines if multi-file output is enabled
   bool get isMultiFileEnabled => config.multiFileOutput.enabled;
@@ -303,9 +308,27 @@ class FeatureFileWriter {
           'File $filePath does not exist and auto-creation is disabled',
         );
       }
+      // New file, just write and save snapshot
+      file.writeAsStringSync(content);
+      _snapshotManager.saveSnapshot(filePath, content);
+      return;
     }
 
-    file.writeAsStringSync(content);
+    // File exists, check for snapshot to perform 3-way merge
+    final base = _snapshotManager.getSnapshot(filePath);
+    final mine = file.readAsStringSync();
+    final theirs = content;
+
+    if (base != null) {
+      final merged = _mergeEngine.merge(base: base, mine: mine, theirs: theirs);
+      file.writeAsStringSync(merged);
+    } else {
+      // No snapshot found, fallback to overwriting
+      file.writeAsStringSync(theirs);
+    }
+
+    // Save the new "theirs" as the base for the next generation
+    _snapshotManager.saveSnapshot(filePath, theirs);
   }
 
   /// Merge generated content into an existing file
