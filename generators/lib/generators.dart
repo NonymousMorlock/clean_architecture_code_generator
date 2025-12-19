@@ -6,7 +6,6 @@ import 'package:build/build.dart';
 import 'package:generators/src/generators/adapter_generator.dart';
 import 'package:generators/src/generators/entity_generator.dart';
 import 'package:generators/src/generators/injection_generator.dart';
-import 'package:generators/src/generators/local_data_src_generator.dart';
 import 'package:generators/src/generators/model_generator.dart';
 import 'package:generators/src/generators/model_test_generator.dart';
 import 'package:generators/src/generators/remote_data_src_generator.dart';
@@ -27,7 +26,6 @@ export 'core/utils/utils.dart';
 export 'src/generators/adapter_generator.dart';
 export 'src/generators/entity_generator.dart';
 export 'src/generators/injection_generator.dart';
-export 'src/generators/local_data_src_generator.dart';
 export 'src/generators/model_generator.dart';
 export 'src/generators/model_test_generator.dart';
 export 'src/generators/remote_data_src_generator.dart';
@@ -76,10 +74,6 @@ Builder generateRepository(BuilderOptions options) =>
 /// Builder function for generating model test files.
 Builder generateModelTest(BuilderOptions options) =>
     SharedPartBuilder([ModelTestGenerator()], 'modelTests');
-
-/// Builder function for generating local data source classes.
-Builder generateLocalDataSrc(BuilderOptions options) =>
-    SharedPartBuilder([LocalDataSrcGenerator()], 'localDataSrc');
 
 /// Builder function for generating dependency injection container code.
 Builder generateInjectionContainer(BuilderOptions options) =>
