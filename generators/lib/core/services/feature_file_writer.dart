@@ -113,7 +113,7 @@ class FeatureFileWriter {
       getFeatureRoot(featureName.snakeCase),
       'data',
       'datasources',
-      '${featureName.snakeCase}_remote_data_src.dart',
+      '${featureName.snakeCase}_remote_data_source.dart',
     );
   }
 
@@ -484,6 +484,7 @@ class FeatureFileWriter {
         featureName: featureName,
         methodName: methodName,
       ),
+      getDomainRepoPath(featureName),
       '${repoName.snakeCase}.mock.dart',
     ];
   }
