@@ -187,7 +187,7 @@ class FeatureFileWriter {
   String getUsecasesRepoMockPath(String featureName) {
     return path.join(
       getUsecasesTestDirPath(featureName),
-      '${featureName.snakeCase}.mock.dart',
+      '${featureName.snakeCase}_repo.mock.dart',
     );
   }
 
