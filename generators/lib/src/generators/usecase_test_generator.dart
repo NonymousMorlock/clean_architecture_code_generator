@@ -384,7 +384,7 @@ class UsecaseTestGenerator
             ref
               ..symbol = 'Right'
               ..types.addAll([
-                const Reference('dynamic'),
+                const Reference('Failure'),
                 refer(method.rawType.rightType.displayString()),
               ]);
           });
