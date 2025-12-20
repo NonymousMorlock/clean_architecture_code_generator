@@ -1,0 +1,10 @@
+# Mock config for tests
+app_name: "test_app"
+multi_file_output:
+  enabled: false
+feature_scaffolding:
+  enabled: false
+  features:
+    auth:
+      entities:
+        - user
