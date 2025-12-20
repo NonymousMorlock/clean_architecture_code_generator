@@ -48,6 +48,7 @@ We believe the value of Clean Architecture is in the separation of concerns, not
 
 - Flutter SDK (>=3.0.0)
 - Dart SDK (>=3.0.0)
+- Git (Recommended for high-precision 3-way merging)
 
 ### Setup
 
@@ -240,6 +241,8 @@ If you and the generator modify the **exact same line**, the tool will inject st
 ```
 
 **To resolve:** Simply use Android Studio or VS Code's built-in merge tools to pick the version you want. This ensures you are always the final authority on your codebase. If the IDE doesn't show merge options, you can manually edit the file to resolve the conflicts.
+
+> **Technical Note:** Our engine uses a hybrid approach for conflict resolution. If Git is detected in your environment, it leverages the native 3-way merge algorithm (`git merge-file`) for granular, character-level precision. If not, it falls back to a strict line-based safe merge to ensure your customizations are never lost.
 
 ### 3. Naming Conventions
 *   **Blueprints**: Always end with `TBG` (e.g., `UserTBG`, `AuthRepoTBG`).
