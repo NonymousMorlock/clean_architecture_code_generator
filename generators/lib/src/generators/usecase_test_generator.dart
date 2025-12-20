@@ -359,18 +359,25 @@ class UsecaseTestGenerator
           final paramsClassName = '${methodName.pascalCase}Params';
           final needsCustomParams =
               method.params != null && method.params!.length > 1;
+          final customParamsRef = refer(paramsClassName);
+          final customParamsIsConst =
+              needsCustomParams &&
+              method.params!.every((param) => param.rawType.isConst);
+          final paramArguments = {
+            for (final param in method.params!)
+              param.name: refer('t${param.name.pascalCase}'),
+          };
+          final customParams = needsCustomParams
+              ? (customParamsIsConst
+                    ? customParamsRef.constInstance([], paramArguments)
+                    : customParamsRef.newInstance([], paramArguments))
+              : null;
           final resultAssignment = refer('usecase').call(
             [
               if (!needsCustomParams && method.hasParams)
                 refer('t${method.params!.first.name.pascalCase}')
               else if (needsCustomParams)
-                refer(paramsClassName).newInstance(
-                  [],
-                  {
-                    for (final param in method.params!)
-                      param.name: refer('t${param.name.pascalCase}'),
-                  },
-                ),
+                customParams!,
             ],
           );
           body.addExpression(
