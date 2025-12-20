@@ -10,8 +10,8 @@ We believe the value of Clean Architecture is in the separation of concerns, not
 
 ### How it differs:
 *   **Developer Ownership**: The generator produces actual human-readable Dart source files. Once generated, **you own the code**. You can (and should) modify, refactor, and commit these files to your repository.
-*   **Blueprints (`TBG` files)**: Classes ending in `TBG` (To Be Generated) are temporary 
-    blueprints. They serve as instructions for the factory. Once your feature is scaffolded, these files are no longer needed for your app to run. You can delete them or keep them ignored in version control.
+*   **Respectful Updates**: The generator is a collaborator, not a dictator. It uses a **Smart Merge Engine** to ensure that when you update your blueprints and regenerate, your manual customizations are preserved.
+*   **Blueprints (`TBG` files)**: Classes ending in `TBG` (To Be Generated) are temporary blueprints. They serve as instructions for the factory. Once your feature is scaffolded, these files are no longer needed for your app to run. You can delete them or keep them ignored in version control.
 *   **Zero Production Bloat**: Since the generated code is standard Dart, both the `annotations` and `generators` packages are strictly `dev_dependencies`. Your final application binary contains zero overhead from this tool.
 
 ---
@@ -30,6 +30,7 @@ We believe the value of Clean Architecture is in the separation of concerns, not
 - **Test Generation**: Generate unit tests for all components
 - **Multi-File Output**: Write generated code directly to feature files instead of .g.dart files
 - **Feature Scaffolding**: Pre-generate feature structure from YAML configuration
+- **Smart 3-Way Merge**: Regenerate features without losing your manual code customizations.
 
 ## 📋 Table of Contents
 
@@ -222,17 +223,29 @@ lib/features/user/
 
 ### 1. The `TBG` Lifecycle
 Think of `TBG` files as **scaffolding instructions**. 
-1. Create the `TBG` class.
-2. Run `generate`.
-3. Verify the generated source code.
-4. **Option A**: Delete the `TBG` file.
-5. **Option B**: Keep the `TBG` file but add it to your `.gitignore`. If you need to add a new method to the entire feature later, update the `TBG` and run `generate` again (the generator is smart enough to append/update modifiable files in multi-file mode).
+1. **Define**: Create the `TBG` class.
+2. **Scaffold**: Run `generate`.
+3. **Own**: The generated files are standard Dart. **You own them.** Modify them or add business logic.
+4. **Evolve**: Need a new field? Update the `TBG` and run `generate` again. The generator will merge the new field while keeping your existing logic safe.
 
-### 2. Naming Conventions
+### 2. Smart Merging & Conflict Resolution
+If you and the generator modify the **exact same line**, the tool will inject standard Git conflict markers:
+
+```dart
+<<<<<<< MINE (User Changes)
+'email': map['Email'], // Your manual fix
+=======
+'email': map['email_address'], // New generator update
+>>>>>>> THEIRS (Generator Output)
+```
+
+**To resolve:** Simply use Android Studio or VS Code's built-in merge tools to pick the version you want. This ensures you are always the final authority on your codebase. If the IDE doesn't show merge options, you can manually edit the file to resolve the conflicts.
+
+### 3. Naming Conventions
 *   **Blueprints**: Always end with `TBG` (e.g., `UserTBG`, `AuthRepoTBG`).
 *   **API Keys**: Use mixed casing in constructor parameters if your API keys aren't camelCase.
 
-### 3. Test Data & Fixtures
+### 4. Test Data & Fixtures
 When generating model tests, the generator creates JSON fixtures. Note that **custom types (nested models)** are skipped in the generated fixture file to keep it manageable. However, the generated test code automatically "hydrates" these fields in the `setUpAll` block by injecting `CustomType.empty().toMap()`, ensuring your serialization tests remain robust.
 
 ---
@@ -244,7 +257,7 @@ Create a `clean_arch_config.yaml` file in your project root to customize your fa
 ```yaml
 # Multi-file output is highly recommended for the Scaffolding workflow
 multi_file_output:
-  enabled: true                  # Write to actual feature files
+  enabled: true                  # Recommended: Write to actual feature files
   auto_create_targets: true      # Auto-create missing files
 ```
 
