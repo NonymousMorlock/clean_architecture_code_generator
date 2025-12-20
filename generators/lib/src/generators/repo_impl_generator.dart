@@ -168,11 +168,15 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       if (isVoid) {
         bodyBuilder
           ..addExpression(callExpression)
-          ..addExpression(refer('Right').call([refer('null')]).returned);
+          ..addExpression(
+            refer('Right').constInstance([refer('null')]).returned,
+          );
       } else {
         bodyBuilder
           ..addExpression(declareFinal('result').assign(callExpression))
-          ..addExpression(refer('Right').call([refer('result')]).returned);
+          ..addExpression(
+            refer('Right').newInstance([refer('result')]).returned,
+          );
       }
 
       bodyBuilder.statements.add(
@@ -184,7 +188,9 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
         'statusCode': refer('e').property('statusCode'),
       });
 
-      bodyBuilder.addExpression(refer('Left').call([serverFailure]).returned);
+      bodyBuilder.addExpression(
+        refer('Left').newInstance([serverFailure]).returned,
+      );
 
       bodyBuilder.statements.add(const Code('}'));
     });
