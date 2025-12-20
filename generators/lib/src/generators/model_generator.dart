@@ -516,6 +516,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             return Parameter((paramBuilder) {
               paramBuilder
                 ..name = param.name.camelCase
+                ..named = true
                 ..type = TypeReference((ref) {
                   ref
                     ..symbol = param.type.isCustomType
