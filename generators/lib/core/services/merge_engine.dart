@@ -11,22 +11,21 @@ class MergeEngine {
   /// {@macro smart_merge_engine}
   MergeEngine() {
     // STRICT SETTINGS:
-    // We disable fuzzy matching. In code generation, 
+    // We disable fuzzy matching. In code generation,
     // "close enough" is dangerous.
     _dmp.matchThreshold = 0.0;
     _dmp.patchDeleteThreshold = 0.0;
     _dmp.patchMargin = 0;
   }
-  
+
   final _dmp = DiffMatchPatch();
   bool? _hasGitCache;
 
-
   /// The Master Merge Function
-  /// 
-  /// 1. Tries to use Git's native 'merge-file' 
+  ///
+  /// 1. Tries to use Git's native 'merge-file'
   /// (Best quality, handles complex conflicts).
-  /// 2. Falls back to a strict Dart line-based merge 
+  /// 2. Falls back to a strict Dart line-based merge
   /// (Safe, handles basic updates).
   String merge({
     required String base,
@@ -92,7 +91,7 @@ class MergeEngine {
       ]);
 
       if (result.exitCode >= 0) {
-        // Exit code 0 = clean merge. Exit code 1 = conflicts 
+        // Exit code 0 = clean merge. Exit code 1 = conflicts
         // (output has markers).
         return result.stdout.toString();
       }
@@ -131,7 +130,7 @@ class MergeEngine {
   String _linesToChars(String text, Map<String, String> lineMap) {
     final buffer = StringBuffer();
     // Split by newline but keep the delimiter to preserve formatting
-    // Dart's LineSplitter drops newlines, so we use a regex 
+    // Dart's LineSplitter drops newlines, so we use a regex
     // lookbehind or manual split
     // Simple approach: split by \n and rejoin later, but that loses \r\n vs \n info.
     // Robust approach:
@@ -144,7 +143,7 @@ class MergeEngine {
       offset = nextNewline + 1;
 
       if (!lineMap.containsKey(line)) {
-        // Use private use area chars to avoid collisions, or 
+        // Use private use area chars to avoid collisions, or
         // just incrementing chars
         // Standard DMP uses unicode starting at 1.
         lineMap[line] = String.fromCharCode(lineMap.length + 1000);
