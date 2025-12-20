@@ -81,7 +81,7 @@ class FeatureFileWriter {
   /// Get the feature package path
   /// e.g., my_app/features/auth
   String getFeaturePackagePath(String featureName) {
-    return '${config.appName}/${config.featureScaffolding.rootName}/${featureName.snakeCase}';
+    return 'package:${config.appName}/${config.featureScaffolding.rootName}/${featureName.snakeCase}';
   }
 
   /// Get the domain repository file path
