@@ -484,7 +484,7 @@ class FeatureFileWriter {
         featureName: featureName,
         methodName: methodName,
       ),
-      getDomainRepoPath(featureName),
+      '${getFeaturePackagePath(featureName)}/domain/repositories/${featureName.snakeCase}_repository.dart',
       '${repoName.snakeCase}.mock.dart',
     ];
   }
@@ -537,7 +537,7 @@ class FeatureFileWriter {
       'package:flutter_test/flutter_test.dart',
       'dart:convert',
       'package:${config.appName}/core/typedefs.dart',
-      '../../../fixtures/fixture_reader.dart',
+      '../../../../fixtures/fixture_reader.dart',
       '${getFeaturePackagePath(featureName.snakeCase)}/data/models/${entityName.snakeCase}_model.dart',
       '${getFeaturePackagePath(featureName.snakeCase)}/domain/entities/${entityName.snakeCase}.dart',
     ];
