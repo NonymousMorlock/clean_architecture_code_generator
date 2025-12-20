@@ -451,7 +451,7 @@ class FeatureFileWriter {
       'package:dartz/dartz.dart',
       if (hasStream) 'dart:async',
       '${getFeaturePackagePath(featureName.snakeCase)}/domain/repositories/${featureName.snakeCase}_repository.dart',
-      '${getFeaturePackagePath(featureName.snakeCase)}/data/datasources/${featureName.snakeCase}_remote_data_src.dart',
+      '${getFeaturePackagePath(featureName.snakeCase)}/data/datasources/${featureName.snakeCase}_remote_data_source.dart',
     ];
   }
 
@@ -501,6 +501,7 @@ class FeatureFileWriter {
     final imports = [
       'package:bloc/bloc.dart',
       'package:equatable/equatable.dart',
+      'package:${config.appName}/core/errors/failures.dart',
       ...methods.map((method) {
         if (!hasStream && method.rawType.isDartAsyncStream) hasStream = true;
         final usecaseFile = method.name.snakeCase;
@@ -512,7 +513,6 @@ class FeatureFileWriter {
       imports.addAll([
         'dart:async',
         'package:dartz/dartz.dart',
-        'package:${config.appName}/core/errors/failures.dart',
       ]);
     }
     return imports;
