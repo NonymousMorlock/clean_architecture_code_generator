@@ -104,7 +104,7 @@ class RemoteDataSrcGenerator
     final repoName = visitor.className
         .replaceAll('TBG', '')
         .replaceAll('Repo', '');
-    final className = '${repoName}RemoteDataSrc';
+    final className = '${repoName}RemoteDataSource';
 
     return Class((classBuilder) {
       classBuilder
@@ -145,7 +145,7 @@ class RemoteDataSrcGenerator
     final repoName = visitor.className
         .replaceAll('TBG', '')
         .replaceAll('Repo', '');
-    final contractClassName = '${repoName}RemoteDataSrc';
+    final contractClassName = '${repoName}RemoteDataSource';
 
     final className = '${contractClassName}Impl';
 

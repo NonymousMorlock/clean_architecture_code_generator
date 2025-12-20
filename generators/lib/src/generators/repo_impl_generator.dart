@@ -117,7 +117,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
               ..name = '_remoteDataSource'
               ..modifier = FieldModifier.final$
               ..type = Reference(
-                '${repoName.substring(0, repoName.length - 4)}RemoteDataSrc',
+                '${repoName.substring(0, repoName.length - 4)}RemoteDataSource',
               ),
           ),
         )
