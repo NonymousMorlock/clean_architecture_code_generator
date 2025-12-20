@@ -8,6 +8,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/class_builder_extensions.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
@@ -384,6 +385,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                   methodName: methodName,
                   featureName: featureName,
                   returnType: returnType,
+                  rawReturnType: method.rawType,
                 ),
               );
           } else {
@@ -411,6 +413,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                                 methodName: methodName,
                                 featureName: featureName,
                                 returnType: returnType,
+                                rawReturnType: method.rawType,
                               ).statement;
                           }).closure,
                         ],
@@ -450,6 +453,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     required String methodName,
     required String featureName,
     required String returnType,
+    required DartType rawReturnType,
   }) {
     return refer('result').property('fold').call([
       Method((failureMethod) {
@@ -473,10 +477,13 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         );
         final isVoid = returnType.toLowerCase() == 'void';
         final successStateRef = refer(successState);
+        final paramName = _getSuccessParamName(
+          returnType: rawReturnType.rightType,
+        );
         failureMethod
           ..requiredParameters.add(
             Parameter(
-              (param) => param.name = isVoid ? '_' : 'data',
+              (param) => paramName ?? '_',
             ),
           )
           ..lambda = true
@@ -484,7 +491,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
             if (isVoid)
               successStateRef.constInstance([])
             else
-              successStateRef.newInstance([refer('data')]),
+              successStateRef.newInstance([], {paramName!: refer(paramName)}),
           ]).code;
       }).closure,
     ]);
@@ -524,8 +531,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         stateClasses.add(
           _generateSuccessStateClass(
             successStateName: successState,
-            returnTypeString: returnType,
-            rawReturnType: method.rawType,
+            returnType: method.rawType.rightType,
             baseStateName: stateName,
           ),
         );
@@ -630,30 +636,21 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
 
   Class _generateSuccessStateClass({
     required String successStateName,
-    required String returnTypeString,
-    required DartType rawReturnType,
+    required DartType returnType,
     required String baseStateName,
   }) {
     return Class((classBuilder) {
-      final hasParams = returnTypeString.toLowerCase().trim() != 'void';
-      String? paramName;
-      if (hasParams) {
-        paramName = 'data';
-        if (returnTypeString.isCustomType) {
-          if (returnTypeString.toLowerCase().startsWith('list<')) {
-            paramName = '${returnTypeString.innerType.camelCase}List';
-          } else {
-            paramName = returnTypeString.innerType.camelCase;
-          }
-        }
-      }
+      final hasReturnData = returnType is! VoidType;
+      final paramName = _getSuccessParamName(
+        returnType: returnType,
+      );
       classBuilder
         ..name = successStateName
         ..extend = Reference(baseStateName)
         ..modifier = ClassModifier.final$
         ..constructors.add(
           Constructor((constructor) {
-            if (hasParams) {
+            if (hasReturnData) {
               constructor.optionalParameters.add(
                 Parameter((param) {
                   param
@@ -661,8 +658,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                     ..toThis = true
                     ..named = true
                     ..required =
-                        rawReturnType.nullabilitySuffix ==
-                        NullabilitySuffix.none;
+                        returnType.nullabilitySuffix == NullabilitySuffix.none;
                 }),
               );
             }
@@ -670,11 +666,8 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
             constructor.constant = true;
           }),
         );
-      if (hasParams) {
-        final isListProperty = returnTypeString.toLowerCase().startsWith(
-          'list',
-        );
-        final body = isListProperty
+      if (hasReturnData) {
+        final body = returnType.rightType.isDartCoreList
             ? refer(paramName!)
             : literalList([refer(paramName!)]);
         classBuilder
@@ -684,9 +677,11 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                 ..name = paramName
                 ..type = TypeReference((ref) {
                   ref
-                    ..symbol = returnTypeString
+                    ..symbol = returnType.getDisplayString(
+                      withNullability: false,
+                    )
                     ..isNullable =
-                        rawReturnType.nullabilitySuffix ==
+                        returnType.nullabilitySuffix ==
                         NullabilitySuffix.question;
                 })
                 ..modifier = FieldModifier.final$;
@@ -695,5 +690,22 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
           ..addEquatableProps(body: body.code);
       }
     });
+  }
+
+  String? _getSuccessParamName({
+    required DartType returnType,
+  }) {
+    if (returnType is! VoidType) {
+      var paramName = 'data';
+      if (returnType.isCustomType) {
+        paramName = returnType.innerType
+            .displayString(withNullability: false)
+            .camelCase;
+        if (returnType.isDartCoreList) {
+          paramName = '${paramName}List';
+        }
+      }
+    }
+    return null;
   }
 }
