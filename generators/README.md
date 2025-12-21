@@ -186,6 +186,12 @@ lib/
 dart test
 ```
 
+To update golden files:
+
+```bash
+UPDATE_GOLDENS=true dart test
+```
+
 ### Running Linter
 
 ```bash
