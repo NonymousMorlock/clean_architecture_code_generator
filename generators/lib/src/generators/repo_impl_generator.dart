@@ -258,7 +258,7 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
 
             body.addExpression(
               refer('sink').property('add').call([
-                refer('Left').call([genericFailure]),
+                refer('Left').constInstance([genericFailure]),
               ]),
             );
 
