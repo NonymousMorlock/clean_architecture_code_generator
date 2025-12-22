@@ -191,6 +191,24 @@ class AuthRepoTBG {
 }
 ```
 
+#### Signature Optimization: Named over Positional
+
+To ensure a robust and idiomatic API, the generator automatically converts **Optional Positional** parameters defined in your `TBG` blueprints into **Optional Named** parameters in the generated code.
+
+**Why we do this:**
+*   **Decoupling from Order**: You can pass optional arguments in any order without providing `null` for preceding ones.
+*   **Clean Architecture Consistency**: It simplifies the mapping between `UseCase` parameter objects and repository methods.
+*   **Standardization**: Ensures the contract across Domain, Data, and Remote layers remains consistent and easy to maintain.
+
+**Example:**
+```dart
+// Your Blueprint (AuthRepoTBG)
+external ResultFuture<void> searchUser(String query, [int? limit]);
+
+// The Scaffolded Result (AuthRepository)
+ResultFuture<void> searchUser(String query, {int? limit});
+```
+
 ---
 
 ## 🏗️ Generated Code Structure
