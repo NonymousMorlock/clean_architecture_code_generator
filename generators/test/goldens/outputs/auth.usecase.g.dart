@@ -3,30 +3,18 @@ class ConfirmSignup implements UsecaseWithParams<void, ConfirmSignupParams> {
   final AuthRepo _repo;
   @override
   ResultFuture<void> call(ConfirmSignupParams params) {
-    return _repo.confirmSignup(
-      identifier: params.identifier,
-      otp: params.otp,
-    );
+    return _repo.confirmSignup(identifier: params.identifier, otp: params.otp);
   }
 }
 
 class ConfirmSignupParams extends Equatable {
-  const ConfirmSignupParams({
-    required this.identifier,
-    required this.otp,
-  });
+  const ConfirmSignupParams({required this.identifier, required this.otp});
   const ConfirmSignupParams.empty()
-    : this(
-        identifier: 'Test String',
-        otp: 'Test String',
-      );
+    : this(identifier: 'Test String', otp: 'Test String');
   final String identifier;
   final String otp;
   @override
-  List<Object?> get props => [
-    identifier,
-    otp,
-  ];
+  List<Object?> get props => [identifier, otp];
 }
 
 class Login implements UsecaseWithParams<void, LoginParams> {
@@ -42,22 +30,13 @@ class Login implements UsecaseWithParams<void, LoginParams> {
 }
 
 class LoginParams extends Equatable {
-  const LoginParams({
-    required this.identifier,
-    required this.password,
-  });
+  const LoginParams({required this.identifier, required this.password});
   const LoginParams.empty()
-    : this(
-        identifier: 'Test String',
-        password: 'Test String',
-      );
+    : this(identifier: 'Test String', password: 'Test String');
   final String identifier;
   final String password;
   @override
-  List<Object?> get props => [
-    identifier,
-    password,
-  ];
+  List<Object?> get props => [identifier, password];
 }
 
 class SignupUser implements UsecaseWithParams<User, SignupUserParams> {
@@ -80,20 +59,12 @@ class SignupUserParams extends Equatable {
     required this.password,
   });
   const SignupUserParams.empty()
-    : this(
-        name: 'Test String',
-        email: 'Test String',
-        password: 'Test String',
-      );
+    : this(name: 'Test String', email: 'Test String', password: 'Test String');
   final String name;
   final String email;
   final String password;
   @override
-  List<Object?> get props => [
-    name,
-    email,
-    password,
-  ];
+  List<Object?> get props => [name, email, password];
 }
 
 class Signup implements UsecaseWithParams<User, SignupParams> {
@@ -116,20 +87,12 @@ class SignupParams extends Equatable {
     required this.password,
   });
   const SignupParams.empty()
-    : this(
-        name: 'Test String',
-        email: 'Test String',
-        password: 'Test String',
-      );
+    : this(name: 'Test String', email: 'Test String', password: 'Test String');
   final String name;
   final String email;
   final String password;
   @override
-  List<Object?> get props => [
-    name,
-    email,
-    password,
-  ];
+  List<Object?> get props => [name, email, password];
 }
 
 class VerifyAuth implements UsecaseWithoutParams<bool> {
@@ -155,28 +118,19 @@ class Test implements UsecaseWithParams<void, TestParams> {
   ResultFuture<void> call(TestParams params) {
     return _repo.test(
       params.positional,
-      params.optionalPositional,
+      optionalPositional: params.optionalPositional,
     );
   }
 }
 
 class TestParams extends Equatable {
-  const TestParams({
-    required this.positional,
-    required this.optionalPositional,
-  });
+  const TestParams({required this.positional, this.optionalPositional});
   const TestParams.empty()
-    : this(
-        positional: 'Test String',
-        optionalPositional: 'Test String',
-      );
+    : this(positional: 'Test String', optionalPositional: null);
   final String positional;
-  final String optionalPositional;
+  final String? optionalPositional;
   @override
-  List<Object?> get props => [
-    positional,
-    optionalPositional,
-  ];
+  List<Object?> get props => [positional, optionalPositional];
 }
 
 class Complex implements UsecaseWithParams<void, ComplexParams> {
@@ -186,10 +140,10 @@ class Complex implements UsecaseWithParams<void, ComplexParams> {
   ResultFuture<void> call(ComplexParams params) {
     return _repo.complex(
       params.positional,
-      namedNullable: params.namedNullable,
       named: params.named,
       listNamed: params.listNamed,
       constListNamed: params.constListNamed,
+      namedNullable: params.namedNullable,
     );
   }
 }
@@ -197,31 +151,31 @@ class Complex implements UsecaseWithParams<void, ComplexParams> {
 class ComplexParams extends Equatable {
   const ComplexParams({
     required this.positional,
-    required this.namedNullable,
     required this.named,
     required this.listNamed,
     required this.constListNamed,
+    this.namedNullable,
   });
   ComplexParams.empty()
     : this(
         positional: 'Test String',
-        namedNullable: null,
         named: User.empty(),
         listNamed: const [],
         constListNamed: const [],
+        namedNullable: null,
       );
   final String positional;
-  final User namedNullable;
   final User named;
   final List<User> listNamed;
   final List<String> constListNamed;
+  final User? namedNullable;
   @override
   List<Object?> get props => [
     positional,
-    namedNullable,
     named,
     listNamed,
     constListNamed,
+    namedNullable,
   ];
 }
 

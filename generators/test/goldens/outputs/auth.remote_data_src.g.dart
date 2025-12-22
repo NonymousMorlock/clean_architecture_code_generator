@@ -1,13 +1,7 @@
-abstract interface class AuthRemoteDataSrc {
-  const AuthRemoteDataSrc();
-  Future<void> confirmSignup({
-    required String identifier,
-    required String otp,
-  });
-  Future<void> login({
-    required String identifier,
-    required String password,
-  });
+abstract interface class AuthRemoteDataSource {
+  const AuthRemoteDataSource();
+  Future<void> confirmSignup({required String identifier, required String otp});
+  Future<void> login({required String identifier, required String password});
   Future<UserModel> signupUser({
     required String name,
     required String email,
@@ -19,22 +13,19 @@ abstract interface class AuthRemoteDataSrc {
     required String password,
   });
   Future<bool> verifyAuth();
-  Future<void> test(
-    String positional, [
-    String optionalPositional,
-  ]);
+  Future<void> test(String positional, {String? optionalPositional});
   Future<void> complex(
     String positional, {
-    UserModel namedNullable,
-    required UserModel named,
-    required List<UserModel> listNamed,
+    required User named,
+    required List<User> listNamed,
     required List<String> constListNamed,
+    User? namedNullable,
   });
   Stream<List<UserModel>> streamOne(String id);
 }
 
-class AuthRemoteDataSrcImpl implements AuthRemoteDataSrc {
-  const AuthRemoteDataSrcImpl({required Dio dio}) : _dio = dio;
+class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
+  const AuthRemoteDataSourceImpl({required Dio dio}) : _dio = dio;
   final Dio _dio;
   @override
   Future<void> confirmSignup({
@@ -76,20 +67,17 @@ class AuthRemoteDataSrcImpl implements AuthRemoteDataSrc {
   }
 
   @override
-  Future<void> test(
-    String positional, [
-    String optionalPositional,
-  ]) async {
+  Future<void> test(String positional, {String? optionalPositional}) async {
     throw UnimplementedError();
   }
 
   @override
   Future<void> complex(
     String positional, {
-    UserModel namedNullable,
-    required UserModel named,
-    required List<UserModel> listNamed,
+    required User named,
+    required List<User> listNamed,
     required List<String> constListNamed,
+    User? namedNullable,
   }) async {
     throw UnimplementedError();
   }

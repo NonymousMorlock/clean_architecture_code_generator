@@ -32,10 +32,7 @@ class AuthAdapter extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     final result = await _confirmSignup(
-      ConfirmSignupParams(
-        identifier: identifier,
-        otp: otp,
-      ),
+      ConfirmSignupParams(identifier: identifier, otp: otp),
     );
     result.fold(
       (failure) => emit(AuthError.fromFailure(failure)),
@@ -49,10 +46,7 @@ class AuthAdapter extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     final result = await _login(
-      LoginParams(
-        identifier: identifier,
-        password: password,
-      ),
+      LoginParams(identifier: identifier, password: password),
     );
     result.fold(
       (failure) => emit(AuthError.fromFailure(failure)),
@@ -67,15 +61,11 @@ class AuthAdapter extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     final result = await _signupUser(
-      SignupUserParams(
-        name: name,
-        email: email,
-        password: password,
-      ),
+      SignupUserParams(name: name, email: email, password: password),
     );
     result.fold(
       (failure) => emit(AuthError.fromFailure(failure)),
-      (data) => emit(UserSignedUp(data)),
+      (user) => emit(UserSignedUp(user: user)),
     );
   }
 
@@ -86,15 +76,11 @@ class AuthAdapter extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     final result = await _signup(
-      SignupParams(
-        name: name,
-        email: email,
-        password: password,
-      ),
+      SignupParams(name: name, email: email, password: password),
     );
     result.fold(
       (failure) => emit(AuthError.fromFailure(failure)),
-      (data) => emit(SignedUp(data)),
+      (user) => emit(SignedUp(user: user)),
     );
   }
 
@@ -103,13 +89,13 @@ class AuthAdapter extends Cubit<AuthState> {
     final result = await _verifyAuth();
     result.fold(
       (failure) => emit(AuthError.fromFailure(failure)),
-      (data) => emit(AuthVerified(data)),
+      (data) => emit(AuthVerified(data: data)),
     );
   }
 
   Future<void> test({
     required String positional,
-    required String optionalPositional,
+    String? optionalPositional,
   }) async {
     emit(const AuthLoading());
     final result = await _test(
@@ -126,19 +112,19 @@ class AuthAdapter extends Cubit<AuthState> {
 
   Future<void> complex({
     required String positional,
-    User? namedNullable,
     required User named,
     required List<User> listNamed,
     required List<String> constListNamed,
+    User? namedNullable,
   }) async {
     emit(const AuthLoading());
     final result = await _complex(
       ComplexParams(
         positional: positional,
-        namedNullable: namedNullable,
         named: named,
         listNamed: listNamed,
         constListNamed: constListNamed,
+        namedNullable: namedNullable,
       ),
     );
     result.fold(
@@ -147,23 +133,24 @@ class AuthAdapter extends Cubit<AuthState> {
     );
   }
 
-  void streamOneStream({required String id}) {
-    _streamOneSubscription?.cancel();
+  Future<void> streamOneStream({required String id}) async {
+    await _streamOneSubscription?.cancel();
     final stream = _streamOne(id);
     _streamOneSubscription = stream.listen(
       (result) {
         result.fold(
           (failure) => emit(AuthError.fromFailure(failure)),
-          (data) => emit(OnesStreamed(data)),
+          (userList) => emit(OnesStreamed(userList: userList)),
         );
       },
-      onError:
-          (
-            Object error,
-            StackTrace stackTrace,
-          ) {
-            emit(const AuthError('Something went wrong'));
-          },
+      onError: (Object error, StackTrace stackTrace) {
+        emit(
+          const AuthError(
+            message: 'Something went wrong',
+            title: 'Unknown Error',
+          ),
+        );
+      },
       cancelOnError: false,
     );
   }
@@ -240,20 +227,11 @@ final class OnesStreamed extends AuthState {
 }
 
 final class AuthError extends AuthState {
-  const AuthError({
-    required this.message,
-    required this.title,
-  });
+  const AuthError({required this.message, required this.title});
   AuthError.fromFailure(Failure failure)
-    : this(
-        message: 'failure.message',
-        title: 'Error ${failure.statusCode}',
-      );
+    : this(message: 'failure.message', title: 'Error ${failure.statusCode}');
   final String message;
   final String? title;
   @override
-  List<Object?> get props => [
-    message,
-    title,
-  ];
+  List<Object?> get props => [message, title];
 }

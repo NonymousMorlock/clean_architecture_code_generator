@@ -1,24 +1,16 @@
 class AuthRepoImpl implements AuthRepo {
   const AuthRepoImpl(this._remoteDataSource);
-  final AuthRemoteDataSrc _remoteDataSource;
+  final AuthRemoteDataSource _remoteDataSource;
   @override
   ResultFuture<void> confirmSignup({
     required String identifier,
     required String otp,
   }) async {
     try {
-      await _remoteDataSource.confirmSignup(
-        identifier: identifier,
-        otp: otp,
-      );
-      return Right(null);
+      await _remoteDataSource.confirmSignup(identifier: identifier, otp: otp);
+      return const Right(null);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
@@ -28,18 +20,10 @@ class AuthRepoImpl implements AuthRepo {
     required String password,
   }) async {
     try {
-      await _remoteDataSource.login(
-        identifier: identifier,
-        password: password,
-      );
-      return Right(null);
+      await _remoteDataSource.login(identifier: identifier, password: password);
+      return const Right(null);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
@@ -57,12 +41,7 @@ class AuthRepoImpl implements AuthRepo {
       );
       return Right(result);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
@@ -80,12 +59,7 @@ class AuthRepoImpl implements AuthRepo {
       );
       return Right(result);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
@@ -95,60 +69,45 @@ class AuthRepoImpl implements AuthRepo {
       final result = await _remoteDataSource.verifyAuth();
       return Right(result);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
   @override
   ResultFuture<void> test(
-    String positional, [
-    String optionalPositional,
-  ]) async {
+    String positional, {
+    String? optionalPositional,
+  }) async {
     try {
       await _remoteDataSource.test(
         positional,
-        optionalPositional,
+        optionalPositional: optionalPositional,
       );
-      return Right(null);
+      return const Right(null);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
   @override
   ResultFuture<void> complex(
     String positional, {
-    User namedNullable,
     required User named,
     required List<User> listNamed,
     required List<String> constListNamed,
+    User? namedNullable,
   }) async {
     try {
       await _remoteDataSource.complex(
         positional,
-        namedNullable: namedNullable,
         named: named,
         listNamed: listNamed,
         constListNamed: constListNamed,
+        namedNullable: namedNullable,
       );
-      return Right(null);
+      return const Right(null);
     } on ServerException catch (e) {
-      return Left(
-        ServerFailure(
-          message: e.message,
-          statusCode: e.statusCode,
-        ),
-      );
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     }
   }
 
@@ -158,39 +117,30 @@ class AuthRepoImpl implements AuthRepo {
         .streamOne(id)
         .transform(
           StreamTransformer<List<UserModel>, List<User>>.fromHandlers(
-            handleData:
-                (
-                  data,
-                  sink,
-                ) {
-                  sink.add(Right(data));
-                },
-            handleError:
-                (
-                  error,
-                  stackTrace,
-                  sink,
-                ) {
-                  if (error is ServerException) {
-                    sink.add(
-                      Left(
-                        ServerFailure(
-                          message: error.message,
-                          statusCode: error.statusCode,
-                        ),
-                      ),
-                    );
-                  } else {
-                    sink.add(
-                      Left(
-                        ServerFailure(
-                          message: 'Something went wrong',
-                          statusCode: 500,
-                        ),
-                      ),
-                    );
-                  }
-                },
+            handleData: (data, sink) {
+              sink.add(Right(data));
+            },
+            handleError: (error, stackTrace, sink) {
+              if (error is ServerException) {
+                sink.add(
+                  Left(
+                    ServerFailure(
+                      message: error.message,
+                      statusCode: error.statusCode,
+                    ),
+                  ),
+                );
+              } else {
+                sink.add(
+                  const Left(
+                    ServerFailure(
+                      message: 'Something went wrong',
+                      statusCode: 500,
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         );
   }

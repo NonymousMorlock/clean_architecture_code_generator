@@ -40,7 +40,7 @@ class UserModel extends User {
             ? _parseDateTime(map['created_at'])
             : null,
       );
-  UserModel copyWith([
+  UserModel copyWith({
     String? id,
     String? email,
     String? name,
@@ -48,7 +48,7 @@ class UserModel extends User {
     List<int>? favoriteItemIds,
     List<AddressModel>? addresses,
     DateTime? createdAt,
-  ]) {
+  }) {
     return UserModel(
       id: id ?? this.id,
       email: email ?? this.email,

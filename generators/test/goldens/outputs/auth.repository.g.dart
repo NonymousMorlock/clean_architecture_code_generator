@@ -19,16 +19,13 @@ abstract interface class AuthRepo {
     required String password,
   });
   ResultFuture<bool> verifyAuth();
-  ResultFuture<void> test(
-    String positional, [
-    String optionalPositional,
-  ]);
+  ResultFuture<void> test(String positional, {String? optionalPositional});
   ResultFuture<void> complex(
     String positional, {
-    User namedNullable,
     required User named,
     required List<User> listNamed,
     required List<String> constListNamed,
+    User? namedNullable,
   });
   ResultStream<List<User>> streamOne(String id);
 }
