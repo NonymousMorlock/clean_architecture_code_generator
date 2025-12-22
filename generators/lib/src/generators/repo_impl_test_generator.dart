@@ -416,6 +416,7 @@ class RepoImplTestGenerator
 
           // VERIFY
           _generateVerificationExpressions(
+            isStream: isStream,
             useLambdas: useLambdas,
             methodName: methodName,
             positionalVerifyArguments: positionalVerifyArguments,
@@ -485,6 +486,7 @@ class RepoImplTestGenerator
               ),
             );
           _generateVerificationExpressions(
+            isStream: isStream,
             useLambdas: useLambdas,
             methodName: methodName,
             positionalVerifyArguments: positionalVerifyArguments,
@@ -497,6 +499,7 @@ class RepoImplTestGenerator
 
   List<Expression> _generateVerificationExpressions({
     required bool useLambdas,
+    required bool isStream,
     required String methodName,
     required List<Expression> positionalVerifyArguments,
     required Map<String, Expression> namedVerifyArguments,
@@ -512,10 +515,13 @@ class RepoImplTestGenerator
                     namedVerifyArguments,
                   );
               methodBuilder
+                ..modifier = isStream ? null : MethodModifier.async
                 ..lambda = useLambdas
                 ..body = useLambdas
                     ? body.code
-                    : Block((block) => block.addExpression(body));
+                    : Block((block) {
+                        block.addExpression(isStream ? body : body.awaited);
+                      });
             }).closure,
           ])
           .property('called')

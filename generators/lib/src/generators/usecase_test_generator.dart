@@ -420,10 +420,15 @@ class UsecaseTestGenerator
                             namedArgumentsWithTest,
                           );
                       methodBuilder
+                        ..modifier = isStream ? null : MethodModifier.async
                         ..lambda = useLambdas
                         ..body = useLambdas
                             ? body.code
-                            : Block((block) => block.addExpression(body));
+                            : Block((block) {
+                                block.addExpression(
+                                  isStream ? body : body.awaited,
+                                );
+                              });
                     }).closure,
                   ])
                   .property('called')
