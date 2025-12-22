@@ -35,18 +35,18 @@ class Param extends Equatable {
 
   /// Factory to create a Param from the Analyzer's ParameterElement.
   /// This centralizes all the parsing logic from your visitors.
-  factory Param.fromElement(ParameterElement element) {
+  factory Param.fromElement(FormalParameterElement element) {
     final isNullable =
         element.type.nullabilitySuffix == NullabilitySuffix.question;
 
     final isDynamic = element.type is DynamicType;
 
     return Param(
-      name: element.name,
       type: element.type.toString().replaceFirst('*', '').replaceAll('?', ''),
       rawType: element.type,
       isNullable: isNullable || isDynamic,
       isNamed: element.isNamed,
+      name: element.name ?? element.displayName,
       // Logic: It is required if it's strictly required (positional or named)
       isRequired: element.isRequired,
       hasDefaultValue: element.hasDefaultValue,
