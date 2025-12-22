@@ -106,10 +106,9 @@ extension DartTypeExtensions on DartType {
   String displayString({bool withNullability = true}) {
     // getDisplayString(withNullability: true)
     // ensures we get 'User?' or 'User' correctly.
-    // then we sanitize legacy Dart 2.x syntax ('*') if present
-    return getDisplayString(
-      withNullability: withNullability,
-    ).replaceAll('*', '');
+    return withNullability
+        ? getDisplayString()
+        : getDisplayString().replaceAll('?', '');
   }
 
   /// Checks if the type is DateTime.
