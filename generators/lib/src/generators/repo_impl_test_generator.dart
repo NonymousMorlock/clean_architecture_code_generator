@@ -373,7 +373,7 @@ class RepoImplTestGenerator
     }
 
     return refer('test').call([
-      literalString(testDescription),
+      Utils.smartString(testDescription),
       Method((methodBuilder) {
         if (!isStream) {
           methodBuilder.modifier = MethodModifier.async;
@@ -444,7 +444,7 @@ class RepoImplTestGenerator
         'remote source is unsuccessful';
 
     return refer('test').call([
-      literalString(testDescription),
+      Utils.smartString(testDescription),
       Method((methodBuilder) {
         if (!isStream) {
           methodBuilder.modifier = MethodModifier.async;

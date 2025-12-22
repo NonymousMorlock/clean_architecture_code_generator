@@ -269,7 +269,7 @@ class UsecaseTestGenerator
     final isStream = method.rawType.isDartAsyncStream;
 
     return refer('test').call([
-      literalString('should call the [$className.$methodName]'),
+      Utils.smartString('should call the [$className.$methodName]'),
       Method((methodBuilder) {
         if (!isStream) {
           methodBuilder.modifier = MethodModifier.async;

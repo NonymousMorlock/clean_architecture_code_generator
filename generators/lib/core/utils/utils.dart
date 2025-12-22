@@ -1,3 +1,4 @@
+import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/generators.dart';
 
@@ -65,5 +66,66 @@ sealed class Utils {
         namedArgumentsLength == 0 && positionalWhenArgumentsLength <= 2;
 
     return !methodHasParams || hasSingleNamedParam || hasOnlyFewPositional;
+  }
+
+  /// Breaks a long string into adjacent string literals ('A' 'B')
+  /// which satisfies the linter and allows DartFormatter to wrap lines.
+  static Expression smartString(String text, {int threshold = 40}) {
+    // 1. Short strings: Use standard code_builder literal
+    if (text.length <= threshold) {
+      return literalString(text);
+    }
+
+    // 2. Split logic
+    final words = text.split(' ');
+    final chunks = <String>[];
+    var currentChunk = StringBuffer();
+
+    for (final word in words) {
+      if (currentChunk.length + word.length + 1 > threshold) {
+        chunks.add(currentChunk.toString());
+        currentChunk = StringBuffer();
+      }
+      // Add the space back here
+      currentChunk.write('$word ');
+    }
+
+    if (currentChunk.isNotEmpty) {
+      // Trim trailing space on last chunk
+      chunks.add(currentChunk.toString().trimRight());
+    }
+
+    // 3. Construct Raw Code: 'Part 1 ' 'Part 2'
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < chunks.length; i++) {
+      var chunk = chunks[i];
+
+      // CRITICAL: Since we are bypassing literalString,
+      // we MUST manually escape!
+      // 1. Escape backslashes first
+      chunk = chunk.replaceAll(r'\', r'\\');
+      // 2. Escape single quotes (since we wrap in single quotes)
+      chunk = chunk.replaceAll("'", r"\'");
+      // 3. Escape $ to prevent accidental interpolation if the string had it
+      chunk = chunk.replaceAll(r'$', r'\$');
+
+      // Add trailing space to the chunk content if it's not the last one
+      if (i < chunks.length - 1) {
+        chunk = '$chunk ';
+      }
+
+      buffer.write("'$chunk'");
+
+      // Add a space between the string tokens so formatter handles them
+      if (i < chunks.length - 1) {
+        buffer.write(' ');
+      }
+    }
+
+    // 4. Return as a CodeExpression
+    // This tells code_builder: "Trust me, this string is valid
+    // Dart expression code"
+    return CodeExpression(Code(buffer.toString()));
   }
 }
