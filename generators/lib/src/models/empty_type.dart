@@ -13,6 +13,7 @@ import 'package:analyzer/dart/element/type_visitor.dart';
 class EmptyType implements DartType {
   /// {@macro empty_type_doc}
   const EmptyType();
+
   @override
   R accept<R>(TypeVisitor<R> visitor) {
     return null as R;
@@ -38,13 +39,10 @@ class EmptyType implements DartType {
   Element? get element => null;
 
   @override
-  Element? get element2 => null;
-
-  @override
   DartType get extensionTypeErasure => this;
 
   @override
-  String getDisplayString({required bool withNullability}) {
+  String getDisplayString({bool withNullability = false}) {
     return '';
   }
 
@@ -109,19 +107,8 @@ class EmptyType implements DartType {
   bool get isDartCoreType => false;
 
   @override
-  bool get isDynamic => false;
-
-  @override
-  bool get isVoid => false;
-
-  @override
   String? get name => '';
 
   @override
   NullabilitySuffix get nullabilitySuffix => NullabilitySuffix.none;
-
-  @override
-  DartType resolveToBound(DartType objectType) {
-    return this;
-  }
 }
