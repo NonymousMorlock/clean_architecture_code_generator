@@ -3,6 +3,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
+import 'package:generators/src/visitors/entity_candidate_visitor.dart';
 import 'package:generators/src/visitors/success_type_visitor.dart';
 
 /// Extension methods for DartType manipulation in code generation.
@@ -13,7 +14,7 @@ extension DartTypeExtensions on DartType {
   /// Converts the DartType to a model class name string.
   String get modelize {
     // 1. Primitives: return as-is
-    if (!isCustomType) return toString();
+    if (!hasCustomType) return toString();
 
     final type = this;
 
@@ -35,19 +36,46 @@ extension DartTypeExtensions on DartType {
     return name;
   }
 
-  /// Unwraps Future or Stream once to get the inner type.
-  DartType get innerType {
-    var current = this;
-
-    // Unwrap Future/Stream once
-    if (current.isDartAsyncFuture || current.isDartAsyncStream) {
-      if (current is InterfaceType && current.typeArguments.isNotEmpty) {
-        current = current.typeArguments.first;
-      }
+  /// Checks if the type ITSELF is a custom user-defined type,
+  /// without considering type arguments.
+  ///
+  /// For deeper custom type check, use [hasCustomType].
+  bool get surfaceIsCustomType {
+    if (this is VoidType || this is DynamicType || this is NeverType) {
+      return false;
     }
 
-    return current;
+    // This catches String, int, bool, List, Map, Set,
+    // Uri, BigInt, DateTime, etc.
+    if (element?.library?.isInSdk ?? false) {
+      return false;
+    }
+
+    // Filter Architecture Wrappers (Failure, Either, etc.)
+    // These are libraries, but not "Models" we want to generate.
+    final name = element?.name ?? '';
+    if (name == 'Either' || name == 'Option' || name.contains('Failure')) {
+      return false;
+    }
+
+    return true;
   }
+
+  /// RECURSIVE CHECK
+  /// Uses the EntityCandidateVisitor.
+  /// If the visitor finds ANY candidates, then `hasCustomType` is true.
+  bool get hasCustomType {
+    return entityCandidates.isNotEmpty;
+  }
+
+  /// Gathers all custom type candidates from the type
+  /// and its type arguments.
+  Set<String> get entityCandidates {
+    final visitor = EntityCandidateVisitor();
+    accept(visitor);
+    return visitor.candidates;
+  }
+
 
   /// Checks if the type is nullable.
   bool get isNullable {
@@ -85,11 +113,6 @@ extension DartTypeExtensions on DartType {
         // This ensures we don't accidentally pick up a 'DateTime' class
         // from a 3rd party package.
         (element!.library?.isDartCore ?? false);
-  }
-
-  /// Checks if the type is a custom user-defined type.
-  bool get isCustomType {
-    return displayString(withNullability: false).isCustomType;
   }
 
   /// Checks if the type is an enum.
@@ -158,7 +181,7 @@ extension DartTypeExtensions on DartType {
     if (targetRawType.isDartCoreRecord) {
       return literalConstRecord([], {});
     }
-    if (targetRawType.isCustomType) {
+    if (targetRawType.hasCustomType) {
       final modelClassName = useModelForCustomType
           ? '${displayString(withNullability: false)}Model'
           : displayString(withNullability: false);
