@@ -1,5 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/visitor.dart';
+import 'package:analyzer/dart/element/visitor2.dart';
 import 'package:generators/src/models/function.dart';
 import 'package:generators/src/models/param.dart';
 
@@ -7,7 +7,7 @@ import 'package:generators/src/models/param.dart';
 ///
 /// This visitor traverses the AST of a repository interface annotated
 /// with `@repoGen` and extracts information about its methods.
-class RepoVisitor extends SimpleElementVisitor<void> {
+class RepoVisitor extends SimpleElementVisitor2<void> {
   /// The name of the repository class being visited.
   String className = '';
 
@@ -16,8 +16,8 @@ class RepoVisitor extends SimpleElementVisitor<void> {
 
   @override
   void visitMethodElement(MethodElement element) {
-    final params = element.parameters;
     final methodParams = <Param>[];
+    final params = element.formalParameters;
     for (final paramElement in params) {
       methodParams.add(
         Param.fromElement(paramElement),
@@ -25,7 +25,7 @@ class RepoVisitor extends SimpleElementVisitor<void> {
     }
 
     final method = IFunction(
-      name: element.name,
+      name: element.name ?? element.displayName,
       rawType: element.returnType,
       returnType: element.returnType.toString().replaceFirst('*', ''),
       params: methodParams.isEmpty ? null : methodParams,
