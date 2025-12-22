@@ -6,6 +6,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/class_builder_extensions.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/model_visitor_extensions.dart';
 import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
@@ -167,7 +168,9 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
                 ..name = param.name.camelCase
                 ..type = TypeReference((ref) {
                   ref
-                    ..symbol = param.type
+                    ..symbol = param.rawType.displayString(
+                      withNullability: false,
+                    )
                     ..isNullable = param.isNullable;
                 })
                 ..modifier = FieldModifier.final$;
