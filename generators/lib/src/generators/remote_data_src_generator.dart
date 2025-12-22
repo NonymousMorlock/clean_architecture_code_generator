@@ -139,7 +139,7 @@ class RemoteDataSrcGenerator
                     ..symbol = isStream ? 'Stream' : 'Future'
                     ..types.add(Reference(returnType));
                 })
-                ..addParamsFrom(method, useModels: true);
+                ..addParamsFrom(method);
             });
           }),
         );
@@ -196,7 +196,7 @@ class RemoteDataSrcGenerator
                     ..types.add(Reference(returnType));
                 })
                 ..modifier = isStream ? null : MethodModifier.async
-                ..addParamsFrom(method, useModels: true)
+                ..addParamsFrom(method)
                 ..body = Block((block) {
                   block
                     ..statements.add(
