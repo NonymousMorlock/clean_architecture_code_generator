@@ -706,6 +706,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
           paramName = '${paramName}List';
         }
       }
+      return paramName;
     }
     return null;
   }
