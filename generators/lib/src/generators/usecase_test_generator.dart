@@ -5,6 +5,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:annotations/annotations.dart';
 import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
+import 'package:generators/core/extensions/block_builder_extensions.dart';
 import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/generators.dart';
@@ -422,33 +423,11 @@ class UsecaseTestGenerator
                 ]),
               ]),
             )
-            ..addExpression(
-              refer('verify')
-                  .call([
-                    Method((methodBuilder) {
-                      final body = refer('repo')
-                          .property(methodName)
-                          .call(
-                            positionalArgumentsWithTest,
-                            namedArgumentsWithTest,
-                          );
-                      methodBuilder
-                        ..modifier = isStream ? null : MethodModifier.async
-                        ..lambda = useLambdas
-                        ..body = useLambdas
-                            ? body.code
-                            : Block((block) {
-                                block.addExpression(
-                                  isStream ? body : body.awaited,
-                                );
-                              });
-                    }).closure,
-                  ])
-                  .property('called')
-                  .call([literalNum(1)]),
-            )
-            ..addExpression(
-              refer('verifyNoMoreInteractions').call([refer('repo')]),
+            ..addVerificationExpressions(
+              mockObjectName: 'repo',
+              methodName: methodName,
+              positionalVerifyArguments: positionalArgumentsWithTest,
+              namedVerifyArguments: namedArgumentsWithTest,
             );
         });
       }).closure,

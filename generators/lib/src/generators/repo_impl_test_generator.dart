@@ -6,6 +6,7 @@ import 'package:annotations/annotations.dart';
 import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
+import 'package:generators/core/extensions/block_builder_extensions.dart';
 import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
@@ -421,16 +422,14 @@ class RepoImplTestGenerator
                 method: method,
                 isFailure: false,
               ),
+            )
+            // VERIFY
+            ..addVerificationExpressions(
+              mockObjectName: 'remoteDataSource',
+              methodName: methodName,
+              positionalVerifyArguments: positionalVerifyArguments,
+              namedVerifyArguments: namedVerifyArguments,
             );
-
-          // VERIFY
-          _generateVerificationExpressions(
-            isStream: isStream,
-            useLambdas: useLambdas,
-            methodName: methodName,
-            positionalVerifyArguments: positionalVerifyArguments,
-            namedVerifyArguments: namedVerifyArguments,
-          ).forEach(body.addExpression);
         });
       }).closure,
     ]);
@@ -493,52 +492,16 @@ class RepoImplTestGenerator
                 method: method,
                 isFailure: true,
               ),
+            )
+            ..addVerificationExpressions(
+              mockObjectName: 'remoteDataSource',
+              methodName: methodName,
+              positionalVerifyArguments: positionalVerifyArguments,
+              namedVerifyArguments: namedVerifyArguments,
             );
-          _generateVerificationExpressions(
-            isStream: isStream,
-            useLambdas: useLambdas,
-            methodName: methodName,
-            positionalVerifyArguments: positionalVerifyArguments,
-            namedVerifyArguments: namedVerifyArguments,
-          ).forEach(body.addExpression);
         });
       }).closure,
     ]);
-  }
-
-  List<Expression> _generateVerificationExpressions({
-    required bool useLambdas,
-    required bool isStream,
-    required String methodName,
-    required List<Expression> positionalVerifyArguments,
-    required Map<String, Expression> namedVerifyArguments,
-  }) {
-    return [
-      refer('verify')
-          .call([
-            Method((methodBuilder) {
-              final body = refer('remoteDataSource')
-                  .property(methodName)
-                  .call(
-                    positionalVerifyArguments,
-                    namedVerifyArguments,
-                  );
-              methodBuilder
-                ..modifier = isStream ? null : MethodModifier.async
-                ..lambda = useLambdas
-                ..body = useLambdas
-                    ? body.code
-                    : Block((block) {
-                        block.addExpression(isStream ? body : body.awaited);
-                      });
-            }).closure,
-          ])
-          .property('called')
-          .call([literalNum(1)]),
-      refer(
-        'verifyNoMoreInteractions',
-      ).call([refer('remoteDataSource')]),
-    ];
   }
 
   Expression _generateWhenExpression({
