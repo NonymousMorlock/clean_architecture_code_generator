@@ -476,16 +476,14 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
           featureName: featureName,
           returnType: returnType,
         );
-        final isVoid = returnType.toLowerCase() == 'void';
+
+        final successType = rawReturnType.successType;
+        final isVoid = successType is VoidType;
         final successStateRef = refer(successState);
-        final paramName = _getSuccessParamName(
-          returnType: rawReturnType.rightType,
-        );
+        final paramName = _getSuccessParamName(returnType: successType);
         successMethod
           ..requiredParameters.add(
-            Parameter(
-              (param) => paramName ?? '_',
-            ),
+            Parameter((param) => param.name = paramName ?? '_'),
           )
           ..lambda = true
           ..body = refer('emit').call([
