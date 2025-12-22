@@ -76,6 +76,27 @@ extension DartTypeExtensions on DartType {
     return visitor.candidates;
   }
 
+  /// Recursively digs into the rightmost type argument.
+  ///
+  /// Example:
+  /// - `Stream<Either<Failure, List<User>>>` -> `User`
+  /// - `Future<String>` -> `String`
+  /// - `Map<String, int>` -> `int`
+  DartType get deepestType {
+    final current = this;
+
+    // We can only dig into InterfaceTypes (classes/mixins with type arguments)
+    if (current is InterfaceType && current.typeArguments.isNotEmpty) {
+      // .last ensures we favor the Right side of Either<L, R>
+      // or the Value of Map<K, V>
+      final rightmostArgument = current.typeArguments.last;
+
+      // If the rightmost argument is also an InterfaceType, keep digging
+      return rightmostArgument.deepestType;
+    }
+
+    return current;
+  }
 
   /// Checks if the type is nullable.
   bool get isNullable {
