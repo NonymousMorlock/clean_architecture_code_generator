@@ -6,6 +6,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/class_builder_extensions.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/i_function_extensions.dart';
 import 'package:generators/core/extensions/param_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
@@ -260,7 +261,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
                 params!.map(
                   (param) => Parameter((paramBuilder) {
                     paramBuilder
-                      ..required = true
+                      ..required = !param.isNullable
                       ..toThis = true
                       ..named = true
                       ..name = param.name;
@@ -290,7 +291,7 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
             return Field((field) {
               field
                 ..name = param.name
-                ..type = Reference(param.type)
+                ..type = Reference(param.rawType.displayString())
                 ..modifier = FieldModifier.final$;
             });
           }),
