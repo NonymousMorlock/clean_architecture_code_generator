@@ -1,4 +1,5 @@
 import 'package:code_builder/code_builder.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/src/models/function.dart';
 
@@ -21,7 +22,7 @@ extension MethodBuilderExtensions on MethodBuilder {
       final parameter = Parameter((paramBuilder) {
         paramBuilder
           ..name = param.name
-          ..type = resolve(param.type)
+          ..type = resolve(param.rawType.displayString())
           // Defaults to false, correct for positional
           ..named = param.isNamed;
 
