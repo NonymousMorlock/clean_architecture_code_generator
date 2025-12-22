@@ -382,7 +382,9 @@ class FeatureFileWriter {
           useNullSafetySyntax: true,
           orderDirectives: true,
         );
-    return DartFormatter().format('${library.accept(libEmitter)}');
+    return DartFormatter(
+      languageVersion: DartFormatter.latestLanguageVersion,
+    ).format('${library.accept(libEmitter)}');
   }
 
   /// Get standard imports for a repository file
