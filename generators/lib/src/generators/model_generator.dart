@@ -218,7 +218,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             constructor
               ..name = 'empty'
               ..constant = visitor.params.every(
-                (param) => param.type.isConstValue,
+                (param) => param.rawType.isConst || param.isNullable,
               )
               ..initializers.add(
                 refer('this').call(

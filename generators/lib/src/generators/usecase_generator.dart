@@ -271,7 +271,9 @@ class UsecaseGenerator extends GeneratorForAnnotation<UsecaseGenAnnotation> {
           Constructor((constructor) {
             constructor
               ..name = 'empty'
-              ..constant = params!.every((param) => param.type.isConstValue)
+              ..constant = params!.every(
+                (param) => param.rawType.isConst || param.isNullable,
+              )
               ..initializers.add(
                 refer('this').call(
                   [],

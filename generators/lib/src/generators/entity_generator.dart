@@ -201,7 +201,9 @@ class EntityGenerator extends GeneratorForAnnotation<EntityGenAnnotation> {
       Constructor((constructor) {
         constructor
           ..name = 'empty'
-          ..constant = visitor.params.every((param) => param.type.isConstValue)
+          ..constant = visitor.params.every(
+            (param) => param.rawType.isConst || param.isNullable,
+          )
           ..initializers.add(
             refer('this').call(
               [],
