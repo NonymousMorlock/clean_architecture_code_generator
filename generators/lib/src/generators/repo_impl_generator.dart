@@ -6,6 +6,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/code_builder_extensions.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/i_function_extensions.dart';
 import 'package:generators/core/extensions/repo_visitor_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
@@ -58,13 +59,25 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
     // Generate repository implementation code
     final repoImplClass = repository(visitor: visitor);
 
+    final customStreamTypes = <String>{};
+    var hasStream = false;
+    for (final method in visitor.methods) {
+      if (method.rawType.isDartAsyncStream) {
+        hasStream = true;
+        if (method.rawType.successType.hasCustomType) {
+          customStreamTypes.add(
+            method.rawType.deepestType.displayString(withNullability: false),
+          );
+        }
+      }
+    }
+
     // Generate complete file with imports
     final (:imports, :importComments) = writer.generateSmartRepoImplImports(
       candidates: visitor.discoverRequiredEntities(),
       featureName: featureName,
-      hasStream: visitor.methods.any(
-        (method) => method.rawType.isDartAsyncStream,
-      ),
+      hasStream: hasStream,
+      customStreamTypes: customStreamTypes,
     );
     final completeFile = writer.resolveGeneratedCode(
       library: Library((library) {

@@ -651,14 +651,31 @@ class FeatureFileWriter {
     required Set<String> candidates,
     required String featureName,
     required bool hasStream,
+    required Set<String> customStreamTypes,
   }) {
-    return _generateSmartImports(
+    final (:imports, :importComments) = _generateSmartImports(
       currentFeatureSnake: featureName.snakeCase,
       candidates: candidates,
       standardImports: getRepoImplImports(
         featureName: featureName.snakeCase,
         hasStream: hasStream,
       ),
+    );
+
+    if (customStreamTypes.isEmpty) {
+      return (imports: imports, importComments: importComments);
+    }
+
+    final customTypeModelImports = getSmartEntityImports(
+      entities: customStreamTypes,
+      currentFeature: featureName.snakeCase,
+      isModel: true,
+    );
+
+    return (
+      imports: imports..addAll(customTypeModelImports.imports),
+      importComments: importComments
+        ..addAll(customTypeModelImports.importComments),
     );
   }
 
