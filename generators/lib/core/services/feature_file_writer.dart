@@ -623,10 +623,22 @@ class FeatureFileWriter {
     required String featureName,
     required Set<String> candidates,
   }) {
-    return _generateSmartImports(
+    final (:imports, :importComments) = _generateSmartImports(
       currentFeatureSnake: featureName.snakeCase,
       candidates: candidates,
       standardImports: getRepoTestImports(featureName: featureName),
+    );
+
+    final customTypeModelImports = getSmartEntityImports(
+      entities: candidates,
+      currentFeature: featureName.snakeCase,
+      isModel: true,
+    );
+
+    return (
+      imports: imports..addAll(customTypeModelImports.imports),
+      importComments: importComments
+        ..addAll(customTypeModelImports.importComments),
     );
   }
 
