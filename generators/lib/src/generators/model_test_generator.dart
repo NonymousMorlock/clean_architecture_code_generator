@@ -339,7 +339,7 @@ class ModelTestGenerator
           // (returns CustomType sentinel), we must inject valid data into
           // tMap so .fromMap() doesn't crash.
           for (final param in visitor.params) {
-            if (param.rawType.isCustomType &&
+            if (param.rawType.hasCustomType &&
                 !param.rawType.isDartCoreList &&
                 !param.rawType.isEnum) {
               final fieldName = param.name;
@@ -900,7 +900,7 @@ class ModelTestGenerator
       };
     } else if (fieldType.isEnum) {
       return 'unknown';
-    } else if (fieldType.isCustomType) {
+    } else if (fieldType.hasCustomType) {
       // TODO(Documentation): Mention in the docs that custom types will be
       //  skipped in fixture generation, but will be injected in the actual test
 
