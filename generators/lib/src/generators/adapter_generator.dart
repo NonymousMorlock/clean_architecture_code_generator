@@ -328,12 +328,10 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
       methodBuilder
         ..name = isStream ? streamName : method.name
         ..returns = TypeReference((ref) {
-          ref.symbol = isStream ? 'void' : 'Future';
-          if (!isStream) {
-            ref.types.add(const Reference('void'));
-          }
+          ref.symbol = 'Future';
+          ref.types.add(const Reference('void'));
         })
-        ..modifier = isStream ? null : MethodModifier.async
+        ..modifier = MethodModifier.async
         ..optionalParameters.addAll(
           method.params?.map((param) {
                 return Parameter((paramBuilder) {
@@ -394,7 +392,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
               ..addExpression(
                 refer(
                   streamSubscriptionName,
-                ).nullSafeProperty('cancel').call([]),
+                ).nullSafeProperty('cancel').call([]).awaited,
               )
               ..addExpression(declareFinal('stream').assign(resultAssignment))
               ..addExpression(
