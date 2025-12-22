@@ -2,6 +2,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:equatable/equatable.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/src/models/empty_type.dart';
 
 /// Represents a parameter in a function/method.
@@ -36,19 +37,30 @@ class Param extends Equatable {
   /// Factory to create a Param from the Analyzer's ParameterElement.
   /// This centralizes all the parsing logic from your visitors.
   factory Param.fromElement(FormalParameterElement element) {
-    final isNullable =
-        element.type.nullabilitySuffix == NullabilitySuffix.question;
+    final isOptionalPositional = element.isOptionalPositional;
 
-    final isDynamic = element.type is DynamicType;
+    final typeSystem = element.library?.typeSystem;
+    final typeProvider = element.library?.typeProvider;
+    var effectiveRawType = element.type;
+    if (typeSystem != null && typeProvider != null && isOptionalPositional) {
+      effectiveRawType = typeSystem.leastUpperBound(
+        element.type,
+        typeProvider.nullType,
+      );
+    }
+
+    final isNullable =
+        effectiveRawType.nullabilitySuffix == NullabilitySuffix.question ||
+        effectiveRawType is DynamicType;
 
     return Param(
-      type: element.type.toString().replaceFirst('*', '').replaceAll('?', ''),
-      rawType: element.type,
-      isNullable: isNullable || isDynamic,
-      isNamed: element.isNamed,
       name: element.name ?? element.displayName,
+      type: effectiveRawType.displayString(),
+      rawType: effectiveRawType,
+      isNullable: isNullable,
+      isNamed: element.isNamed || isOptionalPositional,
       // Logic: It is required if it's strictly required (positional or named)
-      isRequired: element.isRequired,
+      isRequired: !isOptionalPositional && element.isRequired,
       hasDefaultValue: element.hasDefaultValue,
       defaultValueCode: element.defaultValueCode,
     );
