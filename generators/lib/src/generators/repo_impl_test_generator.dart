@@ -133,14 +133,23 @@ class RepoImplTestGenerator
       final namedArgumentsWithTest = <String, Expression>{};
       for (final param in method.params ?? <Param>[]) {
         if (param.isNamed) {
-          namedArgumentsWithAny[param.name] = refer(
-            'any',
-          ).call([], {'named': literalString(param.name)});
+          namedArgumentsWithAny[param.name] =
+              refer(
+                'any',
+              ).call(
+                [],
+                {'named': literalString(param.name)},
+                [refer(param.rawType.displayString())],
+              );
           namedArgumentsWithTest[param.name] = refer(
             't${param.name.pascalCase}',
           );
         } else {
-          positionalArgumentsWithAny.add(refer('any').call([]));
+          positionalArgumentsWithAny.add(
+            refer('any').call([], {}, [
+              refer(param.rawType.displayString()),
+            ]),
+          );
           positionalArgumentsWithTest.add(refer('t${param.name.pascalCase}'));
         }
       }
@@ -285,7 +294,7 @@ class RepoImplTestGenerator
     required IFunction method,
   }) {
     final expressions = <Expression>[];
-    final returnType = method.rawType.rightType;
+    final returnType = method.rawType.successType;
     final resultRef = returnType.fallbackValue(
       useConstForCollections: false,
       useModelForCustomType: true,
@@ -349,7 +358,7 @@ class RepoImplTestGenerator
   }) {
     final isStream = method.rawType.isDartAsyncStream;
     final methodName = method.name;
-    final returnType = method.rawType.rightType;
+    final returnType = method.rawType.successType;
     final isVoid = returnType is VoidType;
 
     final (
@@ -541,7 +550,7 @@ class RepoImplTestGenerator
   }) {
     final methodName = method.name;
     final isStream = method.rawType.isDartAsyncStream;
-    final isVoid = method.rawType.rightType is VoidType;
+    final isVoid = method.rawType.successType is VoidType;
 
     // the Exception (Failure Payload)
     final exceptionRef = refer('ServerException').newInstance(
@@ -651,7 +660,7 @@ class RepoImplTestGenerator
     required bool isFailure,
   }) {
     final isStream = method.rawType.isDartAsyncStream;
-    final returnType = method.rawType.rightType;
+    final returnType = method.rawType.successType;
     final isVoid = returnType is VoidType;
 
     final resultRef = refer(isStream ? 'stream' : 'result');
@@ -678,7 +687,11 @@ class RepoImplTestGenerator
       expectedValue = typeRef.constInstance([literalNull]);
     } else {
       // Right(tResult)
-      expectedValue = typeRef.newInstance([refer('tResult')]);
+      if (returnType.isConst) {
+        expectedValue = typeRef.constInstance([refer('tResult')]);
+      } else {
+        expectedValue = typeRef.newInstance([refer('tResult')]);
+      }
     }
 
     // Wrap in Matcher (equals vs emits)

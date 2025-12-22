@@ -200,7 +200,7 @@ class UsecaseTestGenerator
             }
           }
 
-          final resultType = method.rawType.rightType;
+          final resultType = method.rawType.successType;
           if (resultType is! VoidType) {
             const resultVariableName = 'tResult';
             final testResultRef = resultType.isConst
@@ -281,14 +281,25 @@ class UsecaseTestGenerator
         final namedArgumentsWithTest = <String, Expression>{};
         for (final param in method.params ?? <Param>[]) {
           if (param.isNamed) {
-            namedArgumentsWithAny[param.name] = refer(
-              'any',
-            ).call([], {'named': literalString(param.name)});
+            namedArgumentsWithAny[param.name] =
+                refer(
+                  'any',
+                ).call(
+                  [],
+                  {'named': literalString(param.name)},
+                  [
+                    refer(param.rawType.displayString()),
+                  ],
+                );
             namedArgumentsWithTest[param.name] = refer(
               't${param.name.pascalCase}',
             );
           } else {
-            positionalArgumentsWithAny.add(refer('any').call([]));
+            positionalArgumentsWithAny.add(
+              refer('any').call([], {}, [
+                refer(param.rawType.displayString()),
+              ]),
+            );
             positionalArgumentsWithTest.add(refer('t${param.name.pascalCase}'));
           }
         }
@@ -299,14 +310,14 @@ class UsecaseTestGenerator
         );
 
         methodBuilder.body = Block((body) {
-          final responsePayload = method.rawType.rightType is VoidType
+          final responsePayload = method.rawType.successType is VoidType
               ? literalNull
               : refer('tResult');
           // TODO(Test): Test this with various return types to
           //  make sure it uses a const instance ONLY when appropriate
           final isConst =
               responsePayload == literalNull ||
-              method.rawType.rightType.isConst;
+              method.rawType.successType.isConst;
           // Arrange
           body.addExpression(
             refer('when')
@@ -363,10 +374,12 @@ class UsecaseTestGenerator
           final customParamsIsConst =
               needsCustomParams &&
               method.params!.every((param) => param.rawType.isConst);
-          final paramArguments = {
-            for (final param in method.params!)
-              param.name: refer('t${param.name.pascalCase}'),
-          };
+          final paramArguments = <String, Expression>{};
+          if (needsCustomParams) {
+            for (final param in method.params!) {
+              paramArguments[param.name] = refer('t${param.name.pascalCase}');
+            }
+          }
           final customParams = needsCustomParams
               ? (customParamsIsConst
                     ? customParamsRef.constInstance([], paramArguments)
@@ -392,7 +405,7 @@ class UsecaseTestGenerator
               ..symbol = 'Right'
               ..types.addAll([
                 const Reference('Failure'),
-                refer(method.rawType.rightType.displayString()),
+                refer(method.rawType.successType.displayString()),
               ]);
           });
           body
