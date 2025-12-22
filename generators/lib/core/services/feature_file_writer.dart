@@ -1,9 +1,6 @@
-// We need to import from build package internals to access BuildStep
-// ignore_for_file: implementation_imports
-
 import 'dart:io';
 
-import 'package:build/src/builder/build_step.dart';
+import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:generators/core/services/merge_engine.dart';
