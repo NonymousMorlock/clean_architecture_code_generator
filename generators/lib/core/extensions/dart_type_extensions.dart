@@ -3,45 +3,12 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
+import 'package:generators/src/visitors/success_type_visitor.dart';
 
 /// Extension methods for DartType manipulation in code generation.
 extension DartTypeExtensions on DartType {
   /// Recursively unwraps Future, Stream, and Either to find the "Success" type.
-  DartType get rightType {
-    var current = this;
-
-    while (true) {
-      // 1. Unwrap Future/Stream
-      if (current.isDartAsyncFuture || current.isDartAsyncStream) {
-        if (current is InterfaceType && current.typeArguments.isNotEmpty) {
-          current = current.typeArguments.first;
-          continue;
-        }
-      }
-
-      // 2. Unwrap Either (Check explicit name because
-      // Either isn't in dart:core)
-      // We check the Element's name, which is safer
-      // than the string representation
-      if (current.element?.name == 'Either' && current is InterfaceType) {
-        if (current.typeArguments.length >= 2) {
-          current = current.typeArguments[1]; // The 'Right' side
-          continue;
-        }
-      }
-
-      // 3. Unwrap Dartz-style Option (if you use it)
-      if (current.element?.name == 'Option' && current is InterfaceType) {
-        if (current.typeArguments.isNotEmpty) {
-          current = current.typeArguments.first;
-          continue;
-        }
-      }
-
-      break;
-    }
-    return current;
-  }
+  DartType get successType => accept(const SuccessTypeVisitor());
 
   /// Converts the DartType to a model class name string.
   String get modelize {
