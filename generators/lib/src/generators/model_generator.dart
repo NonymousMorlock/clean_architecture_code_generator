@@ -519,9 +519,9 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
                 ..named = true
                 ..type = TypeReference((ref) {
                   ref
-                    ..symbol = param.type.isCustomType
-                        ? param.type.modelizeType
-                        : param.type
+                    ..symbol = param.rawType.hasCustomType
+                        ? param.rawType.modelize
+                        : param.rawType.displayString(withNullability: false)
                     ..isNullable = true;
                 });
             });
