@@ -16,13 +16,25 @@ class RepoVisitor extends SimpleElementVisitor2<void> {
 
   @override
   void visitMethodElement(MethodElement element) {
-    final methodParams = <Param>[];
     final params = element.formalParameters;
+    final requiredNamedParams = <Param>[];
+    final optionalNamedParams = <Param>[];
+    final positionalParams = <Param>[];
     for (final paramElement in params) {
-      methodParams.add(
-        Param.fromElement(paramElement),
-      );
+      final param = Param.fromElement(paramElement);
+      if (param.isNamed && !param.isNullable) {
+        requiredNamedParams.add(param);
+      } else if (param.isNamed && param.isNullable) {
+        optionalNamedParams.add(param);
+      } else {
+        positionalParams.add(param);
+      }
     }
+    final methodParams = [
+      ...positionalParams,
+      ...requiredNamedParams,
+      ...optionalNamedParams,
+    ];
 
     final method = IFunction(
       name: element.name ?? element.displayName,
