@@ -431,9 +431,12 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                                 }),
                               ])
                               ..body = refer('emit').call([
-                                refer(errorClassName).constInstance([
-                                  literalString('Something went wrong'),
-                                ]),
+                                refer(errorClassName).constInstance([], {
+                                  'message': literalString(
+                                    'Something went wrong',
+                                  ),
+                                  'title': literalString('Unknown Error'),
+                                }),
                               ]).statement;
                           }).closure,
                           'cancelOnError': literalFalse,
