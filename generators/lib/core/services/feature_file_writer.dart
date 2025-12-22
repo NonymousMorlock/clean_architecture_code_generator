@@ -704,16 +704,27 @@ class FeatureFileWriter {
 
   /// Generate smart imports for a usecase file
   ImportResult generateSmartRemoteDataSrcImports({
-    required Set<String> candidates,
+    required Set<String> returnTypeCandidates,
+    required Set<String> paramTypeCandidates,
     required String featureName,
   }) {
-    return _generateSmartImports(
+    final (:imports, :importComments) = _generateSmartImports(
       currentFeatureSnake: featureName.snakeCase,
-      candidates: candidates,
+      candidates: returnTypeCandidates,
       customTypeIsModel: true,
       standardImports: getRemoteDataSrcImports(
         featureName: featureName.snakeCase,
       ),
+    );
+
+    final paramImports = getSmartEntityImports(
+      entities: paramTypeCandidates,
+      currentFeature: featureName.snakeCase,
+    );
+
+    return (
+      imports: imports..addAll(paramImports.imports),
+      importComments: importComments..addAll(paramImports.importComments),
     );
   }
 

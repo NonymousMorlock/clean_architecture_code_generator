@@ -6,7 +6,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:generators/core/config/generator_config.dart';
 import 'package:generators/core/extensions/code_builder_extensions.dart';
-import 'package:generators/core/extensions/repo_visitor_extensions.dart';
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/core/services/feature_file_writer.dart';
 import 'package:generators/src/visitors/repo_visitor.dart';
@@ -64,10 +64,22 @@ class RemoteDataSrcGenerator
     final contract = remoteDataSourceInterface(visitor: visitor);
     final contractImpl = remoteDataSourceImpl(visitor: visitor, config: config);
 
+    final returnTypeCandidates = <String>{};
+    final paramTypeCandidates = <String>{};
+    for (final method in visitor.methods) {
+      returnTypeCandidates.addAll(method.rawType.entityCandidates);
+      if (method.hasParams) {
+        for (final param in method.params!) {
+          paramTypeCandidates.addAll(param.rawType.entityCandidates);
+        }
+      }
+    }
+
     // Generate complete file with imports
     final (:imports, :importComments) = writer
         .generateSmartRemoteDataSrcImports(
-          candidates: visitor.discoverRequiredEntities(),
+          returnTypeCandidates: returnTypeCandidates,
+          paramTypeCandidates: paramTypeCandidates,
           featureName: featureName,
         );
 
