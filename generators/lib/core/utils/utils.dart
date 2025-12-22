@@ -1,3 +1,4 @@
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/generators.dart';
 
 /// Utility class for code generation helpers.
@@ -35,12 +36,12 @@ sealed class Utils {
       // 1. Scan Return Type (e.g. Future<Either<Failure, List<User>>>)
       // This will automatically strip Future, discard Failure,
       // strip List, and find "User"
-      ..addAll(method.returnType.entityCandidates);
+      ..addAll(method.rawType.entityCandidates);
 
     // 2. Scan Parameters (e.g. method(User params))
     if (method.params != null) {
       for (final param in method.params!) {
-        candidates.addAll(param.type.entityCandidates);
+        candidates.addAll(param.rawType.entityCandidates);
       }
     }
     return candidates;
