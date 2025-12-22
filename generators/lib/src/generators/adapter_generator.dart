@@ -530,7 +530,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         stateClasses.add(
           _generateSuccessStateClass(
             successStateName: successState,
-            returnType: method.rawType.rightType,
+            returnType: method.rawType.successType,
             baseStateName: stateName,
           ),
         );
@@ -666,7 +666,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
           }),
         );
       if (hasReturnData) {
-        final body = returnType.rightType.isDartCoreList
+        final body = returnType.successType.isDartCoreList
             ? refer(paramName!)
             : literalList([refer(paramName!)]);
         classBuilder
@@ -676,7 +676,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                 ..name = paramName
                 ..type = TypeReference((ref) {
                   ref
-                    ..symbol = returnType.getDisplayString(
+                    ..symbol = returnType.displayString(
                       withNullability: false,
                     )
                     ..isNullable =
@@ -691,13 +691,11 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
     });
   }
 
-  String? _getSuccessParamName({
-    required DartType returnType,
-  }) {
+  String? _getSuccessParamName({required DartType returnType}) {
     if (returnType is! VoidType) {
       var paramName = 'data';
-      if (returnType.isCustomType) {
-        paramName = returnType.innerType
+      if (returnType.hasCustomType) {
+        paramName = returnType.deepestType
             .displayString(withNullability: false)
             .camelCase;
         if (returnType.isDartCoreList) {
