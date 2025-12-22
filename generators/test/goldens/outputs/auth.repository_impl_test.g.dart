@@ -27,12 +27,10 @@ void main() {
         otp: tOtp,
       );
       expect(result, equals(const Right<Failure, void>(null)));
-      verify(() async {
-        await remoteDataSource.confirmSignup(
-          identifier: tIdentifier,
-          otp: tOtp,
-        );
-      }).called(1);
+      verify(
+        () =>
+            remoteDataSource.confirmSignup(identifier: tIdentifier, otp: tOtp),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -53,12 +51,10 @@ void main() {
         otp: tOtp,
       );
       expect(result, equals(const Left<Failure, void>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.confirmSignup(
-          identifier: tIdentifier,
-          otp: tOtp,
-        );
-      }).called(1);
+      verify(
+        () =>
+            remoteDataSource.confirmSignup(identifier: tIdentifier, otp: tOtp),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -78,12 +74,12 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(const Right<Failure, void>(null)));
-      verify(() async {
-        await remoteDataSource.login(
+      verify(
+        () => remoteDataSource.login(
           identifier: tIdentifier,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -104,12 +100,12 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(const Left<Failure, void>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.login(
+      verify(
+        () => remoteDataSource.login(
           identifier: tIdentifier,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -133,13 +129,13 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(Right<Failure, User>(tResult)));
-      verify(() async {
-        await remoteDataSource.signupUser(
+      verify(
+        () => remoteDataSource.signupUser(
           name: tName,
           email: tEmail,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -162,13 +158,13 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(const Left<Failure, User>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.signupUser(
+      verify(
+        () => remoteDataSource.signupUser(
           name: tName,
           email: tEmail,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -192,13 +188,13 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(Right<Failure, User>(tResult)));
-      verify(() async {
-        await remoteDataSource.signup(
+      verify(
+        () => remoteDataSource.signup(
           name: tName,
           email: tEmail,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -221,13 +217,13 @@ void main() {
         password: tPassword,
       );
       expect(result, equals(const Left<Failure, User>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.signup(
+      verify(
+        () => remoteDataSource.signup(
           name: tName,
           email: tEmail,
           password: tPassword,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -240,7 +236,7 @@ void main() {
       ).thenAnswer((_) async => tResult);
       final result = await repoImpl.verifyAuth();
       expect(result, equals(const Right<Failure, bool>(tResult)));
-      verify(() async => remoteDataSource.verifyAuth()).called(1);
+      verify(() => remoteDataSource.verifyAuth()).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -253,7 +249,7 @@ void main() {
       );
       final result = await repoImpl.verifyAuth();
       expect(result, equals(const Left<Failure, bool>(serverFailure)));
-      verify(() async => remoteDataSource.verifyAuth()).called(1);
+      verify(() => remoteDataSource.verifyAuth()).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -273,12 +269,12 @@ void main() {
         optionalPositional: tOptionalPositional,
       );
       expect(result, equals(const Right<Failure, void>(null)));
-      verify(() async {
-        await remoteDataSource.test(
+      verify(
+        () => remoteDataSource.test(
           tPositional,
           optionalPositional: tOptionalPositional,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -299,12 +295,12 @@ void main() {
         optionalPositional: tOptionalPositional,
       );
       expect(result, equals(const Left<Failure, void>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.test(
+      verify(
+        () => remoteDataSource.test(
           tPositional,
           optionalPositional: tOptionalPositional,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });
@@ -337,15 +333,15 @@ void main() {
         namedNullable: tNamedNullable,
       );
       expect(result, equals(const Right<Failure, void>(null)));
-      verify(() async {
-        await remoteDataSource.complex(
+      verify(
+        () => remoteDataSource.complex(
           tPositional,
           named: tNamed,
           listNamed: tListNamed,
           constListNamed: tConstListNamed,
           namedNullable: tNamedNullable,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
     test('should return [Left<Failure>] when call  '
@@ -372,15 +368,15 @@ void main() {
         namedNullable: tNamedNullable,
       );
       expect(result, equals(const Left<Failure, void>(serverFailure)));
-      verify(() async {
-        await remoteDataSource.complex(
+      verify(
+        () => remoteDataSource.complex(
           tPositional,
           named: tNamed,
           listNamed: tListNamed,
           constListNamed: tConstListNamed,
           namedNullable: tNamedNullable,
-        );
-      }).called(1);
+        ),
+      ).called(1);
       verifyNoMoreInteractions(remoteDataSource);
     });
   });

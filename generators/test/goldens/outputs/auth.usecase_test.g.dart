@@ -20,9 +20,9 @@ void main() {
       const ConfirmSignupParams(identifier: tIdentifier, otp: tOtp),
     );
     expect(result, equals(const Right<Failure, void>(null)));
-    verify(() async {
-      await repo.confirmSignup(identifier: tIdentifier, otp: tOtp);
-    }).called(1);
+    verify(
+      () => repo.confirmSignup(identifier: tIdentifier, otp: tOtp),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -47,9 +47,9 @@ void main() {
       const LoginParams(identifier: tIdentifier, password: tPassword),
     );
     expect(result, equals(const Right<Failure, void>(null)));
-    verify(() async {
-      await repo.login(identifier: tIdentifier, password: tPassword);
-    }).called(1);
+    verify(
+      () => repo.login(identifier: tIdentifier, password: tPassword),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -77,9 +77,9 @@ void main() {
       const SignupUserParams(name: tName, email: tEmail, password: tPassword),
     );
     expect(result, equals(Right<Failure, User>(tResult)));
-    verify(() async {
-      await repo.signupUser(name: tName, email: tEmail, password: tPassword);
-    }).called(1);
+    verify(
+      () => repo.signupUser(name: tName, email: tEmail, password: tPassword),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -107,9 +107,9 @@ void main() {
       const SignupParams(name: tName, email: tEmail, password: tPassword),
     );
     expect(result, equals(Right<Failure, User>(tResult)));
-    verify(() async {
-      await repo.signup(name: tName, email: tEmail, password: tPassword);
-    }).called(1);
+    verify(
+      () => repo.signup(name: tName, email: tEmail, password: tPassword),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -126,7 +126,7 @@ void main() {
     when(() => repo.verifyAuth()).thenAnswer((_) async => const Right(tResult));
     final result = await usecase();
     expect(result, equals(const Right<Failure, bool>(tResult)));
-    verify(() async => repo.verifyAuth()).called(1);
+    verify(() => repo.verifyAuth()).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -154,9 +154,9 @@ void main() {
       ),
     );
     expect(result, equals(const Right<Failure, void>(null)));
-    verify(() async {
-      await repo.test(tPositional, optionalPositional: tOptionalPositional);
-    }).called(1);
+    verify(
+      () => repo.test(tPositional, optionalPositional: tOptionalPositional),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
@@ -195,15 +195,15 @@ void main() {
       ),
     );
     expect(result, equals(const Right<Failure, void>(null)));
-    verify(() async {
-      await repo.complex(
+    verify(
+      () => repo.complex(
         tPositional,
         named: tNamed,
         listNamed: tListNamed,
         constListNamed: tConstListNamed,
         namedNullable: tNamedNullable,
-      );
-    }).called(1);
+      ),
+    ).called(1);
     verifyNoMoreInteractions(repo);
   });
 }
