@@ -1,3 +1,4 @@
+import 'package:generators/core/extensions/dart_type_extensions.dart';
 import 'package:generators/generators.dart';
 
 /// Extensions for ModelVisitor
@@ -8,7 +9,7 @@ extension ModelVisitorExtensions on ModelVisitor {
 
     for (final param in params) {
       // Assuming entity types start with an uppercase letter
-      candidates.addAll(param.type.entityCandidates);
+      candidates.addAll(param.rawType.entityCandidates);
     }
 
     return candidates;
