@@ -469,7 +469,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
             ).newInstanceNamed('fromFailure', [refer('failure')]),
           ]).code;
       }).closure,
-      Method((failureMethod) {
+      Method((successMethod) {
         // Generate success state based on method name and return type
         final successState = StateNameGenerator.generate(
           methodName: methodName,
@@ -481,7 +481,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
         final paramName = _getSuccessParamName(
           returnType: rawReturnType.rightType,
         );
-        failureMethod
+        successMethod
           ..requiredParameters.add(
             Parameter(
               (param) => paramName ?? '_',
