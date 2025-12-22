@@ -2,7 +2,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:code_builder/code_builder.dart';
-import 'package:generators/core/extensions/string_extensions.dart';
 import 'package:generators/src/visitors/entity_candidate_visitor.dart';
 import 'package:generators/src/visitors/success_type_visitor.dart';
 
@@ -158,10 +157,16 @@ extension DartTypeExtensions on DartType {
 
     // Helper: Extracts the type argument as a Reference
     // (e.g., List<String> -> refer('String'))
-    Reference? getTypeArg(int index) {
+    Reference? getTypeArg({
+      required int index,
+      bool useModelForCustomType = false,
+    }) {
       if (targetRawType is InterfaceType &&
           targetRawType.typeArguments.length > index) {
         final arg = targetRawType.typeArguments[index];
+        if (useModelForCustomType && arg.hasCustomType) {
+          return refer(arg.modelize);
+        }
         return refer(arg.displayString());
       }
       return null;
@@ -170,19 +175,29 @@ extension DartTypeExtensions on DartType {
     if (targetRawType.isDartCoreSet) {
       if (useConstForCollections) return literalConstSet({});
       // Generates: <Type>{}
-      return literalSet({}, getTypeArg(0));
+      return literalSet(
+        {},
+        getTypeArg(index: 0, useModelForCustomType: useModelForCustomType),
+      );
     }
 
     if (targetRawType.isDartCoreList || targetRawType.isDartCoreIterable) {
       if (useConstForCollections) return literalConstList([]);
       // Generates: <Type>[]
-      return literalList([], getTypeArg(0));
+      return literalList(
+        [],
+        getTypeArg(index: 0, useModelForCustomType: useModelForCustomType),
+      );
     }
 
     if (targetRawType.isDartCoreMap) {
       if (useConstForCollections) return literalConstMap({});
       // Generates: <Key, Value>{}
-      return literalMap({}, getTypeArg(0), getTypeArg(1));
+      return literalMap(
+        {},
+        getTypeArg(index: 0, useModelForCustomType: useModelForCustomType),
+        getTypeArg(index: 1, useModelForCustomType: useModelForCustomType),
+      );
     }
     if (targetRawType.isDartCoreString) {
       return literalString('Test String');
@@ -204,7 +219,7 @@ extension DartTypeExtensions on DartType {
     }
     if (targetRawType.hasCustomType) {
       final modelClassName = useModelForCustomType
-          ? '${displayString(withNullability: false)}Model'
+          ? modelize
           : displayString(withNullability: false);
       return Reference(modelClassName).newInstanceNamed('empty', []);
     }
