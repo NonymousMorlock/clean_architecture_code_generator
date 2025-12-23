@@ -574,7 +574,7 @@ class AdapterGenerator extends GeneratorForAnnotation<AdapterGenAnnotation> {
                 )
                 ..initializers.add(
                   refer('this').call([], {
-                    'message': literal('failure.message'),
+                    'message': refer('failure').property('message'),
                     'title': literalString(r'Error ${failure.statusCode}'),
                   }).code,
                 );
