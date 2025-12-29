@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_visitor.dart';
 import 'package:generators/core/extensions/dart_type_extensions.dart';
@@ -50,6 +51,9 @@ class EntityCandidateVisitor extends UnifyingTypeVisitor<void> {
       type.typeArguments.first.accept(this);
       return;
     }
+
+    // Handle enums
+    if (type.element is EnumElement) return;
 
     // It is a Custom Entity
     candidates.add(type.displayString(withNullability: false));
