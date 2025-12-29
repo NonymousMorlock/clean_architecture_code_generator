@@ -268,14 +268,14 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
           ..types.add(const Reference('dynamic'));
       });
       for (final param in visitor.params) {
-        final type = param.type;
+        final type = param.rawType;
         final argumentName = param.name.camelCase;
         final valueReference = refer('map').index(literalString(param.name));
 
         Expression value;
 
-        if (type.isCustomType) {
-          final customTypeReference = refer('${type.innerType}Model');
+        if (type.hasCustomType) {
+          final customTypeReference = refer('${type.deepestType}Model');
           if (param.rawType.isDartCoreList) {
             value =
                 TypeReference((ref) {
@@ -307,7 +307,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
           }
         } else if (param.rawType.isDartCoreList) {
           value = refer(
-            type,
+            type.displayString(withNullability: false),
           ).newInstanceNamed('from', [valueReference.asA(dynamicListTypeRef)]);
 
           if (param.isNullable) {
@@ -331,21 +331,25 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
                 .notEqualTo(literalNull)
                 .conditional(value, literalNull);
           }
-        } else if (type.toLowerCase().startsWith('datetime')) {
+        } else if (type.isDateTime) {
           value = refer('_parseDateTime').call([valueReference]);
           if (param.isNullable) {
             value = valueReference
                 .notEqualTo(literalNull)
                 .conditional(value, literalNull);
           }
+        } else if (type.isEnum) {
+          value = refer(
+            type.displayString(withNullability: false),
+          ).property('fromString').call([valueReference.asA(refer('String'))]);
+
+          if (param.isNullable) {
+            value = valueReference
+                .notEqualTo(literalNull)
+                .conditional(value, literalNull);
+          }
         } else {
-          value = valueReference.asA(
-            TypeReference((ref) {
-              ref
-                ..symbol = type
-                ..isNullable = param.isNullable;
-            }),
-          );
+          value = valueReference.asA(refer(type.displayString()));
         }
         entries[argumentName] = value;
       }
@@ -405,7 +409,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             final key = param.name;
             Expression valueReference = refer(param.name.camelCase);
 
-            if (param.type.isCustomType) {
+            if (param.rawType.hasCustomType) {
               if (param.rawType.isDartCoreList) {
                 valueReference = param.isNullable
                     ? valueReference.nullSafeProperty('map')
@@ -430,7 +434,11 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
                     : valueReference.property('toMap');
                 valueReference = valueReference.call([]);
               }
-            } else if (param.type.toLowerCase().startsWith('datetime')) {
+            } else if (param.rawType.isEnum) {
+              valueReference = param.isNullable
+                  ? valueReference.nullSafeProperty('value')
+                  : valueReference.property('value');
+            } else if (param.rawType.isDateTime) {
               // 1. Resolve the Config Format
 
               // Lookup logic: Specific Model -> Default
