@@ -41,7 +41,7 @@ extension StringExt on String {
     // "XMLHttp" -> "XML Http"
     // Look for: (Lower -> Upper) OR (Upper -> Upper + Lower for acronyms)
     clean = clean.replaceAllMapped(
-      RegExp('([a-z])([A-Z])|([A-Z])([A-Z][a-z])'),
+      RegExp('([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])'),
       (Match m) {
         if (m.group(1) != null) {
           // Case 1: camelCase (aB) -> a B
