@@ -217,6 +217,11 @@ extension DartTypeExtensions on DartType {
     if (targetRawType.isDartCoreRecord) {
       return literalConstRecord([], {});
     }
+    if (targetRawType.isEnum) {
+      return refer(
+        targetRawType.displayString(withNullability: false),
+      ).property('values').property('first');
+    }
     if (targetRawType.hasCustomType) {
       final modelClassName = useModelForCustomType
           ? modelize
