@@ -1,0 +1,6 @@
+# Template bundle for clean_arch_cli init command
+name: clean_arch_init
+description: Templates for initializing clean architecture boilerplate
+version: 0.1.0
+vars:
+  - appName

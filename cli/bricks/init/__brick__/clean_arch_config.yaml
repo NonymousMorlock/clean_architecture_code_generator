@@ -1,0 +1,122 @@
+# Clean Architecture Code Generator Configuration
+
+# Application configuration
+app_name: "{{appName}}"  # Change this to your actual app name or remove entirely (used for import paths)
+
+# Output directory for generated files (relative to project root)
+output_path: lib
+
+# Naming convention for generated classes and files
+# Options: camel_case, snake_case, pascal_case
+naming_convention: camel_case
+
+# Whether to generate test files
+generate_tests: true
+
+# Whether to generate documentation
+generate_docs: false
+
+# Custom imports to add to generated files
+custom_imports:
+  - "import 'dart:convert';"
+  - "import 'package:dartz/dartz.dart';"
+  - "import 'package:equatable/equatable.dart';"
+  - "import 'package:shared_preferences/shared_preferences.dart';"
+  - "import 'package:dio/dio.dart';"
+
+# Template overrides for custom code generation
+template_overrides:
+  # Add custom templates here if needed
+  # entity_template: "path/to/custom/entity_template.dart"
+
+# Feature structure configuration
+feature_structure:
+  data_path: data
+  domain_path: domain
+  presentation_path: presentation
+  use_subfolders: true
+
+# Dependency injection configuration
+dependency_injection:
+  service_locator: get_it
+  generate_injection_container: true
+  container_name: injection_container
+  
+# Interface Adapter configuration
+interface_adapter:
+  type: cubit # Options: cubit, bloc
+  generate_states: true
+  base_state_name: State
+  error_handling: true
+
+# Model test configuration
+model_test_config:
+  # Global settings for all models
+  global:
+    use_fixture_based_tests: true
+    generate_null_safety_tests: true
+    
+  # Per-model field type configurations
+  user:
+    field_types:
+      created_at: "iso_string"     # Options: iso_string, timestamp_ms, timestamp_s
+      updated_at: "iso_string"
+      birth_date: "timestamp_ms"
+      
+  product:
+    field_types:
+      price: "double"              # Options: double, int, string
+      created_at: "timestamp_ms"
+      
+  # Default field type mappings for new models
+  defaults:
+    datetime_format: "iso_string"  # Default for DateTime fields
+    number_format: "double"        # Default for numeric fields
+
+# Remote data source configuration
+remote_data_source:
+  # HTTP Client configuration
+  http_client: "dio"              # Options: dio, http, chopper, retrofit, custom
+  base_url: "https://fedora.taildfeebb.ts.net/api/v1"
+  timeout: 30000                  # Timeout in milliseconds
+  enable_logging: true
+  enable_retry: true
+  max_retries: 3
+
+  # Service integrations
+  firebase_auth: false            # Use Firebase Authentication
+  firebase_firestore: false      # Use Cloud Firestore
+  firebase_storage: false        # Use Firebase Storage
+  graphql: false                  # Use GraphQL client
+  websockets: false               # Use WebSocket connections
+  supabase: false                 # Use Supabase client
+
+  # Custom dependencies (for packages not covered above)
+#  custom_dependencies:
+#    - "package:custom_http_client/custom_http_client.dart"
+#    - "package:analytics/analytics.dart"
+
+# Multi-file output configuration
+multi_file_output:
+  enabled: true                  # Write generated code to actual feature files instead of .g.dart
+  auto_create_targets: true       # Auto-create missing files during generation
+
+# Feature scaffolding configuration
+feature_scaffolding:
+  root_name: src          # Root folder for features. e.g., 'features' or 'modules' or 'src'
+  enabled: true                  # Pre-generate files when running 'create -t feature'
+  features:                       # Define features and their methods for scaffolding
+    auth:
+      methods:
+        - register
+        - login
+        - logout
+        - verify_token
+      entities:
+        - user
+#      data_file_name: auth        # Optional: override default file naming
+    user:
+      methods:
+        - get_profile
+        - update_profile
+        - delete_account
