@@ -1,7 +1,7 @@
 # Clean Architecture Code Generator Configuration
 
 # Application configuration
-app_name: "example"  # Change this to your actual app name (used for import paths)
+app_name: "example"  # Change this to your actual app name or remove entirely (used for import paths)
 
 # Output directory for generated files (relative to project root)
 output_path: lib
@@ -114,9 +114,6 @@ feature_scaffolding:
         - verify_token
       entities:
         - user
-    video:
-      entities:
-        - video
 #      data_file_name: auth        # Optional: override default file naming
     user:
       methods:
