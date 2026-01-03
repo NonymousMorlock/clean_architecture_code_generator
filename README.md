@@ -58,24 +58,13 @@ We believe the value of Clean Architecture is in the separation of concerns, not
    cd clean_architecture_code_generator
    ```
 
-2. **Install dependencies for all packages:**
-   ```bash
-   # Install CLI dependencies
-   cd cli && flutter pub get && cd ..
-   
-   # Install generator dependencies
-   cd generators && flutter pub get && cd ..
-   
-   # Install annotation dependencies
-   cd annotations && flutter pub get && cd ..
-   ```
-
-3. **Install CLI globally:**
+2. **Install CLI globally:**
    ```bash
    cd cli
    dart pub global activate --source path .
    ```
    *Note: After activation, you can run `clean_arch_cli` directly from any project directory.*
+   
 
 ## 🚀 Quick Start
 
@@ -83,70 +72,38 @@ We believe the value of Clean Architecture is in the separation of concerns, not
 
 1. **Initialize the tool in your target project:**
    ```bash
-   clean_arch_cli init --project-name my_app
-   cd my_app
+   cd <your_project_directory>
+   clean_arch_cli init
    ```
+   **Options:**
+   - `--project-name, -n`: Name of the Flutter project (required)
+   - `--output, -o`: Output directory (default: current directory)
+   - `--with-examples`: Include example models and repositories (default: true)
 
-2. **Add the dependencies to your `pubspec.yaml`:**
-   Note: All tooling is kept in `dev_dependencies`.
-   ```yaml
-   dependencies:
-     # Dependencies used by the scaffolded code
-     equatable: ^2.0.5
-     dartz: ^0.10.1
-     get_it: ^7.6.4
-     dio: ^5.3.2
-     bloc: ^8.1.2
-     flutter_bloc: ^8.1.3
+   This automatically:
+   * Adds dependencies to your pubspec.yaml
+       Note: All tooling is kept in `dev_dependencies`.
+       ```yaml
+       dev_dependencies:
+         build_runner: any
+         generators:
+           git:
+             url: https://github.com/NonymousMorlock/clean_architecture_code_generator.git
+             path: generators
+         mocktail: any
+       ```
+   * Generates the `clean_arch_config.yaml` file.
+   * Generates a sample directory in lib/src/sample/tbg/ with sample TBG files. See [Annotations Reference](#-annotations-reference) for more details
 
-   dev_dependencies:
-     build_runner: ^2.4.7
-     # The Factory (Reference via Git or Path)
-     annotations:
-       git:
-         url: https://github.com/your-username/clean_architecture_code_generator.git
-         path: annotations
-     generators:
-       git:
-         url: https://github.com/your-username/clean_architecture_code_generator.git
-         path: generators
-   ```
+2. **Generate your source code:**
+    ```bash
+    clean_arch_cli generate [options]
+    ```
 
-3. **Create your first feature blueprint:**
-   ```bash
-   clean_arch_cli create --type feature --name authentication
-   ```
-
-4. **Generate your source code:**
-   ```bash
-   clean_arch_cli generate
-   ```
-
----
-
-## 🖥️ CLI Usage
-
-The CLI tool provides several commands to help you manage your clean architecture project:
-
-### Initialize Project
-```bash
-clean_arch_cli init --project-name my_app [options]
-```
-
-**Options:**
-- `--project-name, -n`: Name of the Flutter project (required)
-- `--output, -o`: Output directory (default: current directory)
-- `--with-examples`: Include example models and repositories (default: true)
-
-### Generate Code
-```bash
-clean_arch_cli generate [options]
-```
-
-**Options:**
-- `--path, -p`: Path to Flutter project (default: current directory)
-- `--watch, -w`: Watch for changes and regenerate automatically
-- `--delete-conflicting-outputs`: Delete conflicting outputs before generation
+    **Options:**
+   - `--path, -p`: Path to Flutter project (default: current directory)
+   - `--watch, -w`: Watch for changes and regenerate automatically
+   - `--delete-conflicting-outputs`: Delete conflicting outputs before generation
 
 ---
 
@@ -178,11 +135,14 @@ Internal fields in the generated Entity and Model will automatically be converte
 ### Repository & Use Case Generation
 
 ```dart
-@repoGen        // Generates modifiable abstract repository
-@usecaseGen     // Generates modifiable use cases
-@repoImplGen    // Generates modifiable repository implementation
-@remoteSrcGen   // Generates modifiable remote data source
-@injectionGen   // Generates dependency injection setup
+@repoGen          // Generates modifiable abstract repository
+@usecaseGen       // Generates modifiable use cases
+@repoImplGen      // Generates modifiable repository implementation
+@remoteSrcGen     // Generates modifiable remote data source
+@adapterGen       // Generates modifiable interface adapter
+@usecaseTestGen   // Generates modifiable use case tests
+@repoImplTestGen  // Generates modifiable repository tests
+@remoteSrcTestGen // Generates modifiable remote data source tests
 class AuthRepoTBG {
   external ResultFuture<User> login({required String email, required String password});
   external ResultFuture<User> register({required String email, required String password});
@@ -234,6 +194,10 @@ lib/features/user/
 │   └── usecases/
 │       ├── login.dart                        # Modifiable Use case
 │       └── register.dart 
+├── presentation/
+│   └── adapter/
+│       ├── user_adapter.dart                   # Modifiable Adapter
+│       └── user_state.dart                     # Modifiable Adapter state
 ```
 
 ---
