@@ -229,7 +229,11 @@ final class OnesStreamed extends AuthState {
 final class AuthError extends AuthState {
   const AuthError({required this.message, required this.title});
   AuthError.fromFailure(Failure failure)
-    : this(message: 'failure.message', title: 'Error ${failure.statusCode}');
+    : this(
+        message: failure.message,
+        title:
+            '${failure.statusCode is int ? 'Error ' : ''}${failure.statusCode}',
+      );
   final String message;
   final String? title;
   @override
