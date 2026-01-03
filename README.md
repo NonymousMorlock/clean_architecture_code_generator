@@ -76,7 +76,6 @@ We believe the value of Clean Architecture is in the separation of concerns, not
    clean_arch_cli init
    ```
    **Options:**
-   - `--project-name, -n`: Name of the Flutter project (required)
    - `--output, -o`: Output directory (default: current directory)
    - `--with-examples`: Include example models and repositories (default: true)
 
