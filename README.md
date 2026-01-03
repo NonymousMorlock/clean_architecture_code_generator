@@ -117,6 +117,8 @@ We believe the value of Clean Architecture is in the separation of concerns, not
 
 The generator uses the parameter names in your `TBG` class as the keys for JSON serialization. If your API uses specific naming conventions (like snake_case or PascalCase), you should declare the properties in your annotated class using that exact casing.
 
+> **Important:** When generating models, ensure the model is mapped to a feature in `feature_scaffolding`. See [Mapping models to features](#mapping-models-to-features-important).
+
 ```dart
 @modelTestGen
 @modelGen
@@ -250,6 +252,57 @@ multi_file_output:
   enabled: true                  # Recommended: Write to actual feature files
   auto_create_targets: true      # Auto-create missing files
 ```
+
+### Mapping models to features (important)
+
+When you add model TBGs with active annotations, make sure the model name is listed under the correct feature in `feature_scaffolding`. This keeps generation aligned with your feature folders. For example, starting from:
+
+```yaml
+feature_scaffolding:
+  root_name: src
+  enabled: true
+  features:
+    auth:
+      methods:
+        - register
+        - login
+        - logout
+        - verify_token
+      entities:
+        - user
+    user:
+      methods:
+        - get_profile
+        - update_profile
+        - delete_account
+```
+
+If you introduce a `wishlist_item` model under the `product` feature, update the config before generating:
+
+```yaml
+feature_scaffolding:
+  root_name: src
+  enabled: true
+  features:
+    auth:
+      methods:
+        - register
+        - login
+        - logout
+        - verify_token
+      entities:
+        - user
+    user:
+      methods:
+        - get_profile
+        - update_profile
+        - delete_account
+    product:
+      entities:
+        - wishlist_item
+```
+
+That mapping ensures the generator places the model in the intended feature structure.
 
 ---
 
