@@ -55,12 +55,14 @@ void main() {
     });
 
     test('shows error message when failed to check for updates', () async {
+      const errorMessage = 'Failed to check for updates';
+      final exception = Exception(errorMessage);
       when(
         () => pubUpdater.getLatestVersion(any()),
-      ).thenThrow(Exception('Failed to check for updates'));
+      ).thenThrow(exception);
 
       await commandRunner.run(['--version']);
-      verify(() => logger.err('Failed to check for updates.')).called(1);
+      verify(() => logger.detail('Update check failed: $exception')).called(1);
     });
 
     test('Does not show update message when the shell calls the '
