@@ -71,7 +71,6 @@ class InitCommand extends Command<int> {
 
     _logger
       ..success('🎉 Clean architecture project initialized successfully!')
-      ..info('📁 Project created at: $outputDir')
       ..info('🔧 Run "flutter pub get" to install dependencies');
 
     return ExitCode.success.code;
