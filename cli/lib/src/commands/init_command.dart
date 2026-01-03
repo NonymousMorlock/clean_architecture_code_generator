@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/command_runner.dart';
-import 'package:mason_logger/mason_logger.dart';
+import 'package:mason/mason.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
@@ -82,177 +84,204 @@ class InitCommand extends Command<int> {
   }) async {
     final libPath = path.join(projectPath, 'lib');
 
-    // Core directories
-    final directories = [
-      'core/errors',
-      'core/usecases',
-    ];
+    final brick = await _loadInitBrick();
+    final generator = await MasonGenerator.fromBrick(brick);
 
-    for (final dir in directories) {
-      final dirPath = path.join(libPath, dir);
-      await Directory(dirPath).create(recursive: true);
-      _logger.detail('📁 Created: $dir');
-    }
+    final coreTarget = DirectoryGeneratorTarget(Directory(libPath));
 
-    // Create core files
-    await _createCoreFiles(libPath);
+    await _generateFile(
+      generator: generator,
+      target: coreTarget,
+      filePath: path.join('core', 'errors', 'failures.dart'),
+      vars: {'appName': appName},
+      appendIfExists: false,
+    );
+
+    await _generateFile(
+      generator: generator,
+      target: coreTarget,
+      filePath: path.join('core', 'errors', 'exceptions.dart'),
+      vars: {'appName': appName},
+      appendIfExists: false,
+    );
+
+    await _generateFile(
+      generator: generator,
+      target: coreTarget,
+      filePath: path.join('core', 'usecases', 'usecase.dart'),
+      vars: {'appName': appName},
+      appendIfExists: false,
+    );
+
+    await _generateFile(
+      generator: generator,
+      target: coreTarget,
+      filePath: path.join('core', 'typedefs.dart'),
+      vars: {'appName': appName},
+      appendIfExists: true,
+    );
+
+    await _generateFile(
+      generator: generator,
+      target: DirectoryGeneratorTarget(Directory(projectPath)),
+      filePath: 'clean_arch_config.yaml',
+      vars: {'appName': appName},
+      appendIfExists: false,
+    );
 
     if (withExamples) {
-      await _createExampleFiles(libPath);
+      await _createSampleTbgFiles(
+        generator: generator,
+        libPath: libPath,
+        appName: appName,
+      );
     }
   }
 
-  Future<void> _createCoreFiles(String libPath) async {
-    // Create typedefs.dart
-    const typedefsContent = '''
-typedef DataMap = Map<String, dynamic>;
-typedef ResultFuture<T> = Future<Either<Failure, T>>;
-typedef ResultStream<T> = Stream<Either<Failure, T>>;
-''';
-    await File(
-      path.join(libPath, 'core', 'typedefs.dart'),
-    ).writeAsString(typedefsContent);
+  Future<void> _createSampleTbgFiles({
+    required MasonGenerator generator,
+    required String libPath,
+    required String appName,
+  }) async {
+    final sampleDir = Directory(path.join(libPath, 'src', 'sample', 'tbg'));
+    await sampleDir.create(recursive: true);
 
-    // Create failures.dart
-    const failuresContent = '''
-import 'package:equatable/equatable.dart';
+    final existingFiles = sampleDir.listSync().whereType<File>().toList();
 
-abstract class Failure extends Equatable {
-  const Failure({required this.message, required this.statusCode});
+    final templateFiles = [
+      path.join('src', 'sample', 'tbg', 'auth_repository_tbg.dart'),
+      path.join('src', 'sample', 'tbg', 'user_model_tbg.dart'),
+    ];
 
-  final String message;
-  final int statusCode;
+    for (final relativePath in templateFiles) {
+      final content = await _renderTemplate(
+        generator: generator,
+        filePath: relativePath,
+        vars: {'appName': appName},
+      );
 
-  @override
-  List<Object> get props => [message, statusCode];
-}
+      final alreadyPresent = existingFiles.any((file) {
+        final existingContent = file.readAsStringSync();
+        return existingContent.trim() == content.trim();
+      });
 
-class ServerFailure extends Failure {
-  const ServerFailure({required super.message, required super.statusCode});
-}
+      if (alreadyPresent) {
+        _logger.detail(
+          '⏭️ Skipped ${path.basename(relativePath)} (already present)',
+        );
+        continue;
+      }
 
-class CacheFailure extends Failure {
-  const CacheFailure({required super.message, required super.statusCode});
-}
-
-class NetworkFailure extends Failure {
-  const NetworkFailure({required super.message, required super.statusCode});
-}
-''';
-    await File(
-      path.join(libPath, 'core', 'errors', 'failures.dart'),
-    ).writeAsString(failuresContent);
-
-    // Create exceptions.dart
-    const exceptionsContent = '''
-class ServerException implements Exception {
-  const ServerException({required this.message, required this.statusCode});
-
-  final String message;
-  final int statusCode;
-}
-
-class CacheException implements Exception {
-  const CacheException({required this.message, required this.statusCode});
-}
-
-class NetworkException implements Exception {
-  const NetworkException({required this.message, required this.statusCode});
-}
-''';
-    await File(
-      path.join(libPath, 'core', 'errors', 'exceptions.dart'),
-    ).writeAsString(exceptionsContent);
-
-    // Create usecase.dart
-    const usecaseContent = '''
-import '../typedefs.dart';
-
-abstract class UsecaseWithParams<Type, Params> {
-  const UsecaseWithParams();
-  
-  ResultFuture<Type> call(Params params);
-}
-
-abstract class UsecaseWithoutParams<Type> {
-  const UsecaseWithoutParams();
-  
-  ResultFuture<Type> call();
-}
-
-abstract class StreamUsecaseWithParams<Type, Params> {
-  const StreamUsecaseWithParams();
-  
-  ResultStream<Type> call(Params params);
-}
-
-abstract class StreamUsecaseWithoutParams<Type> {
-  const StreamUsecaseWithoutParams();
-  
-  ResultStream<Type> call();
-}
-''';
-    await File(
-      path.join(libPath, 'core', 'usecases', 'usecase.dart'),
-    ).writeAsString(usecaseContent);
-
-    _logger.detail('✅ Created core files');
+      final destinationFile = await _nextAvailableSampleFile(sampleDir);
+      await destinationFile.writeAsString(content);
+      existingFiles.add(destinationFile);
+      _logger.detail(
+        '✅ Added sample TBG: ${path.basename(destinationFile.path)}',
+      );
+    }
   }
 
-  Future<void> _createExampleFiles(String libPath) async {
-    // Create example auth entity
-    const authEntityContent = '''
-import 'package:annotations/annotations.dart';
+  Future<File> _nextAvailableSampleFile(Directory directory) async {
+    var index = 0;
+    while (true) {
+      final fileName = index == 0
+          ? 'sample_tbg.dart'
+          : 'sample_tbg_${index + 1}.dart';
+      final candidate = File(path.join(directory.path, fileName));
+      if (!candidate.existsSync()) {
+        return candidate;
+      }
+      index++;
+    }
+  }
 
-@entityGen
-@modelGen
-class UserTBG {
-  final String id;
-  final String email;
-  final String name;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-}
-''';
-    await File(
-      path.join(
-        libPath,
-        'features',
-        'authentication',
-        'domain',
-        'entities',
-        'user.dart',
-      ),
-    ).writeAsString(authEntityContent);
+  Future<Brick> _loadInitBrick() async {
+    final packageUri = await Isolate.resolvePackageUri(
+      Uri.parse('package:clean_arch_cli/src/commands/init_command.dart'),
+    );
 
-    // Create example repository interface
-    const authRepoContent = '''
-import 'package:annotations/annotations.dart';
-import '../entities/user.dart';
-import '../../../../core/typedefs.dart';
+    if (packageUri == null) {
+      throw Exception('Could not resolve package URI for templates');
+    }
 
-@repoGen
-@usecaseGen
-@repoImplGen
-@remoteSrcGen
-@localSrcGen
-class AuthRepoTBG {
-  external ResultFuture<User> login({required String email, required String password});
-  external ResultFuture<User> register({required String email, required String password, required String name});
-  external ResultFuture<void> logout();
-  external ResultFuture<User> getCurrentUser();
-}
-''';
-    await File(
-      path.join(
-        libPath,
-        'features',
-        'authentication',
-        'auth_repository_tbg.dart',
-      ),
-    ).writeAsString(authRepoContent);
+    final packageRoot = path.normalize(
+      path.join(path.dirname(packageUri.toFilePath()), '..', '..', '..'),
+    );
+    final brickPath = path.join(packageRoot, 'bricks', 'init');
 
-    _logger.detail('✅ Created example files');
+    return Brick.path(brickPath);
+  }
+
+  Future<void> _generateFile({
+    required MasonGenerator generator,
+    required DirectoryGeneratorTarget target,
+    required String filePath,
+    required Map<String, dynamic> vars,
+    required bool appendIfExists,
+  }) async {
+    final rendered = await _renderTemplate(
+      generator: generator,
+      filePath: filePath,
+      vars: vars,
+    );
+
+    final destination = File(path.join(target.dir.path, filePath));
+
+    final relativePath = path.relative(destination.path, from: target.dir.path);
+
+    if (destination.existsSync()) {
+      if (!appendIfExists) {
+        _logger.detail(
+          '⏭️ Skipped $relativePath (already exists)',
+        );
+        return;
+      }
+
+      final existingContent = await destination.readAsString();
+      if (existingContent.contains(rendered.trim())) {
+        _logger.detail(
+          '⏭️ Skipped $relativePath (already present)',
+        );
+        return;
+      }
+
+      final updatedContent = '${existingContent.trimRight()}\n\n$rendered';
+      await destination.writeAsString(updatedContent);
+      _logger.detail(
+        '➕ Appended $relativePath',
+      );
+      return;
+    }
+
+    await destination.create(recursive: true);
+    await destination.writeAsString(rendered);
+    _logger.detail(
+      '✅ Created $relativePath',
+    );
+  }
+
+  Future<String> _renderTemplate({
+    required MasonGenerator generator,
+    required String filePath,
+    required Map<String, dynamic> vars,
+  }) async {
+    final target = _MemoryGeneratorTarget();
+    await generator.generate(
+      target,
+      vars: vars,
+    );
+
+    final normalizedTarget = path.normalize(filePath);
+    final file = target.files.firstWhere(
+      (f) {
+        final generatedPath = path.normalize(f.path);
+        return generatedPath == normalizedTarget ||
+            generatedPath.endsWith(normalizedTarget);
+      },
+      orElse: () => throw Exception('Template not found for $filePath'),
+    );
+
+    return file.contentAsString();
   }
 
   Future<void> _addDependencies(String projectPath) async {
@@ -303,5 +332,34 @@ dev_dependencies:
       await File(pubspecPath).writeAsString(updatedContent);
       _logger.detail('✅ Added dependencies to pubspec.yaml');
     }
+  }
+}
+
+class _MemoryGeneratedFile {
+  _MemoryGeneratedFile({
+    required this.path,
+    required this.bytes,
+  });
+
+  final String path;
+  final List<int> bytes;
+
+  String contentAsString() => utf8.decode(bytes);
+}
+
+class _MemoryGeneratorTarget extends GeneratorTarget {
+  _MemoryGeneratorTarget() : files = [];
+
+  final List<_MemoryGeneratedFile> files;
+
+  @override
+  Future<GeneratedFile> createFile(
+    String filePath,
+    List<int> contents, {
+    Logger? logger,
+    OverwriteRule? overwriteRule,
+  }) async {
+    files.add(_MemoryGeneratedFile(path: filePath, bytes: contents));
+    return GeneratedFile.created(path: filePath);
   }
 }
