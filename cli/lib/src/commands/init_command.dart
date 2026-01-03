@@ -1,7 +1,9 @@
 import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as path;
+import 'package:yaml/yaml.dart';
 
 /// {@template init_command}
 /// `clean_arch_cli init` command to initialize a new Flutter project
@@ -11,12 +13,6 @@ class InitCommand extends Command<int> {
   /// {@macro init_command}
   InitCommand({required Logger logger}) : _logger = logger {
     argParser
-      ..addOption(
-        'project-name',
-        abbr: 'n',
-        help: 'Name of the Flutter project',
-        mandatory: true,
-      )
       ..addOption(
         'output',
         abbr: 'o',
@@ -41,77 +37,56 @@ class InitCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final projectName = argResults!['project-name'] as String;
     final outputDir = argResults!['output'] as String;
     final withExamples = argResults!['with-examples'] as bool;
 
     _logger.info('🚀 Initializing Flutter project with clean architecture...');
-
-    final projectPath = path.join(outputDir, projectName);
-
-    // Create Flutter project
-    try {
-      final createResult = await Process.run(
-        'flutter',
-        ['create', projectName],
-        workingDirectory: outputDir,
-      );
-
-      if (createResult.exitCode != 0) {
-        _logger.err('Failed to create Flutter project: ${createResult.stderr}');
-        return ExitCode.software.code;
+    final pubspecPath = path.join(outputDir, 'pubspec.yaml');
+    final pubspecFile = File(pubspecPath);
+    if (pubspecFile.existsSync()) {
+      final pubspecYamlString = pubspecFile.readAsStringSync();
+      final pubspecYamlMap =
+          loadYaml(pubspecYamlString) as Map<dynamic, dynamic>;
+      final appName = pubspecYamlMap['name'] as String?;
+      if (appName != null) {
+        // Create clean architecture structure
+        await _createCleanArchStructure(
+          projectPath: outputDir,
+          withExamples: withExamples,
+          appName: appName,
+        );
+      } else {
+        _logger.err('❌ Could not find project name in pubspec.yaml');
+        return ExitCode.ioError.code;
       }
-    } on ProcessException catch (e) {
-      _logger.err('Failed to create Flutter project: ${e.message}');
-      return ExitCode.software.code;
+    } else {
+      _logger.err('❌ Could not find pubspec.yaml');
+      return ExitCode.ioError.code;
     }
 
-    _logger.success('✅ Flutter project created');
-
-    // Create clean architecture structure
-    await _createCleanArchStructure(projectPath, projectName, withExamples);
-
     // Add dependencies
-    await _addDependencies(projectPath);
+    await _addDependencies(outputDir);
 
     _logger
       ..success('🎉 Clean architecture project initialized successfully!')
-      ..info('📁 Project created at: $projectPath')
+      ..info('📁 Project created at: $outputDir')
       ..info('🔧 Run "flutter pub get" to install dependencies');
 
     return ExitCode.success.code;
   }
 
-  Future<void> _createCleanArchStructure(
-    String projectPath,
-    String projectName,
-    bool withExamples,
-  ) async {
+  Future<void> _createCleanArchStructure({
+    required String projectPath,
+    required String appName,
+    required bool withExamples,
+  }) async {
     final libPath = path.join(projectPath, 'lib');
 
     // Core directories
     final directories = [
-      'core/constants',
       'core/errors',
-      'core/network',
       'core/usecases',
-      'core/utils',
-      'injection_container',
     ];
-
-    if (withExamples) {
-      directories.addAll([
-        'features/authentication/data/datasources',
-        'features/authentication/data/models',
-        'features/authentication/data/repositories',
-        'features/authentication/domain/entities',
-        'features/authentication/domain/repositories',
-        'features/authentication/domain/usecases',
-        'features/authentication/presentation/adapter',
-        'features/authentication/presentation/pages',
-        'features/authentication/presentation/widgets',
-      ]);
-    }
 
     for (final dir in directories) {
       final dirPath = path.join(libPath, dir);
@@ -281,36 +256,52 @@ class AuthRepoTBG {
   }
 
   Future<void> _addDependencies(String projectPath) async {
-    final pubspecPath = path.join(projectPath, 'pubspec.yaml');
-    final pubspecContent = await File(pubspecPath).readAsString();
+    var wasCLISuccessful = true;
+    try {
+      final addDependencies = await Process.run(
+        'flutter',
+        [
+          'pub',
+          'add',
+          'dev:build_runner',
+          'dev:mocktail',
+          'dev:generators',
+          '--git-url=https://github.com/NonymousMorlock/clean_architecture_code_generator.git',
+          '--git-path=generators',
+        ],
+        workingDirectory: projectPath,
+      );
+      if (addDependencies.exitCode != 0) {
+        _logger.err('❌ Failed to add dependencies: ${addDependencies.stderr}');
+        wasCLISuccessful = false;
+      } else {
+        _logger.detail('✅ Added dependencies');
+      }
+    } on ProcessException catch (e) {
+      _logger.err('❌ Failed to add dependencies: $e');
+      wasCLISuccessful = false;
+    }
+    if (!wasCLISuccessful) {
+      final pubspecPath = path.join(projectPath, 'pubspec.yaml');
+      final pubspecContent = await File(pubspecPath).readAsString();
 
-    const additionalDependencies = '''
-  # Clean Architecture Dependencies
-  equatable: ^2.0.5
-  dartz: ^0.10.1
-  get_it: ^7.6.4
-  shared_preferences: ^2.2.2
-  dio: ^5.3.2
-  bloc: ^8.1.2
-  flutter_bloc: ^8.1.3
-  
-  # Code Generation
-  annotations:
-    path: ../annotations
-  generators:
-    path: ../generators
-
+      const additionalDependencies = '''
 dev_dependencies:
-  build_runner: ^2.4.7
-  json_annotation: ^4.8.1
-''';
+  build_runner: any
+  generators:
+    git:
+      url: https://github.com/NonymousMorlock/clean_architecture_code_generator.git
+      path: generators
+  mocktail: any
+  ''';
 
-    final updatedContent = pubspecContent.replaceFirst(
-      'dev_dependencies:',
-      '$additionalDependencies\ndev_dependencies:',
-    );
+      final updatedContent = pubspecContent.replaceFirst(
+        'dev_dependencies:',
+        '$additionalDependencies\ndev_dependencies:',
+      );
 
-    await File(pubspecPath).writeAsString(updatedContent);
-    _logger.detail('✅ Added dependencies to pubspec.yaml');
+      await File(pubspecPath).writeAsString(updatedContent);
+      _logger.detail('✅ Added dependencies to pubspec.yaml');
+    }
   }
 }
