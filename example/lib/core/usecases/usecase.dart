@@ -1,7 +1,7 @@
 // I need these abstractions to define use cases. They cannot be functions.
 // ignore_for_file: one_member_abstracts
 
-import 'package:itube/core/typedefs.dart';
+import 'package:example/core/typedefs.dart';
 
 abstract class UsecaseWithParams<ReturnType, Params> {
   const UsecaseWithParams();

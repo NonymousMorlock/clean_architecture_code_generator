@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:itube/core/errors/exceptions.dart';
+import 'package:example/core/errors/exceptions.dart';
 
 abstract class Failure extends Equatable {
   const Failure({required this.message, required this.statusCode});
