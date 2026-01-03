@@ -285,52 +285,83 @@ class InitCommand extends Command<int> {
   }
 
   Future<void> _addDependencies(String projectPath) async {
-    var wasCLISuccessful = true;
     try {
-      final addDependencies = await Process.run(
+      final addStandardDependencies = await Process.run(
         'flutter',
         [
           'pub',
           'add',
           'dev:build_runner',
           'dev:mocktail',
+        ],
+        workingDirectory: projectPath,
+      );
+      if (addStandardDependencies.exitCode != 0) {
+        _logger.err(
+          '❌ Failed to add dependencies: ${addStandardDependencies.stderr}',
+        );
+      } else {
+        _logger.detail('✅ Added build_runner and mocktail');
+      }
+    } on ProcessException catch (e) {
+      _logger.err('❌ Failed to add dependencies: $e');
+    }
+
+    final hasGenerators = await _hasGeneratorsDependency(projectPath);
+    if (hasGenerators) {
+      _logger.detail('⏭️ Skipped generators (already present)');
+      return;
+    }
+
+    const generatorEntrySnippet =
+        'Add this to your pubspec.yaml manually:\n'
+        'dev_dependencies:\n'
+        '  generators:\n'
+        '    git:\n'
+        '      url: https://github.com/NonymousMorlock/clean_architecture_code_generator.git\n'
+        '      path: generators';
+
+    try {
+      final addGenerators = await Process.run(
+        'flutter',
+        [
+          'pub',
+          'add',
           'dev:generators',
           '--git-url=https://github.com/NonymousMorlock/clean_architecture_code_generator.git',
           '--git-path=generators',
         ],
         workingDirectory: projectPath,
       );
-      if (addDependencies.exitCode != 0) {
-        _logger.err('❌ Failed to add dependencies: ${addDependencies.stderr}');
-        wasCLISuccessful = false;
-      } else {
-        _logger.detail('✅ Added dependencies');
+
+      final stderr = addGenerators.stderr?.toString() ?? '';
+      if (addGenerators.exitCode == 0) {
+        _logger.detail('✅ Added generators dependency');
+        return;
       }
+
+      final generatorsNowPresent =
+          stderr.contains('already depends on "generators"') ||
+          await _hasGeneratorsDependency(projectPath);
+
+      if (generatorsNowPresent) {
+        _logger.detail('⏭️ Skipped generators (already present)');
+        return;
+      }
+
+      _logger
+        ..warn('⚠️ Failed to add generators: $stderr')
+        ..info(generatorEntrySnippet);
     } on ProcessException catch (e) {
-      _logger.err('❌ Failed to add dependencies: $e');
-      wasCLISuccessful = false;
-    }
-    if (!wasCLISuccessful) {
-      final pubspecPath = path.join(projectPath, 'pubspec.yaml');
-      final pubspecContent = await File(pubspecPath).readAsString();
+      final generatorsNowPresent = await _hasGeneratorsDependency(projectPath);
+      if (generatorsNowPresent) {
+        _logger.detail('⏭️ Skipped generators (already present)');
+        return;
+      }
 
-      const additionalDependencies = '''
-dev_dependencies:
-  build_runner: any
-  generators:
-    git:
-      url: https://github.com/NonymousMorlock/clean_architecture_code_generator.git
-      path: generators
-  mocktail: any
-  ''';
-
-      final updatedContent = pubspecContent.replaceFirst(
-        'dev_dependencies:',
-        '$additionalDependencies\ndev_dependencies:',
-      );
-
-      await File(pubspecPath).writeAsString(updatedContent);
-      _logger.detail('✅ Added dependencies to pubspec.yaml');
+      _logger
+        ..warn('⚠️ Failed to add generators: $e')
+        ..info(generatorEntrySnippet);
     }
   }
 }
@@ -362,4 +393,24 @@ class _MemoryGeneratorTarget extends GeneratorTarget {
     files.add(_MemoryGeneratedFile(path: filePath, bytes: contents));
     return GeneratedFile.created(path: filePath);
   }
+}
+
+Future<bool> _hasGeneratorsDependency(String projectPath) async {
+  final pubspecPath = path.join(projectPath, 'pubspec.yaml');
+  final pubspecFile = File(pubspecPath);
+  if (!pubspecFile.existsSync()) return false;
+
+  try {
+    final pubspecYamlString = await pubspecFile.readAsString();
+    final pubspecYamlMap =
+        loadYaml(pubspecYamlString) as Map<dynamic, dynamic>? ?? {};
+    final devDeps = pubspecYamlMap['dev_dependencies'];
+    if (devDeps is Map && devDeps.containsKey('generators')) {
+      return true;
+    }
+  } on Exception catch (_) {
+    // Ignore parse errors; treat as missing.
+  }
+
+  return false;
 }
