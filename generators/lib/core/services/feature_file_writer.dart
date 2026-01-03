@@ -271,6 +271,18 @@ class FeatureFileWriter {
     );
   }
 
+  /// Get the associated feature name for a given entity
+  String? getAssociatedFeatureNameForEntity({required String entityName}) {
+    for (final featureEntry in config.featureScaffolding.features.entries) {
+      final featureName = featureEntry.key;
+      final definition = featureEntry.value;
+      if (definition.entities.contains(entityName.toLowerCase())) {
+        return featureName;
+      }
+    }
+    return null;
+  }
+
   /// Check if a file exists
   bool fileExists(String filePath) {
     return File(filePath).existsSync();

@@ -85,21 +85,16 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       ignoreMultiFileCheck = true;
     }
 
-    String? associatedFeatureName;
+    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
-    // Normalize the class name: UserTBG -> User -> user
+    // Normalize the class name: UserTBG -> User
     final normalisedName = visitor.className
         .replaceAll('TBG', '')
         .replaceAll('Model', '');
 
-    for (final featureEntry in config.featureScaffolding.features.entries) {
-      final featureName = featureEntry.key;
-      final definition = featureEntry.value;
-      if (definition.entities.contains(normalisedName.toLowerCase())) {
-        associatedFeatureName = featureName;
-        break;
-      }
-    }
+    final associatedFeatureName = writer.getAssociatedFeatureNameForEntity(
+      entityName: normalisedName,
+    );
 
     if (associatedFeatureName == null) {
       stderr.writeln(
@@ -109,8 +104,6 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
       );
       ignoreMultiFileCheck = true;
     }
-
-    final writer = FeatureFileWriter(config: config, buildStep: buildStep);
 
     if (writer.isMultiFileEnabled && !ignoreMultiFileCheck) {
       return _generateMultiFile(
