@@ -178,7 +178,7 @@ ResultFuture<void> searchUser(String query, {int? limit});
 When you annotate a `UserRepoTBG` class, the generator scaffolds actual files that follow Clean Architecture conventions. Unlike other generators, you won't find the implementation logic trapped in `.g.dart` files; it will be in your `lib/` directory, ready for you to add your business logic.
 
 ```
-lib/features/user/
+lib/src/user/
 ├── data/
 │   ├── datasources/
 │   │   └── user_remote_data_source.dart      # Modifiable HTTP/API implementation
@@ -198,6 +198,7 @@ lib/features/user/
 │   └── adapter/
 │       ├── user_adapter.dart                   # Modifiable Adapter
 │       └── user_state.dart                     # Modifiable Adapter state
+...tests as well. y'know
 ```
 
 ---
