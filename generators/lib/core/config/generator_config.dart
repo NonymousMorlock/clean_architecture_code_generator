@@ -41,6 +41,19 @@ class GeneratorConfig {
       final yamlString = file.readAsStringSync();
       final yamlMap = loadYaml(yamlString) as Map<dynamic, dynamic>;
 
+      if (yamlMap['app_name'] == null) {
+        final pubspecFile = File('pubspec.yaml');
+        if (pubspecFile.existsSync()) {
+          final pubspecYamlString = pubspecFile.readAsStringSync();
+          final pubspecYamlMap =
+              loadYaml(pubspecYamlString) as Map<dynamic, dynamic>;
+          final appName = pubspecYamlMap['name'] as String?;
+          if (appName != null) {
+            yamlMap['app_name'] = appName;
+          }
+        }
+      }
+
       return GeneratorConfig.fromMap(yamlMap);
     } on Exception catch (e) {
       // Use stderr instead of print for warnings in production code
