@@ -92,6 +92,11 @@ We believe the value of Clean Architecture is in the separation of concerns, not
          mocktail: any
        ```
    * Generates the `clean_arch_config.yaml` file.
+   * Generates core boilerplate:
+        - `lib/core/errors/failures.dart`
+        - `lib/core/errors/exceptions.dart`
+        - `lib/core/usecases/usecase.dart`
+        - `lib/core/typedefs.dart`
    * Generates a sample directory in lib/src/sample/tbg/ with sample TBG files. See [Annotations Reference](#-annotations-reference) for more details
 
 2. **Generate your source code:**
