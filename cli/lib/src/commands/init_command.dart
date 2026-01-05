@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:args/command_runner.dart';
+import 'package:clean_arch_cli/src/utils/pub_conflict_parser.dart';
+import 'package:clean_arch_cli/src/utils/pubspec_editor.dart';
 import 'package:mason/mason.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
@@ -343,6 +345,7 @@ class InitCommand extends Command<int> {
         return;
       }
 
+      // Check if already present
       final generatorsNowPresent =
           stderr.contains('already depends on "$generatorPackageName"') ||
           await _hasGeneratorsDependency(
@@ -355,6 +358,19 @@ class InitCommand extends Command<int> {
         return;
       }
 
+      // Parse conflict and attempt auto-resolution
+      final conflict = PubConflictParser.parse(stderr);
+
+      if (conflict.isConflict && conflict.canAutoResolve) {
+        final resolved = await _attemptAutoResolve(
+          projectPath: projectPath,
+          conflict: conflict,
+          generatorEntrySnippet: generatorEntrySnippet,
+        );
+        if (resolved) return;
+      }
+
+      // Fallback to manual instructions
       _logger
         ..warn('⚠️ Failed to add generators: $stderr')
         ..info(generatorEntrySnippet);
@@ -372,6 +388,81 @@ class InitCommand extends Command<int> {
         ..warn('⚠️ Failed to add generators: $e')
         ..info(generatorEntrySnippet);
     }
+  }
+
+  /// Attempt to auto-resolve dependency conflicts
+  Future<bool> _attemptAutoResolve({
+    required String projectPath,
+    required ConflictResult conflict,
+    required String generatorEntrySnippet,
+  }) async {
+    _logger.warn(
+      '⚠️ Dependency conflict detected. Attempting auto-resolution...',
+    );
+
+    try {
+      // Apply overrides to pubspec.yaml
+      await PubspecEditor.addDependencyOverrides(
+        pubspecPath: path.join(projectPath, 'pubspec.yaml'),
+        overrides: conflict.suggestedOverrides,
+      );
+
+      // Log what was added
+      _logger.info('📝 Added dependency_overrides:');
+      final sorted = conflict.suggestedOverrides.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      for (final entry in sorted) {
+        _logger.info('   ${entry.key}: ${entry.value}');
+      }
+
+      // Retry flutter pub get
+      _logger.detail('Retrying flutter pub get...');
+      final result = await Process.run(
+        'flutter',
+        ['pub', 'get'],
+        workingDirectory: projectPath,
+      );
+
+      if (result.exitCode == 0) {
+        _logger.success(
+          '✅ Conflict resolved! Dependencies installed successfully.',
+        );
+        return true;
+      } else {
+        _logger.warn('⚠️ Auto-resolution failed. Manual intervention needed.');
+        _logManualInstructions(
+          conflict.suggestedOverrides,
+          generatorEntrySnippet,
+        );
+        return false;
+      }
+    } on Exception catch (e) {
+      _logger.warn('⚠️ Failed to apply overrides: $e');
+      _logManualInstructions(
+        conflict.suggestedOverrides,
+        generatorEntrySnippet,
+      );
+      return false;
+    }
+  }
+
+  /// Log manual instructions for dependency overrides
+  void _logManualInstructions(
+    Map<String, String> overrides,
+    String generatorEntrySnippet,
+  ) {
+    final sorted = overrides.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    final snippet = StringBuffer('Add this to your pubspec.yaml manually:\n')
+    ..writeln('dependency_overrides:');
+    for (final entry in sorted) {
+      snippet.writeln('  ${entry.key}: ${entry.value}');
+    }
+
+    _logger
+      ..info(snippet.toString())
+      ..info(generatorEntrySnippet);
   }
 }
 
