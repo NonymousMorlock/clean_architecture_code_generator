@@ -415,15 +415,21 @@ class InitCommand extends Command<int> {
         _logger.info('   ${entry.key}: ${entry.value}');
       }
 
-      // Retry flutter pub get
-      _logger.detail('Retrying flutter pub get...');
-      final result = await Process.run(
+      // Retry adding generators now that conflict is resolved
+      _logger.detail('Retrying generators dependency...');
+      final retryGenerators = await Process.run(
         'flutter',
-        ['pub', 'get'],
+        [
+          'pub',
+          'add',
+          'dev:generators',
+          '--git-url=https://github.com/NonymousMorlock/clean_architecture_code_generator.git',
+          '--git-path=generators',
+        ],
         workingDirectory: projectPath,
       );
 
-      if (result.exitCode == 0) {
+      if (retryGenerators.exitCode == 0) {
         _logger.success(
           '✅ Conflict resolved! Dependencies installed successfully.',
         );
@@ -455,7 +461,7 @@ class InitCommand extends Command<int> {
       ..sort((a, b) => a.key.compareTo(b.key));
 
     final snippet = StringBuffer('Add this to your pubspec.yaml manually:\n')
-    ..writeln('dependency_overrides:');
+      ..writeln('dependency_overrides:');
     for (final entry in sorted) {
       snippet.writeln('  ${entry.key}: ${entry.value}');
     }
