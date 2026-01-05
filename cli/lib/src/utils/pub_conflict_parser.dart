@@ -174,14 +174,15 @@ class PubConflictParser {
     final sentences = <String>[];
 
     for (final line in lines) {
+      final trimmed = line.trim();
       // Check if this line starts a new logical sentence
-      if (line.startsWith('Because') ||
-          line.startsWith('And because') ||
-          line.startsWith('So, because')) {
-        sentences.add(line.trim());
+      if (trimmed.startsWith('Because') ||
+          trimmed.startsWith('And because') ||
+          trimmed.startsWith('So, because')) {
+        sentences.add(trimmed);
       } else if (sentences.isNotEmpty) {
         // Continuation of previous sentence
-        sentences[sentences.length - 1] += ' ${line.trim()}';
+        sentences[sentences.length - 1] += ' $trimmed';
       }
     }
 
@@ -236,7 +237,9 @@ class PubConflictParser {
       final packageName = match.group(1)!;
 
       // Look for version requirement for this git package
+      // Account for "every version of" prefix
       final pattern =
+          r'(?:every version of\s+)?'
           '${RegExp.escape(packageName)}'
           r'\s+from\s+git\s+depends\s+on\s+'
           r'(\w+(?:_\w+)*)\s+([^\s,]+)';
@@ -342,27 +345,34 @@ class PubConflictParser {
   ) {
     final overrides = <String, String>{};
 
-    // If we have a clear root cause, find what it needs
+    // Packages that shouldn't be overridden (SDK-pinned or circular deps)
+    const excludedPackages = {
+      'test_api', // Pinned by flutter_test
+      'matcher', // Pinned by flutter_test
+      'test', // Usually causes more conflicts
+      'bloc_test', // User dependency, not a transitive one
+    };
+
+    // If we have a clear root cause, find what it DIRECTLY needs
     if (rootCause != null) {
-      for (final conflict in conflicts.values) {
-        if (conflict.packageName == rootCause) continue;
+      // Look for direct dependencies in sentences like:
+      // "every version of [rootCause] from git depends on [package] [version]"
+      final directDepPattern = RegExp(
+        'every version of\\s+$rootCause\\s+from\\s+git\\s+depends\\s+on\\s+'
+        r'(\w+(?:_\w+)*)\s+([^\s,]+)',
+      );
 
-        // Find the version required by root cause
-        final rootRequirement = conflict.conflictingVersions.firstWhere(
-          (v) => v.source.contains(rootCause),
-          orElse: () => conflict.conflictingVersions.isNotEmpty
-              ? conflict.conflictingVersions.first
-              : const VersionConstraint(constraint: '', source: ''),
-        );
+      for (final match in directDepPattern.allMatches(stderr)) {
+        final packageName = match.group(1)!;
+        final versionConstraint = match.group(2)!;
 
-        if (rootRequirement.constraint.isNotEmpty) {
-          // Use the most specific version mentioned by root cause
-          final version = _extractMostSpecificVersion(
-            rootRequirement.constraint,
-          );
-          if (version != null) {
-            overrides[conflict.packageName] = version;
-          }
+        // Skip excluded packages
+        if (excludedPackages.contains(packageName)) continue;
+
+        // Extract and add the override
+        final version = _extractMostSpecificVersion(versionConstraint);
+        if (version != null) {
+          overrides[packageName] = version;
         }
       }
     }
