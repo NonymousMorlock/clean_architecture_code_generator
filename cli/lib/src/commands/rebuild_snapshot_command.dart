@@ -2,9 +2,10 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
+import 'package:path/path.dart' as path;
 
 /// `clean_arch_cli rebuild-snapshot`
-/// Removes a stale snapshot used by the global wrapper and forces a rebuild
+/// Removes all stale snapshots used by the global wrapper and forces a rebuild
 /// (by invoking the wrapper), so the wrapper will run the up-to-date package
 /// source.
 class RebuildSnapshotCommand extends Command<int> {
@@ -22,7 +23,7 @@ class RebuildSnapshotCommand extends Command<int> {
 
   @override
   String get description {
-    return 'Remove stale package snapshot used by the '
+    return 'Remove all stale package snapshots used by the '
         'global wrapper and force a rebuild.';
   }
 
@@ -30,101 +31,153 @@ class RebuildSnapshotCommand extends Command<int> {
   Future<int> run() async {
     final dryRun = argResults!['dry-run'] as bool;
 
-    _logger.info('🔧 Rebuilding global snapshot for $name...');
+    _logger.info('🔧 Rebuilding global snapshot for clean_arch_cli...');
 
-    // Find wrapper using `which` (POSIX)
-    String? wrapperPath;
-    try {
-      final which = await Process.run('which', [name.replaceAll('-', '_')]);
-      // some systems may not have an underscore name; try original
-      if (which.exitCode == 0 && (which.stdout as String).trim().isNotEmpty) {
-        wrapperPath = (which.stdout as String).trim();
-      }
-    } on Exception {
-      // ignore
-    }
+    // Strategy 1: Delete all snapshots from .dart_tool directory
+    final snapshotsDeleted = await _deleteAllSnapshots(dryRun: dryRun);
 
-    // Fallback: try the executable name directly
-    wrapperPath ??= (await _whichExecutable()).trim();
+    // Strategy 2: Also find and handle wrapper-referenced snapshot
+    final wrapperPath = await _findWrapperPath();
 
     if (wrapperPath.isEmpty) {
-      _logger.err('Could not locate global `$name` wrapper in PATH.');
+      if (snapshotsDeleted > 0) {
+        _logger.success(
+          '✅ Deleted $snapshotsDeleted snapshot file(s). '
+          'Next invocation will recompile.',
+        );
+        return ExitCode.success.code;
+      }
+      _logger.warn('Could not locate global wrapper in PATH.');
       return ExitCode.software.code;
     }
 
     _logger.detail('Wrapper path: $wrapperPath');
 
-    final wrapperFile = File(wrapperPath);
-    if (!wrapperFile.existsSync()) {
-      _logger.err('Wrapper script not found at: $wrapperPath');
-      return ExitCode.software.code;
-    }
-
-    final wrapperContent = wrapperFile.readAsStringSync();
-
-    // Try to extract the snapshot path from the common wrapper pattern
-    final snapshotRegex = RegExp(r'if \[ -f ([^\s]+) \]; then', dotAll: true);
-    final match = snapshotRegex.firstMatch(wrapperContent);
-    String? snapshotPath;
-    if (match != null && match.groupCount >= 1) {
-      snapshotPath = match.group(1);
-    } else {
-      // try alternate quoting style
-      final quotedRegex = RegExp(r"if \[ -f '([\w\-\./\_:\~]+)' \]; then");
-      final m2 = quotedRegex.firstMatch(wrapperContent);
-      if (m2 != null) snapshotPath = m2.group(1);
-    }
-
-    if (snapshotPath == null || snapshotPath.isEmpty) {
-      _logger
-        ..warn(
-          'No snapshot path found inside wrapper; '
-          'it may not be using a snapshot.',
-        )
-        ..info('Invoking wrapper to ensure latest package is used...');
-      if (!dryRun) {
-        await _invokeWrapper(wrapperPath);
-      }
-      return ExitCode.success.code;
-    }
-
-    _logger.info('Found snapshot path: $snapshotPath');
-
-    final snapshotFile = File(snapshotPath);
-    if (!snapshotFile.existsSync()) {
-      _logger.info('Snapshot file does not exist (nothing to rebuild).');
-      if (!dryRun) await _invokeWrapper(wrapperPath);
-      return ExitCode.success.code;
-    }
-
-    if (dryRun) {
+    if (!dryRun) {
       _logger.info(
-        'Dry run: would back up and remove $snapshotPath '
-        'and then invoke wrapper.',
+        'Invoking wrapper to rebuild the executable '
+        '(this may take a moment)...',
       );
-      return ExitCode.success.code;
+      await _invokeWrapper(wrapperPath);
     }
 
-    try {
-      final bakPath =
-          '$snapshotPath.bak.${DateTime.now().millisecondsSinceEpoch}';
-      snapshotFile.renameSync(bakPath);
-      _logger.info('Backed up snapshot to: $bakPath');
-    } on Exception catch (e) {
-      _logger.err('Failed to back up/remove snapshot: $e');
-      return ExitCode.software.code;
-    }
-
-    _logger.info(
-      'Invoking wrapper to rebuild the executable (this may take a moment)...',
-    );
-    await _invokeWrapper(wrapperPath);
-
-    _logger.info(
-      'Rebuild step complete. If you still see stale behavior, '
-      'try `dart pub global activate --source=path <path-to-cli>`',
+    _logger.success(
+      '✅ Rebuild step complete. Deleted $snapshotsDeleted snapshot file(s). '
+      'Stale code should now be resolved.',
     );
     return ExitCode.success.code;
+  }
+
+  /// Delete all snapshot files from .dart_tool/pub/bin/
+  /// Returns the number of files deleted.
+  Future<int> _deleteAllSnapshots({required bool dryRun}) async {
+    var deletedCount = 0;
+
+    // Find .dart_tool directory in common locations
+    final possibleRoots = <String>[];
+
+    // Add path from wrapper if we can extract it
+    final wrapperPath = await _findWrapperPath();
+    if (wrapperPath.isNotEmpty) {
+      final wrapperFile = File(wrapperPath);
+      if (wrapperFile.existsSync()) {
+        final content = wrapperFile.readAsStringSync();
+        final snapshotMatch = RegExp(
+          r'if \[ -f ([^\s]+) \]; then',
+          dotAll: true,
+        ).firstMatch(content);
+
+        if (snapshotMatch != null) {
+          final snapshotPath = snapshotMatch.group(1);
+          if (snapshotPath != null) {
+            // Extract the .dart_tool/pub/bin directory
+            final snapshotDir = path.dirname(snapshotPath);
+            // Go up to .dart_tool/pub/bin (parent of 'cli')
+            final dartToolBin = path.dirname(snapshotDir);
+            possibleRoots.add(dartToolBin);
+          }
+        }
+      }
+    }
+
+    // Add standard locations as fallbacks
+    possibleRoots.add(
+      path.join(
+        Platform.environment['HOME'] ?? '',
+        '.pub-cache',
+        'global_packages',
+        'clean_arch_cli',
+        '.dart_tool',
+        'pub',
+        'bin',
+      ),
+    );
+
+    for (final rootDir in possibleRoots) {
+      _logger.detail('Scanning for snapshots in: $rootDir');
+      final root = Directory(rootDir);
+      if (!root.existsSync()) {
+        _logger.detail('Directory does not exist: $rootDir');
+        continue;
+      }
+
+      try {
+        // Recursively find all snapshot files
+        final files = root
+            .listSync(recursive: true)
+            .whereType<File>()
+            .where(
+              (f) =>
+                  path.basename(f.path).endsWith('.snapshot') ||
+                  path.basename(f.path).contains('.snapshot.'),
+            )
+            .toList();
+
+        _logger.detail('Found ${files.length} snapshot file(s) in $rootDir');
+
+        for (final file in files) {
+          if (dryRun) {
+            _logger.info('Dry run: would delete ${file.path}');
+            deletedCount++;
+          } else {
+            try {
+              file.deleteSync();
+              _logger.detail(
+                '🗑️  Deleted: ${path.relative(file.path, from: rootDir)}',
+              );
+              deletedCount++;
+            } on Exception catch (e) {
+              _logger.warn('Failed to delete ${file.path}: $e');
+            }
+          }
+        }
+      } on Exception catch (e) {
+        _logger.detail('Could not scan $rootDir: $e');
+      }
+    }
+
+    if (dryRun && deletedCount == 0) {
+      _logger.info('Dry run: no snapshot files found to delete');
+    } else if (!dryRun && deletedCount == 0) {
+      _logger.detail('No snapshot files found to delete');
+    }
+
+    return deletedCount;
+  }
+
+  /// Find the wrapper path using `which`
+  Future<String> _findWrapperPath() async {
+    // Try with underscores first
+    try {
+      final which = await Process.run('which', ['clean_arch_cli']);
+      if (which.exitCode == 0 && (which.stdout as String).trim().isNotEmpty) {
+        return (which.stdout as String).trim();
+      }
+    } on Exception {
+      // ignore
+    }
+
+    return '';
   }
 
   Future<void> _invokeWrapper(String wrapperPath) async {
@@ -144,16 +197,5 @@ class RebuildSnapshotCommand extends Command<int> {
     } on Exception catch (e) {
       _logger.err('Failed to invoke wrapper: $e');
     }
-  }
-
-  /// Attempt to locate the wrapper by running `which clean_arch_cli`.
-  Future<String> _whichExecutable() async {
-    try {
-      final which = await Process.run('which', ['clean_arch_cli']);
-      if (which.exitCode == 0) return which.stdout as String;
-    } on Exception {
-      // ignore
-    }
-    return '';
   }
 }
