@@ -284,6 +284,7 @@ class InitCommand extends Command<int> {
   }
 
   Future<void> _addDependencies(String projectPath) async {
+    const generatorPackageName = 'generators';
     try {
       final addStandardDependencies = await Process.run(
         'flutter',
@@ -306,7 +307,10 @@ class InitCommand extends Command<int> {
       _logger.err('❌ Failed to add dependencies: $e');
     }
 
-    final hasGenerators = await _hasGeneratorsDependency(projectPath);
+    final hasGenerators = await _hasGeneratorsDependency(
+      projectPath: projectPath,
+      packageName: generatorPackageName,
+    );
     if (hasGenerators) {
       _logger.detail('⏭️ Skipped generators (already present)');
       return;
@@ -326,7 +330,7 @@ class InitCommand extends Command<int> {
         [
           'pub',
           'add',
-          'dev:generators',
+          'dev:$generatorPackageName',
           '--git-url=https://github.com/NonymousMorlock/clean_architecture_code_generator.git',
           '--git-path=generators',
         ],
@@ -340,8 +344,11 @@ class InitCommand extends Command<int> {
       }
 
       final generatorsNowPresent =
-          stderr.contains('already depends on "generators"') ||
-          await _hasGeneratorsDependency(projectPath);
+          stderr.contains('already depends on "$generatorPackageName"') ||
+          await _hasGeneratorsDependency(
+            projectPath: projectPath,
+            packageName: generatorPackageName,
+          );
 
       if (generatorsNowPresent) {
         _logger.detail('⏭️ Skipped generators (already present)');
@@ -352,7 +359,10 @@ class InitCommand extends Command<int> {
         ..warn('⚠️ Failed to add generators: $stderr')
         ..info(generatorEntrySnippet);
     } on ProcessException catch (e) {
-      final generatorsNowPresent = await _hasGeneratorsDependency(projectPath);
+      final generatorsNowPresent = await _hasGeneratorsDependency(
+        projectPath: projectPath,
+        packageName: generatorPackageName,
+      );
       if (generatorsNowPresent) {
         _logger.detail('⏭️ Skipped generators (already present)');
         return;
@@ -394,7 +404,10 @@ class _MemoryGeneratorTarget extends GeneratorTarget {
   }
 }
 
-Future<bool> _hasGeneratorsDependency(String projectPath) async {
+Future<bool> _hasGeneratorsDependency({
+  required String projectPath,
+  required String packageName,
+}) async {
   final pubspecPath = path.join(projectPath, 'pubspec.yaml');
   final pubspecFile = File(pubspecPath);
   if (!pubspecFile.existsSync()) return false;
@@ -404,7 +417,7 @@ Future<bool> _hasGeneratorsDependency(String projectPath) async {
     final pubspecYamlMap =
         loadYaml(pubspecYamlString) as Map<dynamic, dynamic>? ?? {};
     final devDeps = pubspecYamlMap['dev_dependencies'];
-    if (devDeps is Map && devDeps.containsKey('generators')) {
+    if (devDeps is Map && devDeps.containsKey(packageName)) {
       return true;
     }
   } on Exception catch (_) {
