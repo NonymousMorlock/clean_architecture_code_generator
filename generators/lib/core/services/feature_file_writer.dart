@@ -276,7 +276,7 @@ class FeatureFileWriter {
     for (final featureEntry in config.featureScaffolding.features.entries) {
       final featureName = featureEntry.key;
       final definition = featureEntry.value;
-      if (definition.entities.contains(entityName.toLowerCase())) {
+      if (definition.entities.contains(entityName.snakeCase)) {
         return featureName;
       }
     }
