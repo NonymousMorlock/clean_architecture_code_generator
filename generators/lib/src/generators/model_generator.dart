@@ -416,12 +416,23 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
                           ..requiredParameters.add(
                             Parameter((param) => param.name = 'e'),
                           )
-                          ..body = refer('e').property('toMap').call([]).code;
+                          ..body = refer('e')
+                              .asA(refer(param.rawType.deepestType.modelize))
+                              .property('toMap')
+                              .call([])
+                              .code;
                       }).closure,
                     ])
                     .property('toList')
                     .call([]);
               } else {
+                valueReference = valueReference.asA(
+                  TypeReference((ref) {
+                    ref
+                      ..symbol = param.rawType.deepestType.modelize
+                      ..isNullable = param.isNullable;
+                  }),
+                );
                 valueReference = param.isNullable
                     ? valueReference.nullSafeProperty('toMap')
                     : valueReference.property('toMap');
@@ -671,18 +682,13 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             ..addExpression(refer('value').property('toInt').call([]).returned)
             ..statements.add(const Code('} else if (value is String) {'))
             ..addExpression(
-              refer('int')
-                  .property('tryParse')
-                  .call([refer('value')])
-                  .nullSafeProperty('toInt') // Ensures result is int
-                  .call([])
-                  .ifNullThen(
-                    refer('Exception').newInstance([
-                      literalString('Could not parse int from string'),
-                    ]),
-                  )
-                  .returned,
+              declareFinal('result').assign(
+                refer('int').property('tryParse').call([refer('value')]),
+              ),
             )
+            ..statements.add(const Code('if (result != null) {'))
+            ..addExpression(refer('result').returned)
+            ..statements.add(const Code('}'))
             ..statements.add(const Code('} else {'))
             ..addExpression(
               refer('Exception').newInstance([
@@ -719,8 +725,13 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             ..statements.add(const Code('} else if (value is String) {'))
             // Handles "1.5" and "1" (via double.parse)
             ..addExpression(
-              refer('double').property('parse').call([refer('value')]).returned,
+              declareFinal('result').assign(
+                refer('double').property('tryParse').call([refer('value')]),
+              ),
             )
+            ..statements.add(const Code('if (result != null) {'))
+            ..addExpression(refer('result').returned)
+            ..statements.add(const Code('}'))
             ..statements.add(const Code('} else {'))
             ..addExpression(
               refer('Exception').newInstance([
