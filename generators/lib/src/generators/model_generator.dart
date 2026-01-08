@@ -689,6 +689,13 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             ..statements.add(const Code('if (result != null) {'))
             ..addExpression(refer('result').returned)
             ..statements.add(const Code('}'))
+            ..addExpression(
+              refer('Exception').newInstance([
+                literalString(
+                  r'Invalid int string: $value',
+                ),
+              ]).thrown,
+            )
             ..statements.add(const Code('} else {'))
             ..addExpression(
               refer('Exception').newInstance([
@@ -732,6 +739,13 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
             ..statements.add(const Code('if (result != null) {'))
             ..addExpression(refer('result').returned)
             ..statements.add(const Code('}'))
+            ..addExpression(
+              refer('Exception').newInstance([
+                literalString(
+                  r'Invalid int string: $value',
+                ),
+              ]).thrown,
+            )
             ..statements.add(const Code('} else {'))
             ..addExpression(
               refer('Exception').newInstance([
