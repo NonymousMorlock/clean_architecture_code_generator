@@ -137,6 +137,12 @@ class GenerateCommand extends Command<int> {
                 .whereType<File>()
                 .where((file) {
                   final path = file.path;
+
+                  // Only cleanup files within a 'tbg' directory to avoid
+                  // deleting legitimate generated files in other folders.
+                  final segments = path.split(RegExp(r'[/\\]'));
+                  if (!segments.contains('tbg')) return false;
+
                   final isGFile = path.endsWith('.g.dart');
                   final isPartFile =
                       path.endsWith('.g.part') || path.endsWith('.part');
