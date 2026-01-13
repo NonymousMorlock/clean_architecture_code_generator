@@ -246,9 +246,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
   ///
   /// Creates a factory that deserializes a model from a Map,
   /// handling various data types including DateTime and numeric conversions.
-  Constructor fromMap({
-    required ModelVisitor visitor,
-  }) {
+  Constructor fromMap({required ModelVisitor visitor}) {
     return Constructor((constructor) {
       // TODO(Documentation): Add this note somewhere for the user to see.
       // I'm using the param.name as it is. So, if the user's API is
@@ -268,7 +266,7 @@ class ModelGenerator extends GeneratorForAnnotation<ModelGenAnnotation> {
         Expression value;
 
         if (type.hasCustomType) {
-          final customTypeReference = refer('${type.deepestType}Model');
+          final customTypeReference = refer(type.deepestType.modelize);
           if (param.rawType.isDartCoreList) {
             value =
                 TypeReference((ref) {
