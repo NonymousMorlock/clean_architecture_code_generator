@@ -39,7 +39,7 @@ class GeneratorConfig {
       }
 
       final yamlString = file.readAsStringSync();
-      final yamlMap = loadYaml(yamlString) as Map<dynamic, dynamic>;
+      final yamlMap = Map<dynamic, dynamic>.from(loadYaml(yamlString) as Map);
 
       if (yamlMap['app_name'] == null) {
         final pubspecFile = File('pubspec.yaml');
