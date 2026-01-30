@@ -87,7 +87,7 @@ class RemoteDataSrcGenerator
       library: Library((library) {
         if (visitor.methods.length < 2) {
           library.comments.addAll([
-            'I need this class to be an interface.',
+            'Repository interfaces are valid with a single method',
             'ignore_for_file: one_member_abstracts',
           ]);
         }
