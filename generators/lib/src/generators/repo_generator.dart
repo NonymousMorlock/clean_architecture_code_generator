@@ -67,7 +67,7 @@ class RepoGenerator extends GeneratorForAnnotation<RepoGenAnnotation> {
       library: Library((library) {
         if (visitor.methods.length < 2) {
           library.comments.addAll([
-            'Repository interfaces are valid with a single method',
+            'This interface is intentionally kept at the domain boundary even with one method so the data layer can remain replaceable/testable',
             'ignore_for_file: one_member_abstracts',
           ]);
         }
