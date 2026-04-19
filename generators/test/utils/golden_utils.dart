@@ -77,7 +77,7 @@ void _compareAndWrite({
   required bool isUpdateMode,
   required String? reason,
 }) {
-  actualOutput = _normalize(actualOutput);
+  final actualOutputCopy = _normalize(actualOutput);
   final goldenPath = p.join('test', 'goldens', 'outputs', goldenFileName);
   final goldenFile = File(goldenPath);
 
@@ -85,7 +85,7 @@ void _compareAndWrite({
     if (!goldenFile.parent.existsSync()) {
       goldenFile.parent.createSync(recursive: true);
     }
-    goldenFile.writeAsStringSync(actualOutput);
+    goldenFile.writeAsStringSync(actualOutputCopy);
     return;
   }
 
@@ -96,7 +96,7 @@ void _compareAndWrite({
   final expectedOutput = _normalize(goldenFile.readAsStringSync());
 
   expect(
-    actualOutput,
+    actualOutputCopy,
     equals(expectedOutput),
     reason:
         reason ?? 'Generated output for $inputFileName does not match golden.',
