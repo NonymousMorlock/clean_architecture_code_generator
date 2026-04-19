@@ -193,13 +193,12 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
       }
 
       bodyBuilder.statements.add(
-        const Code('} on ServerException catch (e) {'),
+        const Code('} on ServerException catch (exception) {'),
       );
 
-      final serverFailure = refer('ServerFailure').newInstance([], {
-        'message': refer('e').property('message'),
-        'statusCode': refer('e').property('statusCode'),
-      });
+      final serverFailure = refer(
+        'ServerFailure',
+      ).newInstanceNamed('fromException', [const Reference('exception')]);
 
       bodyBuilder.addExpression(
         refer('Left').newInstance([serverFailure]).returned,
@@ -238,10 +237,9 @@ class RepoImplGenerator extends GeneratorForAnnotation<RepoImplGenAnnotation> {
           ..body = Block((body) {
             body.statements.add(const Code('if (error is ServerException) {'));
 
-            final serverFailure = refer('ServerFailure').newInstance([], {
-              'message': refer('error').property('message'),
-              'statusCode': refer('error').property('statusCode'),
-            });
+            final serverFailure = refer(
+              'ServerFailure',
+            ).newInstanceNamed('fromException', [const Reference('error')]);
 
             body.addExpression(
               refer('sink').property('add').call([
