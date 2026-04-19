@@ -192,8 +192,8 @@ class RepoImplTestGenerator
     required RepoVisitor visitor,
     required Map<String, TestMethodArgs> methodArguments,
   }) {
-    remoteDataSourceName = remoteDataSourceName.pascalCase;
-    repoImplName = repoImplName.pascalCase;
+    final remoteDataSourceNameCopy = remoteDataSourceName.pascalCase;
+    final repoImplNameCopy = repoImplName.pascalCase;
 
     return Method((methodBuilder) {
       methodBuilder
@@ -204,12 +204,12 @@ class RepoImplTestGenerator
             ..addExpression(
               declareVar(
                 'remoteDataSource',
-                type: refer(remoteDataSourceName),
+                type: refer(remoteDataSourceNameCopy),
                 late: true,
               ),
             )
             ..addExpression(
-              declareVar('repoImpl', type: refer(repoImplName), late: true),
+              declareVar('repoImpl', type: refer(repoImplNameCopy), late: true),
             )
             ..addExpression(
               refer('setUp').call([
@@ -218,12 +218,14 @@ class RepoImplTestGenerator
                     body
                       ..addExpression(
                         refer('remoteDataSource').assign(
-                          refer('Mock$remoteDataSourceName').newInstance([]),
+                          refer(
+                            'Mock$remoteDataSourceNameCopy',
+                          ).newInstance([]),
                         ),
                       )
                       ..addExpression(
                         refer('repoImpl').assign(
-                          refer(repoImplName).newInstance(
+                          refer(repoImplNameCopy).newInstance(
                             [refer('remoteDataSource')],
                           ),
                         ),
