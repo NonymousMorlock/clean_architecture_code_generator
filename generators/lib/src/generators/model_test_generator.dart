@@ -334,7 +334,8 @@ class ModelTestGenerator
           for (final param in visitor.params) {
             if (param.rawType.hasCustomType &&
                 !param.rawType.isDartCoreList &&
-                !param.rawType.isEnum) {
+                !param.rawType.isEnum &&
+                !param.rawType.isNullable) {
               final fieldName = param.name;
               final subModelName = param.rawType.modelize;
 
